@@ -34,7 +34,7 @@ once per 50 time steps.
     "compute_value": 50
 }
 ~~~~~~~~~~~~~~~
-If no parameters for the `output_` parametersare provided, they areset to be the
+If no parameters for the `output_` parameters are provided, they are set to be the
  same as for `compute_`.
 
  ## List of simulation components
@@ -46,7 +46,7 @@ If no parameters for the `output_` parametersare provided, they areset to be the
 
  ## lambda2
  Computes \f$ \lambda_2 \f$ for the velocity field and stores it in the normal output files as the first unused field.
- This means that \f$ \lambda_2 \f$ can be found in the temeprature field in then fld files if running without a scalar
+ This means that \f$ \lambda_2 \f$ can be found in the temperature field in then fld files if running without a scalar
  and s1 if neko is run with one scalar.
  
  ## probes

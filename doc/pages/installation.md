@@ -66,6 +66,6 @@ checking for fgslib_gs_setup in -lgs... yes
 
 @todo Needs to be written
 
-### Bulding PFunit (optional)
+### Building PFunit (optional)
 
 To build the PFunit testing framework, please refers to the \subpage testing page
