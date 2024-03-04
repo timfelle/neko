@@ -28,7 +28,7 @@
     "pressure_solver": {
       "type": "gmres",
       "preconditioner": "hsmg",
-      "projection_space_size": 8,
+      // "projection_space_size": 8,
       "absolute_tolerance": 1e-7,
       "max_iterations": 200
     },
