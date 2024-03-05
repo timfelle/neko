@@ -26,7 +26,6 @@ function help() {
     echo -e "  See Readme for additional details."
     exit 0
 }
-if [ $# -eq 0 ]; then help; fi
 
 # Handle options
 Nx=32 && Ny=8 && Nz=8
@@ -52,6 +51,7 @@ for arg in "$@"; do
         cases="$cases $arg"
     fi
 done
+if [ $# -eq 0 ]; then ALL=1; fi
 
 if [ "$ALL" ]; then
     cases=$(find $(dirname $0) -name "*.case")
