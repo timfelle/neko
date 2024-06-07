@@ -1,6 +1,11 @@
 # ![Neko](https://user-images.githubusercontent.com/750135/169531665-313c3471-50d1-4c44-964a-fee7312d6459.png)
-![CI](https://github.com/ExtremeFLOW/neko/workflows/CI/badge.svg) ![develop](https://github.com/ExtremeFLOW/neko/workflows/develop/badge.svg) [![DOI](https://zenodo.org/badge/338607716.svg)](https://zenodo.org/doi/10.5281/zenodo.6631055)
+![CI](https://github.com/ExtremeFLOW/neko/workflows/CI/badge.svg) 
+![develop](https://github.com/ExtremeFLOW/neko/workflows/develop/badge.svg) 
+[![DOI](https://zenodo.org/badge/338607716.svg)](https://zenodo.org/doi/10.5281/zenodo.6631055)
+[![Linting](./doc/media/flint.svg)](https://github.com/ExtremeFLOW/neko/actions/workflows/lint.yml)
+
 ## About
+
 Neko is a portable framework for high-order spectral element flow simulations. Written in modern Fortran, Neko adopts an object-oriented approach, allowing multi-tier abstractions of the solver stack and facilitating various hardware backends ranging from general-purpose processors, CUDA and HIP enabled accelerators to SX-Aurora vector processors. Neko has its roots in the spectral element code Nek5000 from UChicago/ANL, from where many of the namings, code structure and numerical methods are adopted.
 
 
@@ -66,3 +71,11 @@ The development of Neko was supported by the European Commission Horizon 2020 pr
 
 
 [<img src="https://raw.githubusercontent.com/zulip/zulip/143baa42432cde9f288bd202336ef2b11172f6e4/static/images/logo/zulip-icon-128x128.png" width="32"/>](https://zulip.com) Sponsored by Zulip, an open-source modern team chat app designed to keep both live and asynchronous conversations organized.
+
+### Contributors
+
+Thanks to all the people who contribute:
+<br><br>
+<a href="https://github.com/ExtremeFLOW/neko/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=ExtremeFLOW/neko" />
+</a>
