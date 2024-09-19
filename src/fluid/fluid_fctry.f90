@@ -37,8 +37,8 @@ submodule (fluid_scheme) fluid_fctry
   use utils, only : concat_string_array
 
   ! List of all possible types created by the factory routine
-  character(len=20) :: FLUID_KNOWN_TYPES(1) = [character(len=20) :: &
-     "pnpn"]
+  character(len=20) :: FLUID_KNOWN_TYPES(2) = [character(len=20) :: &
+     "pnpn", "pnpn_perturb"]
 
 contains
 
