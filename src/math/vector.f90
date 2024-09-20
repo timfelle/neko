@@ -33,23 +33,23 @@
 !> Defines a vector
 module vector
   use neko_config, only: NEKO_BCKND_DEVICE
-  use math, only: sub3, chsign, add3, cmult2, cadd2, cfill, copy
+  use math, only: sub3, chsign, add3, cmult2, cadd2, cfill, copy, col3
   use num_types, only: rp
   use device, only: device_map, device_free, c_ptr, C_NULL_PTR
   use device_math, only: device_copy, device_cfill, device_cmult, &
-       device_sub3, device_cmult2, device_add3, device_cadd2
+       device_sub3, device_cmult2, device_add3, device_cadd2, device_col3
   use utils, only: neko_error
   use, intrinsic :: iso_c_binding
   implicit none
   private
 
-  type, public ::  vector_t
+  type, public :: vector_t
      !> Vector entries.
      real(kind=rp), allocatable :: x(:)
      !> Device pointer.
      type(c_ptr) :: x_d = C_NULL_PTR
      !> Size of vector.
-     integer :: n  = 0
+     integer :: n = 0
    contains
      !> Initialise a vector of size `n`.
      procedure, pass(v) :: init => vector_init
@@ -77,6 +77,8 @@ module vector
      procedure, pass(a) :: vector_cmult_left
      !> Scalar-vector multiplication \f$ v = c*a \f$.
      procedure, pass(a) :: vector_cmult_right
+     !> Pointwise-vector multiplication \f$ v = a*b \f$.
+     procedure, pass(a) :: vector_pointwise_mult
 
      generic :: assignment(=) => vector_assign_vector, &
           vector_assign_scalar
@@ -84,7 +86,8 @@ module vector
           vector_add_scalar_left, vector_add_scalar_right
      generic :: operator(-) => vector_sub_vector, &
           vector_sub_scalar_left, vector_sub_scalar_right
-     generic :: operator(*) => vector_cmult_left, vector_cmult_right
+     generic :: operator(*) => vector_cmult_left, vector_cmult_right, &
+          vector_pointwise_mult
   end type vector_t
 
   type, public :: vector_ptr_t
@@ -324,4 +327,25 @@ contains
 
   end function vector_cmult_right
 
+  !> Pointwise-vector multiplication \f$ v = a*b \f$.
+  function vector_pointwise_mult(a, b) result(v)
+    class(vector_t), intent(in) :: a, b
+    type(vector_t) :: v
+
+    if (a%n .ne. b%n) call neko_error("Vectors must be the same length!")
+
+    v%n = a%n
+    allocate(v%x(v%n))
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_map(v%x, v%x_d, v%n)
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_col3(v%x_d, a%x_d, b%x_d, v%n)
+    else
+       call col3(v%x, a%x, b%x, v%n)
+    end if
+
+  end function vector_pointwise_mult
 end module vector
