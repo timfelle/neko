@@ -102,7 +102,7 @@ module math
        add2s1, add2s2, addsqr2s2, cmult2, invcol2, col2, col3, subcol3, &
        add3s2, subcol4, addcol3, addcol4, ascol5, p_update, x_update, glsc2, &
        glsc3, glsc4, sort, masked_copy, cfill_mask, relcmp, glimax, glimin, &
-       swap, reord, flipv, cadd2
+       swap, reord, flipv, cadd2, cdiv, cdiv2
 
 contains
 
@@ -283,6 +283,45 @@ contains
        a(i) = c * a(i)
     end do
   end subroutine cmult
+
+  !> Multiplication by constant c \f$ a = c \cdot b \f$
+  subroutine cmult2(a, b, c, n)
+    integer, intent(in) :: n
+    real(kind=rp), dimension(n), intent(inout) :: a
+    real(kind=rp), dimension(n), intent(in) :: b
+    real(kind=rp), intent(in) :: c
+    integer :: i
+
+    do i = 1, n
+       a(i) = c * b(i)
+    end do
+
+  end subroutine cmult2
+
+  !> Division of constant c by elements of a \f$ a = c / a \f$
+  subroutine cdiv(a, c, n)
+    integer, intent(in) :: n
+    real(kind=rp), dimension(n), intent(inout) :: a
+    real(kind=rp), intent(in) :: c
+    integer :: i
+
+    do i = 1, n
+       a(i) = c / a(i)
+    end do
+  end subroutine cdiv
+
+  !> Division of constant c by elements of a \f$ a = c / b \f$
+  subroutine cdiv2(a, b, c, n)
+    integer, intent(in) :: n
+    real(kind=rp), dimension(n), intent(inout) :: a
+    real(kind=rp), dimension(n), intent(in) :: b
+    real(kind=rp), intent(in) :: c
+    integer :: i
+
+    do i = 1, n
+       a(i) = c / b(i)
+    end do
+  end subroutine cdiv2
 
   !> Add a scalar to vector \f$ a_i = a_i + s \f$
   subroutine cadd(a, s, n)
@@ -655,20 +694,6 @@ contains
     end do
 
   end subroutine addsqr2s2
-
-  !> Multiplication by constant c \f$ a = c \cdot b \f$
-  subroutine cmult2(a, b, c, n)
-    integer, intent(in) :: n
-    real(kind=rp), dimension(n), intent(inout) :: a
-    real(kind=rp), dimension(n), intent(in) :: b
-    real(kind=rp), intent(in) :: c
-    integer :: i
-
-    do i = 1, n
-       a(i) = c * b(i)
-    end do
-
-  end subroutine cmult2
 
   !> Vector division \f$ a = a / b \f$
   subroutine invcol2(a, b, n)
