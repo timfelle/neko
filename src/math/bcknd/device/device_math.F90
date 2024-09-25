@@ -1072,7 +1072,7 @@ module device_math
        device_col3, device_subcol3, device_sub2, device_sub3, device_addcol3, &
        device_addcol4, device_vdot3, device_vlsc3, device_glsc3, &
        device_glsc3_many, device_add2s2_many, device_glsc2, device_glsum, &
-       device_masked_copy, device_cfill_mask
+       device_masked_copy, device_cfill_mask, device_invcol3
 
 contains
 
@@ -1372,6 +1372,24 @@ contains
     call neko_error('No device backend configured')
 #endif
   end subroutine device_invcol2
+
+  !> Vector division \f$ a = b / c \f$
+  subroutine device_invcol3(a_d, b_d, c_d, n)
+    type(c_ptr) :: a_d, b_d, c_d
+    integer :: n
+#ifdef HAVE_HIP
+    ! call hip_invcol3(a_d, b_d, c_d, n)
+    call neko_error('hip_invcol3 not implemented')
+#elif HAVE_CUDA
+    ! call cuda_invcol3(a_d, b_d, c_d, n)
+    call neko_error('cuda_invcol3 not implemented')
+#elif HAVE_OPENCL
+    ! call opencl_invcol3(a_d, b_d, c_d, n)
+    call neko_error('opencl_invcol3 not implemented')
+#else
+    call neko_error('No device backend configured')
+#endif
+  end subroutine device_invcol3
 
   !> Vector multiplication \f$ a = a \cdot b \f$
   subroutine device_col2(a_d, b_d, n)
