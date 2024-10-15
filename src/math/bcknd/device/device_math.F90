@@ -55,7 +55,8 @@ module device_math
        device_addcol3, device_addcol4, device_vdot3, device_vlsc3, &
        device_glsc3, device_glsc3_many, device_add2s2_many, device_glsc2, &
        device_glsum, device_masked_copy, device_cfill_mask, &
-       device_masked_red_copy, device_vcross, device_absval, device_invcol3
+       device_masked_red_copy, device_vcross, device_absval, device_invcol3, &
+       device_cdiv, device_cdiv2
 
 contains
 
@@ -180,6 +181,38 @@ contains
     call neko_error('No device backend configured')
 #endif
   end subroutine device_cmult2
+
+  !> Division of constant c by array \f$ a = c / a \f$
+  subroutine device_cdiv(a_d, c, n)
+    type(c_ptr) :: a_d
+    real(kind=rp), intent(in) :: c
+    integer :: n
+#if HAVE_HIP
+    call hip_cdiv(a_d, c, n)
+#elif HAVE_CUDA
+    call cuda_cdiv(a_d, c, n)
+#elif HAVE_OPENCL
+    call opencl_cdiv(a_d, c, n)
+#else
+    call neko_error('No device backend configured')
+#endif
+  end subroutine device_cdiv
+
+  !> Division of constant c by array \f$ a = c / b \f$
+  subroutine device_cdiv2(a_d, b_d, c, n)
+    type(c_ptr) :: a_d, b_d
+    real(kind=rp), intent(in) :: c
+    integer :: n
+#if HAVE_HIP
+    call hip_cdiv2(a_d, b_d, c, n)
+#elif HAVE_CUDA
+    call cuda_cdiv2(a_d, b_d, c, n)
+#elif HAVE_OPENCL
+    call opencl_cdiv2(a_d, b_d, c, n)
+#else
+    call neko_error('No device backend configured')
+#endif
+  end subroutine device_cdiv2
 
   !> Add a scalar to vector \f$ a = a + s \f$
   subroutine device_cadd(a_d, c, n)
