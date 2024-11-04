@@ -62,7 +62,7 @@ module brinkman_source_term
      !> The value of the source term.
      type(field_t), pointer :: indicator
      !> Brinkman permeability field.
-     type(field_t) :: brinkman
+     type(field_t), pointer :: brinkman
      !> Filter
      class(filter_t), allocatable :: filter
    contains
@@ -141,10 +141,11 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Allocate the permeability and indicator field
 
+    call neko_field_registry%add_field(coef%dof, "brinkman", .true.)
     call neko_field_registry%add_field(coef%dof, "brinkman_indicator", .true.)
 
+    this%brinkman => neko_field_registry%get_field("brinkman")
     this%indicator => neko_field_registry%get_field("brinkman_indicator")
-    call this%brinkman%init(coef%dof)
 
     ! ------------------------------------------------------------------------ !
     ! Select which constructor should be called
@@ -226,7 +227,7 @@ contains
     class(brinkman_source_term_t), intent(inout) :: this
 
     nullify(this%indicator)
-    call this%brinkman%free()
+    nullify(this%brinkman)
     call this%free_base()
   end subroutine brinkman_source_term_free
 
@@ -373,33 +374,14 @@ contains
        scalar_r = real(scalar_d, kind=rp)
 
        call signed_distance_field(temp_field, boundary_mesh)
-
-       call neko_field_registry%add_field(this%coef%dof, 'sdf', .true.)
-       debug_field => neko_field_registry%get_field('sdf')
-       call field_copy(debug_field, temp_field)
-
        call smooth_step_field(temp_field, scalar_r, 0.0_rp)
 
-       call neko_field_registry%add_field(this%coef%dof, 'step', .true.)
-       debug_field => neko_field_registry%get_field('step')
-       call field_copy(debug_field, temp_field)
-
       case ('step')
-
        call json_get(json, 'distance_transform.value', scalar_d)
        scalar_r = real(scalar_d, kind=rp)
 
        call signed_distance_field(temp_field, boundary_mesh)
-
-       call neko_field_registry%add_field(this%coef%dof, 'sdf', .true.)
-       debug_field => neko_field_registry%get_field('sdf')
-       call field_copy(debug_field, temp_field)
-
        call step_function_field(temp_field, scalar_r, 0.0_rp, 1.0_rp)
-
-       call neko_field_registry%add_field(this%coef%dof, 'step', .true.)
-       debug_field => neko_field_registry%get_field('step')
-       call field_copy(debug_field, temp_field)
 
       case default
        call neko_error('Unknown distance transform')
