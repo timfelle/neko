@@ -58,12 +58,12 @@ module brinkman_source_term
      private
 
      !> The unfiltered indicator field
-     type(field_t) :: indicator_unfiltered 
+     type(field_t) :: indicator_unfiltered
      !> The value of the source term.
-     type(field_t) :: indicator
+     type(field_t), pointer :: indicator
      !> Brinkman permeability field.
      type(field_t) :: brinkman
-     !> Filter 
+     !> Filter
      class(filter_t), allocatable :: filter
    contains
      !> The common constructor using a JSON object.
@@ -123,7 +123,6 @@ contains
     integer :: i
     type(fld_file_output_t) :: output
 
-
     ! Mandatory fields for the general source term
     call json_get_or_default(json, "start_time", start_time, 0.0_rp)
     call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
@@ -142,12 +141,9 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Allocate the permeability and indicator field
 
-    if (neko_field_registry%field_exists('brinkman_indicator') &
-         .or. neko_field_registry%field_exists('brinkman')) then
-       call neko_error('Brinkman field already exists.')
-    end if
+    call neko_field_registry%add_field(coef%dof, "brinkman_indicator", .true.)
 
-    call this%indicator%init(coef%dof)
+    this%indicator => neko_field_registry%get_field("brinkman_indicator")
     call this%brinkman%init(coef%dof)
 
     ! ------------------------------------------------------------------------ !
@@ -159,7 +155,7 @@ contains
 
     do i = 1, n_regions
        call json_extract_item(core, json_object_list, i, object_settings)
-       call json_get_or_default(object_settings, 'type', object_type, 'none')
+       call json_get(object_settings, 'type', object_type)
 
        select case (object_type)
          case ('boundary_mesh')
@@ -181,36 +177,36 @@ contains
 
     call json_get_or_default(json, 'filter.type', filter_type, 'none')
     select case (filter_type)
-       case ('PDE')
-          ! Initialize the unfiltered design field
-          call this%indicator_unfiltered%init(coef%dof)
+      case ('PDE')
+       ! Initialize the unfiltered design field
+       call this%indicator_unfiltered%init(coef%dof)
 
-          ! Allocate a PDE filter
-          allocate(PDE_filter_t::this%filter)
+       ! Allocate a PDE filter
+       allocate(PDE_filter_t::this%filter)
 
-          ! Initialize the filter
-          call this%filter%init(json, coef)
+       ! Initialize the filter
+       call this%filter%init(json, coef)
 
-          ! Copy the current indicator to unfiltered (essentially a rename) 
-          call field_copy(this%indicator_unfiltered, this%indicator)
+       ! Copy the current indicator to unfiltered (essentially a rename)
+       call field_copy(this%indicator_unfiltered, this%indicator)
 
-          ! Apply the filter
-          call this%filter%apply(this%indicator, this%indicator_unfiltered)
+       ! Apply the filter
+       call this%filter%apply(this%indicator, this%indicator_unfiltered)
 
-          ! Set up sampler to include the unfiltered and filtered fields
-          call output%init(sp, 'brinkman', 3)
-          call output%fields%assign_to_field(1, this%indicator_unfiltered)
-          call output%fields%assign_to_field(2, this%indicator)
-          call output%fields%assign_to_field(3, this%brinkman)
+       ! Set up sampler to include the unfiltered and filtered fields
+       call output%init(sp, 'brinkman', 3)
+       call output%fields%assign_to_field(1, this%indicator_unfiltered)
+       call output%fields%assign_to_field(2, this%indicator)
+       call output%fields%assign_to_field(3, this%brinkman)
 
-       case ('none')
-          ! Set up sampler to include the unfiltered field
-          call output%init(sp, 'brinkman', 2)
-          call output%fields%assign_to_field(1, this%indicator)
-          call output%fields%assign_to_field(2, this%brinkman)
+      case ('none')
+       ! Set up sampler to include the unfiltered field
+       call output%init(sp, 'brinkman', 2)
+       call output%fields%assign_to_field(1, this%indicator)
+       call output%fields%assign_to_field(2, this%brinkman)
 
-       case default
-          call neko_error('Brinkman source term unknown filter type')
+      case default
+       call neko_error('Brinkman source term unknown filter type')
     end select
 
     ! ------------------------------------------------------------------------ !
@@ -229,7 +225,7 @@ contains
   subroutine brinkman_source_term_free(this)
     class(brinkman_source_term_t), intent(inout) :: this
 
-    call this%indicator%free()
+    nullify(this%indicator)
     call this%brinkman%free()
     call this%free_base()
   end subroutine brinkman_source_term_free
@@ -298,6 +294,9 @@ contains
     type(field_t) :: temp_field
     type(aabb_t) :: mesh_box, target_box
     integer :: idx_p
+
+    !
+    type(field_t), pointer :: debug_field
 
     ! ------------------------------------------------------------------------ !
     ! Read the options for the boundary mesh
@@ -373,16 +372,34 @@ contains
        call json_get(json, 'distance_transform.value', scalar_d)
        scalar_r = real(scalar_d, kind=rp)
 
-       call signed_distance_field(temp_field, boundary_mesh, scalar_d)
+       call signed_distance_field(temp_field, boundary_mesh)
+
+       call neko_field_registry%add_field(this%coef%dof, 'sdf', .true.)
+       debug_field => neko_field_registry%get_field('sdf')
+       call field_copy(debug_field, temp_field)
+
        call smooth_step_field(temp_field, scalar_r, 0.0_rp)
+
+       call neko_field_registry%add_field(this%coef%dof, 'step', .true.)
+       debug_field => neko_field_registry%get_field('step')
+       call field_copy(debug_field, temp_field)
 
       case ('step')
 
        call json_get(json, 'distance_transform.value', scalar_d)
        scalar_r = real(scalar_d, kind=rp)
 
-       call signed_distance_field(temp_field, boundary_mesh, scalar_d)
-       call step_function_field(temp_field, scalar_r, 1.0_rp, 0.0_rp)
+       call signed_distance_field(temp_field, boundary_mesh)
+
+       call neko_field_registry%add_field(this%coef%dof, 'sdf', .true.)
+       debug_field => neko_field_registry%get_field('sdf')
+       call field_copy(debug_field, temp_field)
+
+       call step_function_field(temp_field, scalar_r, 0.0_rp, 1.0_rp)
+
+       call neko_field_registry%add_field(this%coef%dof, 'step', .true.)
+       debug_field => neko_field_registry%get_field('step')
+       call field_copy(debug_field, temp_field)
 
       case default
        call neko_error('Unknown distance transform')
