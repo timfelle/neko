@@ -295,6 +295,7 @@ contains
     type(field_t) :: temp_field
     type(aabb_t) :: mesh_box, target_box
     integer :: idx_p
+    real(kind=rp) :: max_distance
 
     !
     type(field_t), pointer :: debug_field
@@ -373,14 +374,17 @@ contains
        call json_get(json, 'distance_transform.value', scalar_d)
        scalar_r = real(scalar_d, kind=rp)
 
-       call signed_distance_field(temp_field, boundary_mesh)
+       max_distance = max(2.0_rp * scalar_r, 0.1_rp)
+
+       call signed_distance_field(temp_field, boundary_mesh, max_distance)
        call smooth_step_field(temp_field, scalar_r, 0.0_rp)
 
       case ('step')
        call json_get(json, 'distance_transform.value', scalar_d)
        scalar_r = real(scalar_d, kind=rp)
+       max_distance = max(2.0_rp * scalar_r, 0.1_rp)
 
-       call signed_distance_field(temp_field, boundary_mesh)
+       call signed_distance_field(temp_field, boundary_mesh, max_distance)
        call step_function_field(temp_field, scalar_r, 0.0_rp, 1.0_rp)
 
       case default
