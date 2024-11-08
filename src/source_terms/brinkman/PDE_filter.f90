@@ -46,7 +46,7 @@ module PDE_filter
   use precon, only: pc_t, precon_factory, precon_destroy
   use bc, only: bc_list_add, bc_list_t, bc_list_apply_scalar, bc_list_init, &
        bc_list_free
-  use neumann, only: neumann_t
+  ! use neumann, only: neumann_t
   use profiler, only: profiler_start_region, profiler_end_region
   use gather_scatter, only: gs_t, GS_OP_ADD
   use pnpn_residual, only: pnpn_prs_res_t
@@ -82,8 +82,8 @@ module PDE_filter
      class(ksp_t), allocatable :: ksp_filt
      !> Filter Preconditioner
      class(pc_t), allocatable :: pc_filt
-     !> They will all be Neumann conditions.
-     type(neumann_t) :: filter_bcs
+     !  !> They will all be Neumann conditions.
+     !  type(neumann_t) :: filter_bcs
      !> Filter boundary conditions
      type(bc_list_t) :: bclst_filt
 
@@ -150,8 +150,8 @@ contains
 
     n = this%coef%dof%size()
 
-    ! initialize the filter BCs
-    call this%filter_bcs%init_base(this%coef)
+    ! ! initialize the filter BCs
+    ! call this%filter_bcs%init_base(this%coef)
 
     ! Create list with just Neumann bcs
 
@@ -160,14 +160,14 @@ contains
 
     ! Mark ALL the BCs as Neumann, regardless of what's prescribed
     bc_labels_all_neuman = 'o'
-    call this%filter_bcs%mark_zones_from_list(coef%msh%labeled_zones,&
-         'o', bc_labels_all_neuman)
+    ! call this%filter_bcs%mark_zones_from_list(coef%msh%labeled_zones,&
+    !      'o', bc_labels_all_neuman)
 
     ! set the flux to zero
     call this%filter_bcs%finalize_neumann(0.0_rp)
 
-    ! add them to the filter BCs
-    call bc_list_add(this%bclst_filt, this%filter_bcs)
+    ! ! add them to the filter BCs
+    ! call bc_list_add(this%bclst_filt, this%filter_bcs)
 
 
     ! Setup backend dependent Ax routines
@@ -193,7 +193,7 @@ contains
 
     call precon_destroy(this%pc_filt)
 
-    call this%filter_bcs%free()
+    ! call this%filter_bcs%free()
 
     call bc_list_free(this%bclst_filt)
 
