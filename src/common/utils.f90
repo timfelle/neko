@@ -34,6 +34,7 @@
 !! @details Various utility functions
 module utils
   use, intrinsic :: iso_fortran_env, only: error_unit, output_unit
+  use mpi_f08, only: MPI_COMM_WORLD, MPI_Abort, MPI_Comm_Rank, MPI_Finalize
   implicit none
   private
 
@@ -221,29 +222,42 @@ contains
   !! @param[optional] error_code The error code to report.
   subroutine neko_error_plain(error_code)
     integer, optional :: error_code
+    integer :: rank, mpi_error
 
-    if (present(error_code)) then
-       write(error_unit, *) '*** ERROR ***', error_code
-       error stop
-    else
-       write(error_unit, *) '*** ERROR ***'
-       error stop
+    call MPI_Comm_Rank(MPI_COMM_WORLD, rank, mpi_error)
+
+    if (rank .eq. 0) then
+       if (present(error_code)) then
+          write(error_unit, *) '*** ERROR ***', error_code
+       else
+          write(error_unit, *) '*** ERROR ***'
+       end if
     end if
-
+    error stop
   end subroutine neko_error_plain
 
   !> Reports an error and stops execution
   !! @param error_msg The error message to report.
   subroutine neko_error_msg(error_msg)
     character(len=*) :: error_msg
-    write(error_unit, *) '*** ERROR: ', error_msg, ' ***'
+    integer :: rank, mpi_error
+
+    call MPI_Comm_Rank(MPI_COMM_WORLD, rank, mpi_error)
+
+    if (rank .eq. 0) write(error_unit, *) '*** ERROR: ', error_msg, ' ***'
+
     error stop
   end subroutine neko_error_msg
 
   !> Reports a warning to standard output
   subroutine neko_warning(warning_msg)
     character(len=*) :: warning_msg
-    write(output_unit, *) '*** WARNING: ', warning_msg, ' ***'
+    integer :: rank, mpi_error
+
+    call MPI_Comm_Rank(MPI_COMM_WORLD, rank, mpi_error)
+
+    if (rank .eq. 0) write(output_unit, *) '*** WARNING: ', warning_msg, ' ***'
+
   end subroutine neko_warning
 
   !> Concatenate an array of strings into one string with array items
