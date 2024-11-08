@@ -375,7 +375,7 @@ contains
     ! more efficient method, such as a tree search.
 
     call temp_field%init(this%coef%dof)
-    max_distance = 0.5 * mesh_box%get_diameter()
+    max_distance = 0.01 * mesh_box%get_diameter()
 
     ! Select how to transform the distance field to a design field
     select case (distance_transform)
