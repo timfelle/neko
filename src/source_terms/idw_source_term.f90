@@ -54,6 +54,8 @@ module idw_source_term
   use gather_scatter
   use mpi_f08
   use logger
+  use neko_config, only : NEKO_BCKND_DEVICE
+  use device, only : device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
   implicit none
   private
 
@@ -467,6 +469,20 @@ contains
     fv => this%fields%get(2)
     fw => this%fields%get(3)
 
+    ! Synchronize array back to CPU
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(u%x, u%x_d, u%size(), DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(v%x, v%x_d, v%size(), DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(w%x, w%x_d, w%size(), DEVICE_TO_HOST, sync = .false.)
+
+       call device_memcpy(fu%x, fu%x_d, fu%size(), &
+            DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(fv%x, fv%x_d, fv%size(), &
+            DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(fw%x, fw%x_d, fw%size(), &
+            DEVICE_TO_HOST, sync = .true.)
+    end if
+
     !> @todo Change this once we have variable time-stepping
 !    dt = t / tstep
     dt = t - this%t_old
@@ -478,7 +494,6 @@ contains
          lag_pts => this%lag_pts, tmp => this%tmp, &
          ds => this%ds%x, x => this%w%dof%x, &
          y => this%w%dof%y, z => this%w%dof%z, lx => this%w%Xh%lx)
-
 
       fu_ib = 0.0_rp
       fv_ib = 0.0_rp
@@ -613,6 +628,21 @@ contains
       call this%gs%op(fw, GS_OP_ADD)
 
     end associate
+
+
+    ! Synchronize array back to CPU
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(u%x, u%x_d, u%size(), HOST_TO_DEVICE, sync = .false.)
+       call device_memcpy(v%x, v%x_d, v%size(), HOST_TO_DEVICE, sync = .false.)
+       call device_memcpy(w%x, w%x_d, w%size(), HOST_TO_DEVICE, sync = .false.)
+
+       call device_memcpy(fu%x, fu%x_d, fu%size(), &
+            HOST_TO_DEVICE, sync = .false.)
+       call device_memcpy(fv%x, fv%x_d, fv%size(), &
+            HOST_TO_DEVICE, sync = .false.)
+       call device_memcpy(fw%x, fw%x_d, fw%size(), &
+            HOST_TO_DEVICE, sync = .true.)
+    end if
 
   end subroutine idw_source_term_compute
 
