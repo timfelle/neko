@@ -163,8 +163,8 @@ contains
     ! call this%filter_bcs%mark_zones_from_list(coef%msh%labeled_zones,&
     !      'o', bc_labels_all_neuman)
 
-    ! set the flux to zero
-    call this%filter_bcs%finalize_neumann(0.0_rp)
+    ! ! set the flux to zero
+    ! call this%filter_bcs%finalize_neumann(0.0_rp)
 
     ! ! add them to the filter BCs
     ! call bc_list_add(this%bclst_filt, this%filter_bcs)
