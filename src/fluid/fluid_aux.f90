@@ -20,6 +20,11 @@ contains
     character(len=LOG_SIZE) :: log_buf
     integer :: i
 
+    do i = 1, 4
+       if (.not. ksp_results(i)%converged) then
+          call neko_log%error("Fluid solver did not converge")
+       end if
+    end do
 
     call neko_log%message('Pressure')
 
