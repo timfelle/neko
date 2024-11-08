@@ -247,8 +247,8 @@ contains
 
     ! gather scatter
     call this%coef%gs_h%op(RHS, GS_OP_ADD)
-    ! set BCs
-    call bc_list_apply_scalar(this%bclst_filt, RHS%x, n)
+    ! ! set BCs
+    ! call bc_list_apply_scalar(this%bclst_filt, RHS%x, n)
 
     ! Solve Helmholtz equation
     call profiler_start_region('filter solve')

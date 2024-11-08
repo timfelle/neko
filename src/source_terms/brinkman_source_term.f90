@@ -210,10 +210,18 @@ contains
        call neko_error('Brinkman source term unknown filter type')
     end select
 
+    ! Hack: remove negative values from the indicator field.
+    ! PDE filter is broken and leads to negative values.
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_pwmax(this%indicator%x_d, 0.0_rp, this%indicator%size())
+    else
+       this%indicator%x = max(this%indicator%x, 0.0_rp)
+    end if
+
     ! ------------------------------------------------------------------------ !
     ! Compute the permeability field
 
-    this%brinkman = this%indicator
+    call field_copy(this%brinkman, this%indicator)
     call permeability_field(this%brinkman, &
          brinkman_limits(1), brinkman_limits(2), brinkman_penalty)
 
@@ -323,6 +331,7 @@ contains
 
     call json_get_or_default(json, 'mesh_transform.type', &
          mesh_transform, 'none')
+    mesh_box = get_aabb(boundary_mesh)
 
     select case (mesh_transform)
       case ('none')
@@ -340,7 +349,6 @@ contains
 
        call target_box%init(box_min, box_max)
 
-       mesh_box = get_aabb(boundary_mesh)
 
        scaling = target_box%get_diagonal() / mesh_box%get_diagonal()
        if (keep_aspect_ratio) then
@@ -367,21 +375,24 @@ contains
     ! more efficient method, such as a tree search.
 
     call temp_field%init(this%coef%dof)
+    max_distance = 0.5 * mesh_box%get_diameter()
 
     ! Select how to transform the distance field to a design field
     select case (distance_transform)
       case ('smooth_step')
        call json_get(json, 'distance_transform.value', scalar_d)
        scalar_r = real(scalar_d, kind=rp)
+       max_distance = max(max_distance, scalar_r)
 
-       call signed_distance_field(temp_field, boundary_mesh)
+       call signed_distance_field(temp_field, boundary_mesh, max_distance)
        call smooth_step_field(temp_field, scalar_r, 0.0_rp)
 
       case ('step')
        call json_get(json, 'distance_transform.value', scalar_d)
        scalar_r = real(scalar_d, kind=rp)
+       max_distance = max(max_distance, scalar_r)
 
-       call signed_distance_field(temp_field, boundary_mesh)
+       call signed_distance_field(temp_field, boundary_mesh, max_distance)
        call step_function_field(temp_field, scalar_r, 0.0_rp, 1.0_rp)
 
       case default
