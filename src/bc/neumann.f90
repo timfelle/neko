@@ -72,7 +72,7 @@ contains
   subroutine neumann_apply_scalar(this, x, n, t, tstep)
     class(neumann_t), intent(inout) :: this
     integer, intent(in) :: n
-    real(kind=rp), intent(inout),  dimension(n) :: x
+    real(kind=rp), intent(inout), dimension(n) :: x
     real(kind=rp), intent(in), optional :: t
     integer, intent(in), optional :: tstep
     integer :: i, m, k, facet
@@ -84,15 +84,15 @@ contains
        k = this%msk(i)
        facet = this%facet(i)
        idx = nonlinear_index(k, this%coef%Xh%lx, this%coef%Xh%lx,&
-                             this%coef%Xh%lx)
+            this%coef%Xh%lx)
        select case (facet)
-       case (1,2)
+         case (1,2)
           x(k) = x(k) + this%flux_(i)*this%coef%area(idx(2), idx(3), facet, &
                idx(4))
-       case (3,4)
+         case (3,4)
           x(k) = x(k) + this%flux_(i)*this%coef%area(idx(1), idx(3), facet, &
                idx(4))
-       case (5,6)
+         case (5,6)
           x(k) = x(k) + this%flux_(i)*this%coef%area(idx(1), idx(2), facet, &
                idx(4))
        end select
@@ -104,9 +104,9 @@ contains
   subroutine neumann_apply_vector(this, x, y, z, n, t, tstep)
     class(neumann_t), intent(inout) :: this
     integer, intent(in) :: n
-    real(kind=rp), intent(inout),  dimension(n) :: x
-    real(kind=rp), intent(inout),  dimension(n) :: y
-    real(kind=rp), intent(inout),  dimension(n) :: z
+    real(kind=rp), intent(inout), dimension(n) :: x
+    real(kind=rp), intent(inout), dimension(n) :: y
+    real(kind=rp), intent(inout), dimension(n) :: z
     real(kind=rp), intent(in), optional :: t
     integer, intent(in), optional :: tstep
 
