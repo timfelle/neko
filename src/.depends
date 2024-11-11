@@ -135,7 +135,7 @@ common/profiler.lo : common/profiler.F90 common/runtime_statistics.lo common/cra
 common/craypat.lo : common/craypat.F90 
 bc/bc.lo : bc/bc.f90 common/utils.lo adt/tuple.lo adt/stack.lo mesh/facet_zone.lo mesh/mesh.lo sem/space.lo sem/coef.lo sem/dofmap.lo device/device.lo config/num_types.lo config/neko_config.lo 
 bc/dirichlet.lo : bc/dirichlet.f90 bc/bc.lo config/num_types.lo bc/bcknd/device/device_dirichlet.lo 
-bc/neumann.lo : bc/neumann.f90 math/math.lo sem/coef.lo common/utils.lo bc/bc.lo config/num_types.lo 
+bc/neumann.lo : bc/neumann.f90 device/device.lo math/math.lo sem/coef.lo common/utils.lo bc/bc.lo config/num_types.lo 
 bc/shear_stress.lo : bc/shear_stress.f90 bc/neumann.lo bc/symmetry.lo sem/coef.lo common/utils.lo bc/bc.lo config/num_types.lo 
 bc/dong_outflow.lo : bc/dong_outflow.f90 common/json_utils.lo field/field_registry.lo bc/bcknd/device/device_dong_outflow.lo common/utils.lo sem/coef.lo sem/dofmap.lo field/field.lo bc/bc.lo config/num_types.lo device/device.lo bc/dirichlet.lo config/neko_config.lo 
 bc/wall.lo : bc/wall.f90 bc/bc.lo config/num_types.lo bc/bcknd/device/device_wall.lo 

@@ -35,9 +35,10 @@ module neumann
   use num_types, only : rp
   use bc, only : bc_t
   use, intrinsic :: iso_c_binding, only : c_ptr
-  use utils, only : neko_error, nonlinear_index
+  use utils, only : neko_error, nonlinear_index, neko_warning
   use coefs, only : coef_t
   use math, only : cfill, copy
+  use device, only : device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
   implicit none
   private
 
@@ -46,7 +47,8 @@ module neumann
   !! @note The condition is imposed weekly by adding an appropriate source term
   !! to the right-hand-side.
   type, public, extends(bc_t) :: neumann_t
-     real(kind=rp), allocatable, private :: flux_(:)
+     real(kind=rp), dimension(:), allocatable, private :: flux_
+     real(kind=rp), dimension(:), allocatable, private :: x
    contains
      procedure, pass(this) :: apply_scalar => neumann_apply_scalar
      procedure, pass(this) :: apply_vector => neumann_apply_vector
@@ -122,7 +124,17 @@ contains
     real(kind=rp), intent(in), optional :: t
     integer, intent(in), optional :: tstep
 
-    call neko_error("Neumann bc not implemented on the device")
+    integer :: n
+
+    n = this%coef%dof%size()
+    if (.not. allocated(this%x)) allocate(this%x(n))
+
+    call device_memcpy(this%x, x_d, n, DEVICE_TO_HOST, sync = .false.)
+
+    call this%apply_scalar(this%x, n, t, tstep)
+
+    call device_memcpy(this%x, x_d, n, HOST_TO_DEVICE, sync = .false.)
+
 
   end subroutine neumann_apply_scalar_dev
 
@@ -145,6 +157,8 @@ contains
     class(neumann_t), target, intent(inout) :: this
 
     call this%free_base()
+    if (allocated(this%flux_)) deallocate(this%flux_)
+    if (allocated(this%x)) deallocate(this%x)
 
   end subroutine neumann_free
 
