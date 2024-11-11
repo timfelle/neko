@@ -55,7 +55,10 @@ module idw_source_term
   use mpi_f08
   use logger
   use neko_config, only : NEKO_BCKND_DEVICE
-  use device, only : device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
+  use device, only: device_map, device_free, device_memcpy, DEVICE_TO_HOST, &
+       HOST_TO_DEVICE
+
+  use, intrinsic :: iso_c_binding, only : c_ptr, c_null_ptr
   implicit none
   private
 
@@ -76,6 +79,16 @@ module idw_source_term
      real(kind=rp), allocatable :: fum_ib(:)
      real(kind=rp), allocatable :: fvm_ib(:)
      real(kind=rp), allocatable :: fwm_ib(:)
+
+     ! Device pointers
+     type(c_ptr) :: xyz_d = c_null_ptr
+     type(c_ptr) :: fu_ib_d = c_null_ptr
+     type(c_ptr) :: fv_ib_d = c_null_ptr
+     type(c_ptr) :: fw_ib_d = c_null_ptr
+     type(c_ptr) :: fum_ib_d = c_null_ptr
+     type(c_ptr) :: fvm_ib_d = c_null_ptr
+     type(c_ptr) :: fwm_ib_d = c_null_ptr
+
      real(kind=rp) :: pwr_param
      real(kind=rp) :: rmax
      type(field_t) :: w
@@ -310,6 +323,17 @@ contains
     allocate(this%lag_pts(lagrangian_points%size()))
     allocate(this%lag_nrm(lagrangian_normals%size()))
 
+    ! Map the arrays to the device
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_map(this%xyz, this%xyz_d, 3 * lagrangian_points%size())
+       call device_map(this%fu_ib, this%fu_ib_d, lagrangian_points%size())
+       call device_map(this%fv_ib, this%fv_ib_d, lagrangian_points%size())
+       call device_map(this%fw_ib, this%fw_ib_d, lagrangian_points%size())
+       call device_map(this%fum_ib, this%fum_ib_d, lagrangian_points%size())
+       call device_map(this%fvm_ib, this%fvm_ib_d, lagrangian_points%size())
+       call device_map(this%fwm_ib, this%fwm_ib_d, lagrangian_points%size())
+    end if
+
     select type(pt => lagrangian_points%data)
       type is (point_t)
        do i = 1, lagrangian_points%size()
@@ -444,6 +468,31 @@ contains
           call this%lag_el(i)%free()
        end do
        deallocate(this%lag_el)
+    end if
+
+    ! Free device memory
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       if (c_associated(this%xyz_d)) then
+          call device_free(this%xyz_d)
+       end if
+       if (c_associated(this%fu_ib_d)) then
+          call device_free(this%fu_ib_d)
+       end if
+       if (c_associated(this%fv_ib_d)) then
+          call device_free(this%fv_ib_d)
+       end if
+       if (c_associated(this%fw_ib_d)) then
+          call device_free(this%fw_ib_d)
+       end if
+       if (c_associated(this%fum_ib_d)) then
+          call device_free(this%fum_ib_d)
+       end if
+       if (c_associated(this%fvm_ib_d)) then
+          call device_free(this%fvm_ib_d)
+       end if
+       if (c_associated(this%fwm_ib_d)) then
+          call device_free(this%fwm_ib_d)
+       end if
     end if
 
     call this%gs%free()
