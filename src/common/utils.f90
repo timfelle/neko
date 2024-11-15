@@ -230,7 +230,6 @@ contains
        write(error_unit, *) '*** ERROR ***'
     end if
 
-    call MPI_Abort(MPI_COMM_WORLD, mpi_error)
     error stop
   end subroutine neko_error_plain
 
@@ -242,7 +241,6 @@ contains
 
     write(error_unit, *) '*** ERROR: ', error_msg, ' ***'
 
-    call MPI_Abort(MPI_COMM_WORLD, mpi_error)
     error stop
   end subroutine neko_error_msg
 
