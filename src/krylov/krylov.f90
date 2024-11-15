@@ -61,7 +61,7 @@ module krylov
      !> FInal residual
      real(kind=rp) :: res_final
      !> Status
-     logical :: converged = .true.
+     logical :: converged = .false.
   end type ksp_monitor_t
 
   !> Base abstract type for a canonical Krylov method, solving \f$ Ax = f \f$.
