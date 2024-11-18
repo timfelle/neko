@@ -57,6 +57,7 @@ module idw_source_term
   use neko_config, only : NEKO_BCKND_DEVICE
   use device, only: device_map, device_free, device_memcpy, DEVICE_TO_HOST, &
        HOST_TO_DEVICE
+  use aabb, only : aabb_t, get_aabb
 
   use, intrinsic :: iso_c_binding, only : c_ptr, c_null_ptr
   implicit none
@@ -708,6 +709,14 @@ contains
     type(stack_i4_t) :: overlaps
     type(point_t) :: tri_nrm, tri_cntr
 
+    real(kind=rp), dimension(:), allocatable :: box_min, box_max
+    real(kind=rp), dimension(3) :: scaling, translation
+    type(aabb_t) :: mesh_box, target_box
+    character(len=:), allocatable :: mesh_transform
+    integer :: idx_p
+    logical :: keep_aspect_ratio
+
+
     call json_get(json, 'name', mesh_file_name)
     mesh_file = file_t(mesh_file_name)
     call neko_log%message('Filename   : '// trim(mesh_file_name))
@@ -738,6 +747,43 @@ contains
     if (boundary_mesh%nelv .eq. 0) then
        call neko_error('No elements in the boundary mesh')
     end if
+
+    call json_get_or_default(json, 'mesh_transform.type', &
+         mesh_transform, 'none')
+    mesh_box = get_aabb(boundary_mesh)
+
+    select case (mesh_transform)
+      case ('none')
+       ! Do nothing
+      case ('bounding_box')
+       call json_get(json, 'mesh_transform.box_min', box_min)
+       call json_get(json, 'mesh_transform.box_max', box_max)
+       call json_get_or_default(json, 'mesh_transform.keep_aspect_ratio', &
+            keep_aspect_ratio, .true.)
+
+       if (size(box_min) .ne. 3 .or. size(box_max) .ne. 3) then
+          call neko_error('Case file: mesh_transform. &
+               &box_min and box_max must be 3 element arrays of reals')
+       end if
+
+       call target_box%init(box_min, box_max)
+
+
+       scaling = target_box%get_diagonal() / mesh_box%get_diagonal()
+       if (keep_aspect_ratio) then
+          scaling = minval(scaling)
+       end if
+
+       translation = - scaling * mesh_box%get_min() + target_box%get_min()
+
+       do idx_p = 1, boundary_mesh%mpts
+          boundary_mesh%points(idx_p)%x = &
+               scaling * boundary_mesh%points(idx_p)%x + translation
+       end do
+
+      case default
+       call neko_error('Unknown mesh transform')
+    end select
 
     call overlaps%init()
 
