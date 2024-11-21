@@ -34,7 +34,7 @@
 !! @details Various utility functions
 module utils
   use, intrinsic :: iso_fortran_env, only: error_unit, output_unit
-  use mpi_f08, only: MPI_COMM_WORLD, MPI_Abort
+  use mpi_f08, only: MPI_COMM_WORLD, MPI_Abort, MPI_Comm_rank
   implicit none
   private
 
@@ -224,6 +224,11 @@ contains
     integer, optional :: error_code
     integer :: rank, mpi_error
 
+    rank = 0
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, mpi_error)
+
+    if (rank .eq. 0) then
+
     if (present(error_code)) then
        write(error_unit, *) '*** ERROR ***', error_code
     else
@@ -231,6 +236,8 @@ contains
     end if
 
     error stop
+  end if
+  call MPI_Abort(MPI_COMM_WORLD, 1, mpi_error)
   end subroutine neko_error_plain
 
   !> Reports an error and stops execution
@@ -239,9 +246,15 @@ contains
     character(len=*) :: error_msg
     integer :: rank, mpi_error
 
+    rank = 0
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, mpi_error)
+
+    if (rank .eq. 0) then
     write(error_unit, *) '*** ERROR: ', error_msg, ' ***'
 
     error stop
+  end if
+  call MPI_Abort(MPI_COMM_WORLD, 1, mpi_error)
   end subroutine neko_error_msg
 
   !> Reports a warning to standard output
