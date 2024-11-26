@@ -213,9 +213,15 @@ contains
     ! Hack: remove negative values from the indicator field.
     ! PDE filter is broken and leads to negative values.
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_pwmax(this%indicator%x_d, 0.01_rp, this%indicator%size())
+       call device_pwmax(this%indicator%x_d, 0.00_rp, this%indicator%size())
     else
-       this%indicator%x = max(this%indicator%x, 0.01_rp)
+       this%indicator%x = max(this%indicator%x, 0.00_rp)
+
+      do i = 1, this%indicator%size()
+         if (this%indicator%x(i,1,1,1) < 0.01_rp) then
+            this%indicator%x(i,1,1,1) = 0.0_rp
+         end if
+      end do
     end if
 
     ! ------------------------------------------------------------------------ !
