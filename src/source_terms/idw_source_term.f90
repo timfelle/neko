@@ -117,8 +117,8 @@ contains
   subroutine idw_source_term_init_from_json(this, json, fields, coef)
     class(idw_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
-    type(field_list_t), intent(inout), target :: fields
-    type(coef_t), target, intent(inout) :: coef
+    type(field_list_t), intent(in), target :: fields
+    type(coef_t), target, intent(in) :: coef
     real(kind=rp) :: start_time, end_time
     type(json_value), pointer :: json_object_list
     type(json_core) :: core

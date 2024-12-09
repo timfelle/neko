@@ -120,7 +120,7 @@ contains
   subroutine PDE_filter_init_from_json(this, json, coef)
     class(PDE_filter_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
-    type(coef_t), intent(inout) :: coef
+    type(coef_t), intent(in) :: coef
 
     ! user parameters
     call json_get_or_default(json, "filter.radius", this%r, 1.0_rp)
@@ -143,7 +143,7 @@ contains
   !> Actual constructor.
   subroutine PDE_filter_init_from_attributes(this, coef)
     class(PDE_filter_t), intent(inout) :: this
-    type(coef_t), intent(inout) :: coef
+    type(coef_t), intent(in) :: coef
     integer :: n
     character(len=NEKO_MSH_MAX_ZLBL_LEN) :: &
          bc_labels_all_neuman(NEKO_MSH_MAX_ZLBLS)
