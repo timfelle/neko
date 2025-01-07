@@ -71,6 +71,8 @@ module mask
      !> Returns the mask array on devices.
      procedure, pass(this) :: mask_device_array
 
+     !> Assign a value to the mask.
+     generic, public :: set => set_mask_value, set_mask_array, set_mask_mask
      !> Sets the mask value for a given index.
      procedure, pass(this) :: set_mask_value
      !> Assign the entire mask array to an array.
@@ -79,7 +81,7 @@ module mask
      procedure, pass(this) :: set_mask_mask
 
      ! Operator overloads
-     generic :: assignment(=) => set_mask_array, set_mask_mask
+     generic, public :: assignment(=) => set_mask_array, set_mask_mask
 
   end type mask_t
 
