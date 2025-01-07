@@ -34,31 +34,52 @@
 module mask
   use, intrinsic :: iso_c_binding, only : c_ptr
   use neko_config, only: NEKO_BCKND_DEVICE
-  use device, only: device_map, device_memcpy, HOST_TO_DEVICE
+  use device, only: device_map, device_memcpy, HOST_TO_DEVICE, device_free
 
   implicit none
   private
 
   !>
   type, public :: mask_t
+     private
 
      !> The actual mask array.
-     integer, dimension(:), allocatable, private :: array
+     integer, dimension(:), allocatable :: array
      !> The device mask array.
-     type(c_ptr), private :: array_d
+     type(c_ptr) :: array_d
      !> The number of elements in the mask.
-     integer, private :: mask_size
+     integer :: mask_size
 
    contains
-     procedure, pass(this) :: init => mask_init
-     procedure, pass(this) :: size => mask_get_size
+     !> Constructor for mask_t.
+     procedure, public, pass(this) :: init => mask_init
+     !> Destructor for mask_t.
+     procedure, public, pass(this) :: free => mask_free
 
-     generic :: host => mask_host_array, mask_host_value
+     !> Returns the size of the mask.
+     procedure, public, pass(this) :: get_size => mask_get_size
+
+     !> Returns the mask.
+     generic, public :: get_host => mask_host_array, mask_host_value
+     !> Returns the mask array.
      procedure, pass(this) :: mask_host_array
+     !> Returns the mask value for a given index.
      procedure, pass(this) :: mask_host_value
 
-     generic :: device => mask_device_array
+     !> Returns the mask array on devices.
+     generic :: get_device => mask_device_array
+     !> Returns the mask array on devices.
      procedure, pass(this) :: mask_device_array
+
+     !> Sets the mask value for a given index.
+     procedure, pass(this) :: set_mask_value
+     !> Assign the entire mask array to an array.
+     procedure, pass(this) :: set_mask_array
+     !> Assign the entire mask to another mask.
+     procedure, pass(this) :: set_mask_mask
+
+     ! Operator overloads
+     generic :: assignment(=) => set_mask_array, set_mask_mask
 
   end type mask_t
 
@@ -72,13 +93,24 @@ contains
 
     this%mask_size = n
     allocate(this%array(n))
+    this%array = array
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_map(this%array, this%array_d, n)
-       call device_memcpy(this%array, this%array_d, n, HOST_TO_DEVICE, sync=.false.)
+       call device_memcpy(this%array, this%array_d, n, &
+            HOST_TO_DEVICE, sync = .false.)
     end if
 
   end subroutine mask_init
+
+  !> Destructor
+  subroutine mask_free(this)
+    class(mask_t), intent(inout) :: this
+
+    if (NEKO_BCKND_DEVICE .eq. 1) call device_free(this%array_d)
+    deallocate(this%array)
+
+  end subroutine mask_free
 
   !> Returns the size of the mask.
   pure function mask_get_size(this) result(size)
@@ -108,5 +140,42 @@ contains
     type(c_ptr) :: mask_array
     mask_array = this%array_d
   end function mask_device_array
+
+  ! -------------------------------------------------------------------------- !
+
+  !> Sets the mask value for a given index.
+  subroutine set_mask_value(this, i, input)
+    class(mask_t), intent(inout) :: this
+    integer, intent(in) :: i
+    integer, intent(in) :: input
+
+    this%array(i) = input
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(this%array, this%array_d, this%mask_size, &
+            HOST_TO_DEVICE, sync = .false.)
+    end if
+
+  end subroutine set_mask_value
+
+  !> Assign the entire mask array to an array.
+  subroutine set_mask_array(this, input)
+    class(mask_t), intent(inout) :: this
+    integer, intent(in), dimension(:) :: input
+
+    call this%free()
+    call this%init(size(input), input)
+
+  end subroutine set_mask_array
+
+  !> Assign the entire mask to another mask.
+  subroutine set_mask_mask(this, other)
+    class(mask_t), intent(inout) :: this
+    class(mask_t), intent(in) :: other
+
+    call this%free()
+    call this%init(other%get_size(), other%get_host())
+
+  end subroutine set_mask_mask
 
 end module mask
