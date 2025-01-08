@@ -35,7 +35,8 @@ module vector
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: sub3, add3, cmult2, cadd2, cfill
   use num_types, only: rp
-  use device, only: device_map, device_free, c_ptr, C_NULL_PTR
+  use device, only: device_map, device_free, device_memcpy, c_ptr, C_NULL_PTR, &
+       HOST_TO_DEVICE
   use device_math, only: device_copy, device_cfill, device_cmult, &
        device_sub3, device_cmult2, device_add3, device_cadd2
   use utils, only: neko_error
@@ -43,13 +44,13 @@ module vector
   implicit none
   private
 
-  type, public ::  vector_t
+  type, public :: vector_t
      !> Vector entries.
      real(kind=rp), allocatable :: x(:)
      !> Device pointer.
      type(c_ptr) :: x_d = C_NULL_PTR
      !> Size of vector.
-     integer :: n  = 0
+     integer :: n = 0
    contains
      !> Initialise a vector of size `n`.
      procedure, pass(v) :: init => vector_init
@@ -61,6 +62,8 @@ module vector
      procedure, pass(v) :: vector_assign_vector
      !> Assignment \f$ v = s \f$.
      procedure, pass(v) :: vector_assign_scalar
+     !> Assignment \f$ v = a \f$.
+     procedure, pass(v) :: vector_assign_array
      !> Vector-vector addition \f$ v = a + b \f$.
      procedure, pass(a) :: vector_add_vector
      !> Vector-scalar addition \f$ v = a + c \f$.
@@ -79,7 +82,7 @@ module vector
      procedure, pass(a) :: vector_cmult_right
 
      generic :: assignment(=) => vector_assign_vector, &
-          vector_assign_scalar
+          vector_assign_scalar, vector_assign_array
      generic :: operator(+) => vector_add_vector, &
           vector_add_scalar_left, vector_add_scalar_right
      generic :: operator(-) => vector_sub_vector, &
@@ -179,6 +182,34 @@ contains
     end if
 
   end subroutine vector_assign_scalar
+
+  !> Assignment \f$ v = w \f$.
+  subroutine vector_assign_array(v, w)
+    class(vector_t), intent(inout) :: v
+    real(kind=rp), dimension(:), pointer, intent(in) :: w
+
+    if (allocated(v%x)) then
+       call v%free()
+    end if
+
+    if (.not. allocated(v%x)) then
+
+       v%n = size(w)
+       allocate(v%x(v%n))
+
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_map(v%x, v%x_d, v%n)
+       end if
+
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(w, v%x_d, v%n, HOST_TO_DEVICE, sync = .true.)
+    else
+       v%x = w
+    end if
+
+  end subroutine vector_assign_array
 
   !> Vector-vector addition \f$ v = a + b \f$.
   function vector_add_vector(a, b) result(v)
