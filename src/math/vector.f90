@@ -36,7 +36,7 @@ module vector
   use math, only: sub3, chsign, add3, cmult2, cadd2, cfill, copy, col3, cdiv2, &
        col2, invcol3
   use num_types, only: rp
-  use device, only: device_map, device_free
+  use device, only: device_map, device_free, HOST_TO_DEVICE, DEVICE_TO_HOST
   use device_math, only: device_copy, device_cfill, device_cmult, &
        device_sub3, device_cmult2, device_add3, device_cadd2, device_col3, &
        device_col2, device_invcol3, device_cdiv2
@@ -91,6 +91,8 @@ module vector
      procedure, pass(a) :: vector_pointwise_div
      !> Change the sign of the vector.
      procedure, pass(a) :: vector_chsign
+     !> Synchronise the vector with the device.
+     procedure, pass(this) :: sync => vector_sync
 
      generic :: assignment(=) => vector_assign_vector, &
           vector_assign_scalar
@@ -166,6 +168,21 @@ contains
     v%n = 0
 
   end subroutine vector_free
+
+  !> Synchronise the vector with the device.
+  subroutine vector_sync(this, direction)
+    class(vector_t), intent(inout) :: this
+    integer, intent(in), optional :: direction
+    integer :: dir
+
+    if (present(direction)) dir = direction
+    if (.not. present(direction)) dir = DEVICE_TO_HOST
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(this%x, this%x_d, this%n, dir)
+    end if
+  end subroutine vector_sync
+
 
   !> Return the number of entries in the vector.
   function vector_size(v) result(s)
