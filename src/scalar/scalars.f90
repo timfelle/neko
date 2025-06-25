@@ -152,8 +152,8 @@ contains
           call json_subdict%add('name', 's')
        end if
 
-       call this%scalar_fields(i)%init(msh, coef, gs, json_subdict, numerics_params, &
-            user, chkp, ulag, vlag, wlag, time_scheme, rho)
+       call this%scalar_fields(i)%init(msh, coef, gs, json_subdict, &
+            numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, rho)
     end do
   end subroutine scalars_init
 
@@ -175,11 +175,13 @@ contains
     allocate(scalar_pnpn_t::this%scalar_fields(1))
 
     ! Set the scalar name to "s"
-    call params%add('name', 's')
+    if (.not. params%valid_path('name')) then
+       call params%add('name', 's')
+    end if
 
     ! Initialize it directly with the params
-    call this%scalar_fields(1)%init(msh, coef, gs, params, numerics_params, user, &
-         chkp, ulag, vlag, wlag, time_scheme, rho)
+    call this%scalar_fields(1)%init(msh, coef, gs, params, numerics_params, &
+         user, chkp, ulag, vlag, wlag, time_scheme, rho)
   end subroutine scalars_init_single
 
   !> Perform a time step for all scalar fields
