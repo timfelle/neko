@@ -118,9 +118,6 @@ contains
     real(kind=rp), dimension(:), allocatable :: brinkman_limits
     real(kind=rp) :: brinkman_penalty
 
-    type(json_value), pointer :: json_object_list
-    type(json_core) :: core
-
     character(len=:), allocatable :: object_type
     type(json_file) :: object_settings
     integer :: n_regions
@@ -157,13 +154,11 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Select which constructor should be called
 
-    call json%get('objects', json_object_list)
     call json%info('objects', n_children = n_regions)
-    call json%get_core(core)
 
     do i = 1, n_regions
-       call json_extract_item(core, json_object_list, i, object_settings)
-       call json_get_or_default(object_settings, 'type', object_type, 'none')
+       call json_extract_item(json, 'objects', i, object_settings)
+       call json_get(object_settings, 'type', object_type)
 
        select case (object_type)
        case ('boundary_mesh')
@@ -171,9 +166,6 @@ contains
        case ('point_zone')
           call this%init_point_zone(object_settings)
 
-       case ('none')
-          call object_settings%print()
-          call neko_error('Brinkman source term objects require a region type')
        case default
           call neko_error('Brinkman source term unknown region type')
        end select

@@ -31,7 +31,7 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> @brief Module containing Signed Distance Functions.
-module signed_distance
+module signed_distance_module
   use num_types, only: dp, rp
   use field, only: field_t
   use tri, only: tri_t
@@ -43,8 +43,15 @@ module signed_distance
 
   implicit none
   private
-  public :: signed_distance_field
 
+  interface signed_distance
+     procedure signed_distance_field
+     procedure signed_distance_field_tri_mesh
+     procedure tri_mesh_brute_force
+     procedure tri_mesh_aabb_tree
+  end interface signed_distance
+
+  public :: signed_distance
 contains
 
   !> @brief Signed distance field
@@ -71,10 +78,10 @@ contains
     end if
 
     select type(object)
-      type is (tri_mesh_t)
+    type is (tri_mesh_t)
        call signed_distance_field_tri_mesh(field_data, object, max_dist)
 
-      class default
+    class default
        call neko_error("signed_distance_field: Object type not supported.")
     end select
 
@@ -110,7 +117,7 @@ contains
 
     if (search_tree%get_size() .ne. mesh%nelv) then
        call neko_error("signed_distance_field_tri_mesh: &
-            & Error building the search tree.")
+       & Error building the search tree.")
     end if
 
     do id = 1, total_size
@@ -125,7 +132,7 @@ contains
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call neko_warning("signed_distance_field_tri_mesh:&
-            & Device version not implemented.")
+       & Device version not implemented.")
        call device_memcpy(field_data%x, field_data%x_d, field_data%size(), &
             HOST_TO_DEVICE, sync = .false.)
     end if
@@ -318,10 +325,10 @@ contains
     real(kind=dp), intent(out), optional :: weighted_sign
 
     select type(element)
-      type is (tri_t)
+    type is (tri_t)
        call element_distance_triangle(element, p, distance, weighted_sign)
 
-      class default
+    class default
        print *, "Error: Element type not supported."
        stop
     end select
@@ -434,4 +441,4 @@ contains
 
   end function cross
 
-end module signed_distance
+end module signed_distance_module
