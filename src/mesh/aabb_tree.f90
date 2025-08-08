@@ -172,6 +172,9 @@ module aabb_tree
 
      procedure, pass(this), public :: print => aabb_tree_print
 
+     !> @brief Returns the diameter of the tree.
+     procedure, pass(this), public :: diameter => aabb_tree_get_diameter
+
      ! ----------------------------------------------------------------------- !
      ! Internal methods
 
@@ -253,7 +256,7 @@ contains
     real(kind=dp) :: distance
 
     distance = 0.5_rp * this%aabb%get_diameter() &
-      - norm2(this%aabb%get_center() - p)
+         - norm2(this%aabb%get_center() - p)
   end function aabb_node_min_distance
 
   ! -------------------------------------------------------------------------- !
@@ -265,7 +268,7 @@ contains
     logical :: res
 
     res = this%left_node_index == AABB_NULL_NODE .and. &
-      this%right_node_index == AABB_NULL_NODE
+         this%right_node_index == AABB_NULL_NODE
   end function aabb_node_is_leaf
 
   !> @brief Returns true if the node is a valid node.
@@ -275,14 +278,14 @@ contains
 
     if (this%is_leaf()) then
        valid = &
-         & this%left_node_index .eq. AABB_NULL_NODE .and. &
-         & this%right_node_index .eq. AABB_NULL_NODE .and. &
-         & this%object_index .gt. 0
+       & this%left_node_index .eq. AABB_NULL_NODE .and. &
+       & this%right_node_index .eq. AABB_NULL_NODE .and. &
+       & this%object_index .gt. 0
     else
        valid = &
-         & this%left_node_index .ne. AABB_NULL_NODE .and. &
-         & this%right_node_index .ne. AABB_NULL_NODE .and. &
-         & this%object_index .eq. -1
+       & this%left_node_index .ne. AABB_NULL_NODE .and. &
+       & this%right_node_index .ne. AABB_NULL_NODE .and. &
+       & this%object_index .eq. -1
     end if
 
   end function aabb_node_is_valid
@@ -485,6 +488,19 @@ contains
     end do
 
   end function aabb_tree_get_size
+
+  !> @brief Returns the diameter of the tree.
+  function aabb_tree_get_diameter(this) result(diameter)
+    class(aabb_tree_t), intent(in) :: this
+    real(kind=dp) :: diameter
+
+    if (this%root_node_index == AABB_NULL_NODE) then
+       diameter = 0.0_dp
+    else
+       diameter = this%nodes(this%root_node_index)%aabb%get_diameter()
+    end if
+
+  end function aabb_tree_get_diameter
 
   ! -------------------------------------------------------------------------- !
   ! Get index of nodes
@@ -739,9 +755,9 @@ contains
 
        new_parent_node_cost = 2.0_rp * combined_aabb%get_surface_area()
        minimum_push_down_cost = 2.0_rp * ( &
-         & combined_aabb%get_surface_area() &
-         & - tree_node%aabb%get_surface_area()&
-         & )
+       & combined_aabb%get_surface_area() &
+       & - tree_node%aabb%get_surface_area()&
+       & )
 
        ! use the costs to figure out whether to create a new parent here or
        ! descend
@@ -751,9 +767,9 @@ contains
        else
           new_left_aabb = merge(leaf_node%aabb, left_node%get_aabb())
           cost_left = ( &
-            & new_left_aabb%get_surface_area() &
-            & - left_node%aabb%get_surface_area()&
-            & ) + minimum_push_down_cost
+          & new_left_aabb%get_surface_area() &
+          & - left_node%aabb%get_surface_area()&
+          & ) + minimum_push_down_cost
        end if
 
        if (right_node%is_leaf()) then
@@ -763,9 +779,9 @@ contains
        else
           new_right_aabb = merge(leaf_node%aabb, right_node%aabb)
           cost_right = ( &
-            & new_right_aabb%get_surface_area() &
-            & - right_node%aabb%get_surface_area() &
-            & ) + minimum_push_down_cost
+          & new_right_aabb%get_surface_area() &
+          & - right_node%aabb%get_surface_area() &
+          & ) + minimum_push_down_cost
        end if
 
        ! if the cost of creating a new parent node here is less than descending

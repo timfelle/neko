@@ -53,7 +53,7 @@ module brinkman_source_term
   use point_zone, only : point_zone_t
   use point_zone_registry, only : neko_point_zone_registry
   use profiler, only : profiler_start_region, profiler_end_region
-  use signed_distance, only : signed_distance_field
+  use signed_distance_module, only : signed_distance_field
   use source_term, only : source_term_t
   use utils, only : neko_error
   use filter, only : filter_t
