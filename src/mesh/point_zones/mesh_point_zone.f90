@@ -84,7 +84,6 @@ contains
     call json_get_or_default(json, "invert", invert, .false.)
     call json_get_or_default(json, "threshold", threshold, 0.0_rp)
 
-
     call mesh_point_zone_init_common(this, size, trim(name), invert, &
          filename, threshold)
 
@@ -157,22 +156,14 @@ contains
     integer :: total_size
     integer :: id
 
-
     real(kind=dp), dimension(3) :: p
     real(kind=dp) :: distance
-
 
     p(1) = x
     p(2) = y
     p(3) = z
 
     distance = signed_distance(search_tree, mesh%el, p, max_distance)
-
-
-
-
-
-
 
     ! Inside if distance from center <= radius
     is_inside = (distance .le. this%threshold)
