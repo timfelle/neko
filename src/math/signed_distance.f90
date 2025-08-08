@@ -223,219 +223,212 @@ contains
     integer :: root_index, left_index, right_index
     real(kind=dp) :: random_value
 
-    ! Determine the buffer size based on the object type
-    select type(object_list(1))
-    type is (tri_t)
-       buffer_distance =
 
-       ! Initialize the stack and the search box
-       call simple_stack%init(size(object_list) * 2)
-       call search_box%init(p - max_distance, p + max_distance)
+    ! Grab a random object and compute the distance to it
+    call random_number(random_value)
+    current_object_index = floor(random_value * size(object_list) + 1)
+    call element_distance(object_list(current_object_index), p, distance, &
+         weighted_sign)
+    distance = min(distance, max_distance)
 
-       ! Check if the root node overlaps the search box, if it does, push it to
-       ! the stack and update the search box to a randomly selected object.
-       root_index = tree%get_root_index()
-       root_box = tree%get_aabb(root_index)
+    ! Initialize the stack and the search box
+    call simple_stack%init(size(object_list) * 2)
+    call search_box%init(p - distance, p + distance)
 
-       if (.not. root_box%overlaps(search_box)) then
-          distance = max_distance
-          weighted_sign = 1.0_dp
-          return
-       end if
+    ! Check if the root node overlaps the search box, if it does, push it to
+    ! the stack and update the search box to a randomly selected object.
+    root_index = tree%get_root_index()
+    root_box = tree%get_aabb(root_index)
 
-       ! Grab a random object and compute the distance to it
-       call random_number(random_value)
-       current_object_index = floor(random_value * size(object_list) + 1)
-       call element_distance(object_list(current_object_index), p, distance, &
-            weighted_sign)
-       distance = distance + object_list(current_object_index)%diameter()
+    if (.not. root_box%overlaps(search_box)) then
+       distance = max_distance
+       weighted_sign = 1.0_dp
+       return
+    end if
 
-       ! Update the search box to the new distance and push the root node
-       call search_box%init(p - distance, p + distance)
-       call simple_stack%push(root_index)
+    ! Traverse the tree and compute the signed distance to the elements
+    do while (.not. simple_stack%is_empty())
+       current_index = simple_stack%pop()
+       if (current_index .eq. AABB_NULL_NODE) cycle
 
-       ! Traverse the tree and compute the signed distance to the elements
-       do while (.not. simple_stack%is_empty())
-          current_index = simple_stack%pop()
-          if (current_index .eq. AABB_NULL_NODE) cycle
+       current_node = tree%get_node(current_index)
+       current_aabb = current_node%get_aabb()
 
-          current_node = tree%get_node(current_index)
-          current_aabb = current_node%get_aabb()
+       if (current_node%is_leaf()) then
+          if (distance .lt. current_node%min_distance(p)) then
+             cycle
+          end if
 
-          if (current_node%is_leaf()) then
-             if (distance .lt. current_node%min_distance(p)) then
-                cycle
-             end if
+          current_object_index = current_node%get_object_index()
+          call element_distance(object_list(current_object_index), p, &
+               current_distance, current_sign)
 
-             current_object_index = current_node%get_object_index()
-             call element_distance(object_list(current_object_index), p, current_distance, current_sign)
+          ! Update the weighted sign, if the relative difference is small
+          if (abs(current_distance - distance) / distance .lt. tol) then
+             weighted_sign = weighted_sign + current_sign
+          else if (current_distance .lt. distance) then
+             weighted_sign = current_sign
+          end if
 
-             ! Update the weighted sign, if the relative difference is small
-             if (abs(current_distance - distance) / distance .lt. tol) then
-                weighted_sign = weighted_sign + current_sign
-             else if (current_distance .lt. distance) then
-                weighted_sign = current_sign
-             end if
+          distance = min(distance, current_distance)
 
-             distance = min(distance, current_distance)
+          ! Update the search box to the new distance
+          if (distance .gt. current_aabb%get_diameter()) then
+             call search_box%init(p - distance, p + distance)
+          end if
+       else
 
-             ! Update the search box to the new distance
-             if (distance .gt. current_aabb%get_diameter()) then
-                call search_box%init(p - distance, p + distance)
-             end if
-          else
-
-             left_index = tree%get_left_index(current_index)
-             if (left_index .ne. AABB_NULL_NODE) then
-                left_node = tree%get_left_node(current_index)
-                if (left_node%aabb%overlaps(search_box)) then
-                   call simple_stack%push(left_index)
-                end if
-             end if
-
-             right_index = tree%get_right_index(current_index)
-             if (right_index .ne. AABB_NULL_NODE) then
-                right_node = tree%get_right_node(current_index)
-                if (right_node%aabb%overlaps(search_box)) then
-                   call simple_stack%push(right_index)
-                end if
+          left_index = tree%get_left_index(current_index)
+          if (left_index .ne. AABB_NULL_NODE) then
+             left_node = tree%get_left_node(current_index)
+             if (left_node%aabb%overlaps(search_box)) then
+                call simple_stack%push(left_index)
              end if
           end if
-       end do
 
-       if (distance .gt. max_distance) then
-          distance = max_distance
+          right_index = tree%get_right_index(current_index)
+          if (right_index .ne. AABB_NULL_NODE) then
+             right_node = tree%get_right_node(current_index)
+             if (right_node%aabb%overlaps(search_box)) then
+                call simple_stack%push(right_index)
+             end if
+          end if
        end if
-       distance = sign(distance, weighted_sign)
+    end do
 
-    end function tri_mesh_aabb_tree
+    if (distance .gt. max_distance) then
+       distance = max_distance
+    end if
+    distance = sign(distance, weighted_sign)
 
-    ! ========================================================================== !
-    ! Element distance functions
-    ! ========================================================================== !
+  end function tri_mesh_aabb_tree
 
-    !> @brief Main interface for the signed distance function for an element.
-    subroutine element_distance(element, p, distance, weighted_sign)
-      class(*), intent(in) :: element
-      real(kind=dp), dimension(3), intent(in) :: p
-      real(kind=dp), intent(out) :: distance
-      real(kind=dp), intent(out), optional :: weighted_sign
+  ! ========================================================================== !
+  ! Element distance functions
+  ! ========================================================================== !
 
-      select type(element)
-      type is (tri_t)
-         call element_distance_triangle(element, p, distance, weighted_sign)
+  !> @brief Main interface for the signed distance function for an element.
+  subroutine element_distance(element, p, distance, weighted_sign)
+    class(*), intent(in) :: element
+    real(kind=dp), dimension(3), intent(in) :: p
+    real(kind=dp), intent(out) :: distance
+    real(kind=dp), intent(out), optional :: weighted_sign
 
-      class default
-         print *, "Error: Element type not supported."
-         stop
-      end select
-    end subroutine element_distance
+    select type(element)
+    type is (tri_t)
+       call element_distance_triangle(element, p, distance, weighted_sign)
 
-    ! -------------------------------------------------------------------------- !
-    ! Specific element distance functions
+    class default
+       print *, "Error: Element type not supported."
+       stop
+    end select
+  end subroutine element_distance
 
-    !> @brief Signed distance function for a triangle
-    !! @details This routine computes the signed distance function for the current
-    !! triangle. We compute the barycentric coordinate of the point projected onto
-    !! the triangle. If the projection is inside the triangle, the distance is the
-    !! distance to the plane. If the projection is outside the triangle, the
-    !! distance is the distance to the nearest edge or vertex.
-    !!
-    !! In order to improve precision of the sign estimation, we also compute the
-    !! weighted sign, which is the perpendicular distance to the plane divided by
-    !! the distance to the nearest point.
-    !!
-    !! @Note The returned distance is signed if the weighted_sign is not present.
-    !!
-    !! @param this Triangle
-    !! @param p Point
-    !! @return Distance value
-    !! @return[optional] Weighted sign
-    subroutine element_distance_triangle(triangle, p, distance, weighted_sign)
-      type(tri_t), intent(in) :: triangle
-      real(kind=dp), dimension(3), intent(in) :: p
+  ! -------------------------------------------------------------------------- !
+  ! Specific element distance functions
 
-      real(kind=dp), intent(out) :: distance
-      real(kind=dp), intent(out), optional :: weighted_sign
+  !> @brief Signed distance function for a triangle
+  !! @details This routine computes the signed distance function for the current
+  !! triangle. We compute the barycentric coordinate of the point projected onto
+  !! the triangle. If the projection is inside the triangle, the distance is the
+  !! distance to the plane. If the projection is outside the triangle, the
+  !! distance is the distance to the nearest edge or vertex.
+  !!
+  !! In order to improve precision of the sign estimation, we also compute the
+  !! weighted sign, which is the perpendicular distance to the plane divided by
+  !! the distance to the nearest point.
+  !!
+  !! @Note The returned distance is signed if the weighted_sign is not present.
+  !!
+  !! @param this Triangle
+  !! @param p Point
+  !! @return Distance value
+  !! @return[optional] Weighted sign
+  subroutine element_distance_triangle(triangle, p, distance, weighted_sign)
+    type(tri_t), intent(in) :: triangle
+    real(kind=dp), dimension(3), intent(in) :: p
 
-      real(kind=dp), dimension(3) :: v1, v2, v3
-      real(kind=dp), dimension(3) :: normal
-      real(kind=dp) :: normal_length
-      real(kind=dp) :: b1, b2, b3
+    real(kind=dp), intent(out) :: distance
+    real(kind=dp), intent(out), optional :: weighted_sign
 
-      real(kind=dp), dimension(3) :: projection
-      real(kind=dp), dimension(3) :: edge
-      real(kind=dp) :: tol = 1e-10_dp
+    real(kind=dp), dimension(3) :: v1, v2, v3
+    real(kind=dp), dimension(3) :: normal
+    real(kind=dp) :: normal_length
+    real(kind=dp) :: b1, b2, b3
 
-      real(kind=dp) :: face_distance
-      real(kind=dp) :: t
+    real(kind=dp), dimension(3) :: projection
+    real(kind=dp), dimension(3) :: edge
+    real(kind=dp) :: tol = 1e-10_dp
 
-      ! Get vertices and the normal vector
-      v1 = triangle%pts(1)%p%x
-      v2 = triangle%pts(2)%p%x
-      v3 = triangle%pts(3)%p%x
+    real(kind=dp) :: face_distance
+    real(kind=dp) :: t
 
-      normal = cross(v2 - v1, v3 - v1)
-      normal_length = norm2(normal)
+    ! Get vertices and the normal vector
+    v1 = triangle%pts(1)%p%x
+    v2 = triangle%pts(2)%p%x
+    v3 = triangle%pts(3)%p%x
 
-      if (normal_length .lt. tol) then
-         distance = huge(1.0_dp)
-         weighted_sign = 0.0_dp
-         return
-      end if
-      normal = normal / normal_length
+    normal = cross(v2 - v1, v3 - v1)
+    normal_length = norm2(normal)
 
-      ! Compute Barycentric coordinates to determine if the point is inside the
-      ! triangular prism, of along an edge or by a face.
-      face_distance = dot_product(p - v1, normal)
+    if (normal_length .lt. tol) then
+       distance = huge(1.0_dp)
+       weighted_sign = 0.0_dp
+       return
+    end if
+    normal = normal / normal_length
 
-      projection = p - normal * face_distance
-      b1 = dot_product(normal, cross(v2 - v1, projection - v1)) / normal_length
-      b2 = dot_product(normal, cross(v3 - v2, projection - v2)) / normal_length
-      b3 = dot_product(normal, cross(v1 - v3, projection - v3)) / normal_length
+    ! Compute Barycentric coordinates to determine if the point is inside the
+    ! triangular prism, of along an edge or by a face.
+    face_distance = dot_product(p - v1, normal)
 
-      if (b1 .le. tol) then
-         edge = v2 - v1
-         t = dot_product(p - v1, edge) / norm2(edge)
-         t = max(0.0_dp, min(1.0_dp, t))
+    projection = p - normal * face_distance
+    b1 = dot_product(normal, cross(v2 - v1, projection - v1)) / normal_length
+    b2 = dot_product(normal, cross(v3 - v2, projection - v2)) / normal_length
+    b3 = dot_product(normal, cross(v1 - v3, projection - v3)) / normal_length
 
-         projection = v1 + t * edge
-      else if (b2 .le. tol) then
-         edge = v3 - v2
-         t = dot_product(p - v2, edge) / norm2(edge)
-         t = max(0.0_dp, min(1.0_dp, t))
+    if (b1 .le. tol) then
+       edge = v2 - v1
+       t = dot_product(p - v1, edge) / norm2(edge)
+       t = max(0.0_dp, min(1.0_dp, t))
 
-         projection = v2 + t * edge
-      else if (b3 .le. tol) then
-         edge = v1 - v3
-         t = dot_product(p - v3, edge) / norm2(edge)
-         t = max(0.0_dp, min(1.0_dp, t))
+       projection = v1 + t * edge
+    else if (b2 .le. tol) then
+       edge = v3 - v2
+       t = dot_product(p - v2, edge) / norm2(edge)
+       t = max(0.0_dp, min(1.0_dp, t))
 
-         projection = v3 + t * edge
-      end if
+       projection = v2 + t * edge
+    else if (b3 .le. tol) then
+       edge = v1 - v3
+       t = dot_product(p - v3, edge) / norm2(edge)
+       t = max(0.0_dp, min(1.0_dp, t))
 
-      distance = norm2(projection - p)
-      if (present(weighted_sign)) then
-         weighted_sign = face_distance / distance
-      else
-         distance = sign(distance, face_distance)
-      end if
+       projection = v3 + t * edge
+    end if
 
-    end subroutine element_distance_triangle
+    distance = norm2(projection - p)
+    if (present(weighted_sign)) then
+       weighted_sign = face_distance / distance
+    else
+       distance = sign(distance, face_distance)
+    end if
 
-    !> Compute cross product of two vectors
-    !> @param[in] a First vector
-    !> @param[in] b Second vector
-    !> @return Cross product \f$ a \times b \f$
-    pure function cross(a, b) result(c)
-      real(kind=dp), dimension(3), intent(in) :: a
-      real(kind=dp), dimension(3), intent(in) :: b
-      real(kind=dp), dimension(3) :: c
+  end subroutine element_distance_triangle
 
-      c(1) = a(2) * b(3) - a(3) * b(2)
-      c(2) = a(3) * b(1) - a(1) * b(3)
-      c(3) = a(1) * b(2) - a(2) * b(1)
+  !> Compute cross product of two vectors
+  !> @param[in] a First vector
+  !> @param[in] b Second vector
+  !> @return Cross product \f$ a \times b \f$
+  pure function cross(a, b) result(c)
+    real(kind=dp), dimension(3), intent(in) :: a
+    real(kind=dp), dimension(3), intent(in) :: b
+    real(kind=dp), dimension(3) :: c
 
-    end function cross
+    c(1) = a(2) * b(3) - a(3) * b(2)
+    c(2) = a(3) * b(1) - a(1) * b(3)
+    c(3) = a(1) * b(2) - a(2) * b(1)
 
-  end module signed_distance_module
+  end function cross
+
+end module signed_distance_module
