@@ -454,7 +454,7 @@ contains
        scalar_r = real(scalar_d, kind=rp)
 
        call signed_distance_field(temp_field, boundary_mesh, scalar_d)
-       call smooth_step_field(temp_field, scalar_r, 0.0_rp)
+       !  call smooth_step_field(temp_field, scalar_r, 0.0_rp)
 
     case ('step')
 

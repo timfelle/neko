@@ -36,10 +36,13 @@ module signed_distance
   use field, only: field_t
   use tri, only: tri_t
   use tri_mesh, only: tri_mesh_t
-  use aabb_tree, only: aabb_tree_t
+  use aabb_tree, only: aabb_tree_t, aabb_node_t, AABB_NULL_NODE
   use device, only: device_memcpy, HOST_TO_DEVICE
   use neko_config, only: NEKO_BCKND_DEVICE
   use utils, only: neko_error, neko_warning
+  use aabb, only: aabb_t
+  use stack, only: stack_i4_t
+  use point, only: point_t
 
   implicit none
   private
@@ -71,10 +74,10 @@ contains
     end if
 
     select type(object)
-      type is (tri_mesh_t)
+    type is (tri_mesh_t)
        call signed_distance_field_tri_mesh(field_data, object, max_dist)
 
-      class default
+    class default
        call neko_error("signed_distance_field: Object type not supported.")
     end select
 
@@ -110,7 +113,7 @@ contains
 
     if (search_tree%get_size() .ne. mesh%nelv) then
        call neko_error("signed_distance_field_tri_mesh: &
-            & Error building the search tree.")
+       & Error building the search tree.")
     end if
 
     do id = 1, total_size
@@ -125,7 +128,7 @@ contains
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call neko_warning("signed_distance_field_tri_mesh:&
-            & Device version not implemented.")
+       & Device version not implemented.")
        call device_memcpy(field_data%x, field_data%x_d, field_data%size(), &
             HOST_TO_DEVICE, sync = .false.)
     end if
@@ -143,12 +146,6 @@ contains
   !! @param mesh Boundary mesh
   !! @return Signed distance value
   function tri_mesh_brute_force(mesh, p, max_distance) result(distance)
-    use tri, only: tri_t
-    use point, only: point_t
-    use num_types, only: dp
-
-    implicit none
-
     type(tri_mesh_t), intent(in) :: mesh
     real(kind=dp), intent(in) :: p(3)
     real(kind=dp), intent(in) :: max_distance
@@ -192,11 +189,6 @@ contains
   !! @param max_distance Maximum distance outside the mesh
   !! @return Signed distance value
   function tri_mesh_aabb_tree(tree, object_list, p, max_distance) result(distance)
-    use aabb, only: aabb_t
-    use aabb_tree, only: aabb_node_t, AABB_NULL_NODE
-    use stack, only: stack_i4_t
-    implicit none
-
     class(aabb_tree_t), intent(in) :: tree
     class(tri_t), dimension(:), intent(in) :: object_list
     real(kind=dp), dimension(3), intent(in) :: p
@@ -205,7 +197,7 @@ contains
     real(kind=dp) :: distance
     real(kind=dp) :: weighted_sign
 
-    real(kind=dp), parameter :: tol = 1.0e-6_dp
+    real(kind=dp), parameter :: tol = 1.0e-3_dp
 
     type(stack_i4_t) :: simple_stack
     integer :: current_index
@@ -226,8 +218,8 @@ contains
     real(kind=dp) :: random_value
 
     ! Initialize the stack and the search box
-    call simple_stack%init(size(object_list) * 2)
-    call search_box%init(p - max_distance, p + max_distance)
+    call simple_stack%init(10)
+    call search_box%init(p - 1.01_dp * max_distance, p + 1.01_dp * max_distance)
 
     ! Check if the root node overlaps the search box, if it does, push it to
     ! the stack and update the search box to a randomly selected object.
@@ -236,7 +228,6 @@ contains
 
     if (.not. root_box%overlaps(search_box)) then
        distance = max_distance
-       weighted_sign = 1.0_dp
        return
     end if
 
@@ -264,19 +255,19 @@ contains
           end if
 
           current_object_index = current_node%get_object_index()
-          call element_distance(object_list(current_object_index), p, current_distance, current_sign)
+          call element_distance(object_list(current_object_index), p, &
+               current_distance, current_sign)
 
           ! Update the weighted sign, if the relative difference is small
-          if (abs(current_distance - distance) / distance .lt. tol) then
-             weighted_sign = weighted_sign + current_sign
-          else if (current_distance .lt. distance) then
+          if (current_distance .lt. (1.0_dp - tol) * distance) then
              weighted_sign = current_sign
+          else if (current_distance .lt. (1.0_dp + tol) * distance) then
+             weighted_sign = weighted_sign + current_sign
           end if
 
-          distance = min(distance, current_distance)
-
-          ! Update the search box to the new distance
-          if (distance .gt. current_aabb%get_diameter()) then
+          ! Update the distance and the search box
+          if (current_distance .lt. distance) then
+             distance = current_distance
              call search_box%init(p - distance, p + distance)
           end if
        else
@@ -318,10 +309,10 @@ contains
     real(kind=dp), intent(out), optional :: weighted_sign
 
     select type(element)
-      type is (tri_t)
+    type is (tri_t)
        call element_distance_triangle(element, p, distance, weighted_sign)
 
-      class default
+    class default
        print *, "Error: Element type not supported."
        stop
     end select
