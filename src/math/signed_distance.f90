@@ -197,13 +197,12 @@ contains
     real(kind=dp) :: distance
     real(kind=dp) :: weighted_sign
 
-    real(kind=dp), parameter :: tol = 1.0e-3_dp
+    real(kind=dp), parameter :: tol = 1.0e-2_dp
 
     type(stack_i4_t) :: simple_stack
     integer :: current_index
 
     type(aabb_node_t) :: current_node
-    type(aabb_t) :: current_aabb
     integer :: current_object_index
     real(kind=dp) :: current_distance
     real(kind=dp) :: current_sign
@@ -244,32 +243,27 @@ contains
     ! Traverse the tree and compute the signed distance to the elements
     do while (.not. simple_stack%is_empty())
        current_index = simple_stack%pop()
-       if (current_index .eq. AABB_NULL_NODE) cycle
-
        current_node = tree%get_node(current_index)
-       current_aabb = current_node%get_aabb()
 
        if (current_node%is_leaf()) then
-          if (distance .lt. current_node%min_distance(p)) then
-             cycle
-          end if
+          current_distance = current_node%min_distance(p)
+          if (current_distance .gt. distance + tol * max_distance) cycle
 
           current_object_index = current_node%get_object_index()
           call element_distance(object_list(current_object_index), p, &
                current_distance, current_sign)
 
           ! Update the weighted sign, if the relative difference is small
-          if (current_distance .lt. (1.0_dp - tol) * distance) then
-             weighted_sign = current_sign
-          else if (current_distance .lt. (1.0_dp + tol) * distance) then
+          if (abs(current_distance - distance) .lt. tol * max_distance) then
              weighted_sign = weighted_sign + current_sign
+          else if (current_distance .lt. distance) then
+             weighted_sign = current_sign
           end if
 
           ! Update the distance and the search box
-          if (current_distance .lt. distance) then
-             distance = current_distance
-             call search_box%init(p - distance, p + distance)
-          end if
+          distance = min(current_distance, distance)
+          call search_box%init(p - distance + tol * max_distance, &
+               p + distance + tol * max_distance)
        else
 
           left_index = tree%get_left_index(current_index)
@@ -403,7 +397,7 @@ contains
 
     distance = norm2(projection - p)
     if (present(weighted_sign)) then
-       weighted_sign = face_distance / distance
+       weighted_sign = sign((face_distance / distance)**2, face_distance)
     else
        distance = sign(distance, face_distance)
     end if

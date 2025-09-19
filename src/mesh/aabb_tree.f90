@@ -251,10 +251,13 @@ contains
   function aabb_node_min_distance(this, p) result(distance)
     class(aabb_node_t), intent(in) :: this
     real(kind=dp), dimension(3), intent(in) :: p
-    real(kind=dp) :: distance
+    real(kind=dp), dimension(3) :: center
+    real(kind=dp) :: distance, diameter
 
-    distance = 0.5_rp * this%aabb%get_diameter() &
-         - norm2(this%aabb%get_center() - p)
+    center = this%aabb%get_center()
+    diameter = this%aabb%get_diameter()
+    distance = norm2(center - p) - 0.5_rp * diameter
+
   end function aabb_node_min_distance
 
   ! -------------------------------------------------------------------------- !
