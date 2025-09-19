@@ -402,13 +402,175 @@ contains
     end if
 
     distance = norm2(projection - p)
-    if (present(weighted_sign)) then
-       weighted_sign = face_distance / distance
-    else
-       distance = sign(distance, face_distance)
-    end if
 
   end subroutine element_distance_triangle
+
+  ! -------------------------------------------------------------------------- !
+
+  function sign_ray_marching(tree, object_list, p, max_distance, n_rays) &
+       result(sign_value)
+    class(aabb_tree_t), intent(in) :: tree
+    class(tri_t), dimension(:), intent(in) :: object_list
+    real(kind=dp), dimension(3), intent(in) :: p
+    real(kind=dp), intent(in) :: max_distance
+    integer, intent(in) :: n_rays
+    real(kind=dp) :: sign_value
+
+    integer :: i
+    real(kind=dp), dimension(3) :: center, direction
+    real(kind=dp) :: distance, step_size
+    integer :: hit_counter
+    logical :: hit
+
+    type(aabb_t) :: search_box
+    type(stack_i4_t) :: simple_stack
+
+    integer :: root_index, left_index, right_index
+    type(aabb_t) :: root_box
+    type(aabb_node_t) :: current_node, left_node, right_node
+    integer :: current_index, current_object_index
+
+    ! Initialize the stack and output parameter
+    call simple_stack%init(10)
+    sign_value = 0.0_dp
+    step_size = 1.0e-1_dp * max_distance
+
+    do i = 1, n_rays
+
+       ! Determine which direction to march
+       call random_number(direction)
+       direction = direction - 0.5_dp
+       direction = direction / norm2(direction)
+
+       center = p
+       call search_box%init(p - step_size, p + step_size)
+
+       ! Check if the root node overlaps the search box, if it does, push it to
+       ! the stack and update the search box to a randomly selected object.
+       root_index = tree%get_root_index()
+       root_box = tree%get_aabb(root_index)
+
+       hit_counter = 0
+       distance = 0.0_dp
+       do while (search_box%overlaps(root_box))
+          call simple_stack%push(root_index)
+
+          ! Traverse the tree and compute the ray intersections
+          do while (.not. simple_stack%is_empty())
+
+             ! Check for a valid node
+             current_index = simple_stack%pop()
+             current_node = tree%get_node(current_index)
+
+             if (current_node%is_leaf()) then
+                current_object_index = current_node%get_object_index()
+                hit = ray_intersect(object_list(current_object_index), p, direction)
+                if (hit) hit_counter = hit_counter + 1
+
+             else
+
+                ! Add the left child node if it overlaps the search box
+                left_index = tree%get_left_index(current_index)
+                if (left_index .ne. AABB_NULL_NODE) then
+                   left_node = tree%get_left_node(current_index)
+                   if (left_node%aabb%overlaps(search_box)) then
+                      call simple_stack%push(left_index)
+                   end if
+                end if
+
+                ! Add the right child node if it overlaps the search box
+                right_index = tree%get_right_index(current_index)
+                if (right_index .ne. AABB_NULL_NODE) then
+                   right_node = tree%get_right_node(current_index)
+                   if (right_node%aabb%overlaps(search_box)) then
+                      call simple_stack%push(right_index)
+                   end if
+                end if
+             end if
+          end do
+
+          ! Update the search box to the new distance and push the root node
+          distance = distance + step_size
+          center = p + direction * distance
+          call search_box%init(center - step_size, center + step_size)
+       end do
+
+       ! The sign is determined by the parity of the hit counter
+       if (mod(hit_counter, 2) .eq. 0) then
+          sign_value = sign_value + 1.0_dp
+       else
+          sign_value = sign_value - 1.0_dp
+       end if
+    end do
+
+    if (sign_value .gt. 0.0_dp) then
+       sign_value = 1.0_dp
+    else
+       sign_value = -1.0_dp
+    end if
+
+  end function sign_ray_marching
+
+  ! -------------------------------------------------------------------------- !
+
+  function ray_intersect(triangle, p, direction) result(hit)
+    type(tri_t), intent(in) :: triangle
+    real(kind=dp), dimension(3), intent(in) :: p
+    real(kind=dp), dimension(3), intent(out) :: direction
+    logical :: hit
+
+    real(kind=dp), dimension(3) :: v1, v2, v3
+    real(kind=dp), dimension(3) :: ray_cross_e2
+
+    real(kind=dp), dimension(3) :: projection
+    real(kind=dp), dimension(3) :: edge1, edge2
+    real(kind=dp) :: det, inv_det
+    real(kind=dp) :: u, v, t
+    real(kind=dp), dimension(3) :: s, s_cross_e1
+
+    real(kind=dp) :: face_distance
+    real(kind=dp), parameter :: epsilon = 1e-10_dp
+
+    hit = .false.
+
+    ! Get vertices and the normal vector
+    v1 = triangle%pts(1)%p%x
+    v2 = triangle%pts(2)%p%x
+    v3 = triangle%pts(3)%p%x
+
+    edge1 = v2 - v1
+    edge2 = v3 - v1
+
+    ray_cross_e2 = cross(direction, edge2)
+    det = dot(edge1, ray_cross_e2)
+
+    if (abs(det) .lt. epsilon) return
+
+    inv_det = 1.0_dp / det
+    s = p - v1
+    u = inv_det * dot(s, ray_cross_e2)
+
+    if ((u < 0.0_dp .and. abs(u) > epsilon) .or. &
+         (u > 1.0_dp .and. abs(u - 1.0_dp) > epsilon)) then
+       return
+    end if
+
+    s_cross_e1 = cross(s, edge1)
+    v = inv_det * dot(direction, s_cross_e1)
+
+    if ((v < 0.0_dp .and. abs(v) > epsilon) .or. &
+         (u + v > 1.0_dp .and. abs(u + v - 1.0_dp) > epsilon)) then
+       return
+    end if
+
+    ! At this stage we can compute t to find out where the intersection point is on the line.
+    t = inv_det * dot(edge2, s_cross_e1)
+
+    if (t > epsilon) then! ray intersection
+       hit = .true.
+    end if
+
+  end function ray_intersect
 
   !> Compute cross product of two vectors
   !> @param[in] a First vector
@@ -424,5 +586,18 @@ contains
     c(3) = a(1) * b(2) - a(2) * b(1)
 
   end function cross
+
+  !> Compute dot product of two vectors
+  !> @param[in] a First vector
+  !> @param[in] b Second vector
+  !> @return Cross product \f$ a \times b \f$
+  pure function dot(a, b) result(c)
+    real(kind=dp), dimension(3), intent(in) :: a
+    real(kind=dp), dimension(3), intent(in) :: b
+    real(kind=dp) :: c
+
+    c = a(1) * b(1) + a(2) * b(2) + a(3) * b(3)
+
+  end function dot
 
 end module signed_distance
