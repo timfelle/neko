@@ -107,7 +107,7 @@ contains
     ! Calculate total number of fields
     n_scalars = 0
     if (present(scalar_fields)) then
-       n_scalars = size(scalar_fields%scalar_fields)
+       n_scalars = scalar_fields%n_scalars()
     end if
 
     ! Check if max_wave_speed field exists (for compressible flows)
@@ -149,7 +149,7 @@ contains
     if (present(scalar_fields)) then
        do j = 1, n_scalars
           i = i + 1
-          call this%fluid%assign(i, scalar_fields%scalar_fields(j)%scalar%s)
+          call this%fluid%assign(i, scalar_fields%scalar_schemes(j)%scalar%s)
        end do
     end if
 

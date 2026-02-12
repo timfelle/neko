@@ -241,7 +241,6 @@ module scalar_scheme
           scalar_scheme_wrapper_is_allocated
   end type scalar_scheme_wrapper_t
 
-
   interface
      !> Scalar scheme factory.
      !! Both constructs and initializes the object.
