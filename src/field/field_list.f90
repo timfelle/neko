@@ -75,7 +75,7 @@ contains
   !> Get an item pointer by array index
   !! @param i The index of the item.
   function field_list_get_by_index(this, i) result(f)
-    class(field_list_t), intent(inout) :: this
+    class(field_list_t), intent(in), target :: this
     type(field_t), pointer :: f
     integer, intent(in) :: i
     f => this%items(i)%ptr
@@ -84,7 +84,7 @@ contains
   !> Get an item pointer by array index
   !! @param i The index of the item.
   function field_list_get_by_name(this, name) result(f)
-    class(field_list_t), intent(inout) :: this
+    class(field_list_t), intent(in), target :: this
     type(field_t), pointer :: f
     character(len=*), intent(in) :: name
     integer :: i

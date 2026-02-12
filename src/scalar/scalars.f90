@@ -59,8 +59,10 @@ module scalars
 
   !> Type to manage multiple scalar transport equations
   type, public :: scalars_t
-     !> The scalar fields
+     !> The scalar schemes
      type(scalar_scheme_wrapper_t), allocatable :: scalar_schemes(:)
+     !> The scalar fields
+     type(field_list_t) :: scalar_fields
      !> Shared KSP solver for all scalar fields
      class(ksp_t), allocatable :: shared_ksp
    contains
@@ -107,6 +109,7 @@ contains
 
     ! Allocate the array of the scalar scheme wrappers
     allocate(this%scalar_schemes(n_scalars))
+    call this%scalar_fields%init(n_scalars)
 
     ! Collect and validate field names for all scalars
     allocate(character(len=256) :: field_names(n_scalars))
@@ -154,6 +157,9 @@ contains
        ! Allocate the scalar fields
        call this%scalar_schemes(i)%init(msh, coef, gs, json_subdict, &
             numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, rho)
+
+       ! Store a reference to the scalar field in the scalar_fields list
+       call this%scalar_fields%assign(i, this%scalar_schemes(i)%scalar%s)
     end do
 
     ! Register all scalar lag fields with checkpoint using scalable approach
@@ -184,6 +190,7 @@ contains
 
     ! Allocate a single scalar field
     allocate(this%scalar_schemes(1))
+    call this%scalar_fields%init(1)
 
     ! Set the scalar name to "s"
     if (.not. params%valid_path('name')) then
@@ -193,6 +200,7 @@ contains
     ! Initialize it directly with the params
     call this%scalar_schemes(1)%init(msh, coef, gs, params, numerics_params, &
          user, chkp, ulag, vlag, wlag, time_scheme, rho)
+    call this%scalar_fields%assign(1, this%scalar_schemes(1)%scalar%s)
 
     ! Register single scalar with checkpoint
     select type (scalar => this%scalar_schemes(1)%scalar)
@@ -213,6 +221,8 @@ contains
        end do
        deallocate(this%scalar_schemes)
     end if
+
+    call this%scalar_fields%free()
 
     if (allocated(this%shared_ksp)) then
        call this%shared_ksp%free()
