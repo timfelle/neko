@@ -44,6 +44,7 @@ module checkpoint
   use mesh, only : mesh_t
   use math, only : NEKO_EPS
   use global_interpolation, only : GLOB_INTERP_TOL
+  use time_state, only: time_state_t
   implicit none
   private
 
@@ -108,10 +109,12 @@ module checkpoint
      procedure, pass(this) :: init => chkp_init
      procedure, pass(this) :: sync_host => chkp_sync_host
      procedure, pass(this) :: sync_device => chkp_sync_device
+     procedure, pass(this) :: add_time => chkp_add_time
      procedure, pass(this) :: add_fluid => chkp_add_fluid
      procedure, pass(this) :: add_lag => chkp_add_lag
      procedure, pass(this) :: add_scalar => chkp_add_scalar
      procedure, pass(this) :: add_ale => chkp_add_ale
+     procedure, pass(this) :: restart => chkp_restart
      procedure, pass(this) :: restart_time => chkp_restart_time
      procedure, pass(this) :: free => chkp_free
   end type chkp_t
@@ -334,7 +337,7 @@ contains
             call this%wm_y%copy_from(HOST_TO_DEVICE, sync = .false.)
             call this%wm_z%copy_from(HOST_TO_DEVICE, sync = .false.)
             if (associated(this%wm_x_lag) .and. associated(this%wm_y_lag) .and. &
-                associated(this%wm_z_lag)) then
+                 associated(this%wm_z_lag)) then
                call this%wm_x_lag%lf(1)%copy_from(HOST_TO_DEVICE, &
                     sync = .false.)
                call this%wm_x_lag%lf(2)%copy_from(HOST_TO_DEVICE, &
@@ -383,6 +386,32 @@ contains
 
   end subroutine chkp_sync_device
 
+  !> Add time information to checkpoint
+  subroutine chkp_add_time(this, time)
+    class(chkp_t), intent(inout) :: this
+    class(time_state_t), intent(in), target :: time
+
+    this%t = real(time%t, kind=dp)
+    this%dtlag => time%dtlag
+    this%tlag => time%tlag
+  end subroutine chkp_add_time
+
+  !> Restart time state from checkpoint payload
+  subroutine chkp_restart(this, time)
+    class(chkp_t), intent(in) :: this
+    class(time_state_t), intent(inout) :: time
+
+    time%t = real(this%t, kind=rp)
+
+    if (associated(this%dtlag)) then
+       time%dtlag = this%dtlag
+    end if
+
+    if (associated(this%tlag)) then
+       time%tlag = this%tlag
+    end if
+  end subroutine chkp_restart
+
   !> Add a fluid to the checkpoint
   subroutine chkp_add_fluid(this, u, v, w, p)
     class(chkp_t), intent(inout) :: this
@@ -393,13 +422,12 @@ contains
 
     ! Check that all velocity components are defined on the same
     ! function space
-    if ( u%Xh .ne. v%Xh .or. &
-         u%Xh .ne. w%Xh ) then
+    if (u%Xh .ne. v%Xh .or. u%Xh .ne. w%Xh) then
        call neko_error('Different function spaces for each velocity component')
     end if
 
     ! Check that both velocity and pressure is defined on the same mesh
-    if ( u%msh%nelv .ne. p%msh%nelv ) then
+    if (u%msh%nelv .ne. p%msh%nelv) then
        call neko_error('Velocity and pressure defined on different meshes')
     end if
 
