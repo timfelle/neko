@@ -179,9 +179,16 @@ contains
           call new_zone_dist(pe_rank)%push(recv_buf_zone(j))
        end do
 
-       call MPI_Sendrecv(new_curve_dist(dst)%array(), &
-            new_curve_dist(dst)%size(), MPI_NMSH_CURVE, dst, 2, recv_buf_curve,&
-            max_recv(3), MPI_NMSH_CURVE, src, 2, NEKO_COMM, status, ierr)
+       ! We should use the %array() procedure, which works great for
+       ! GNU, Intel and NEC, but it breaks horribly on Cray when using
+       ! certain data types
+       select type (ncd_array => new_curve_dist(dst)%data)
+       type is (nmsh_curve_el_t)
+          call MPI_Sendrecv(ncd_array, &
+               new_curve_dist(dst)%size(), MPI_NMSH_CURVE, dst, 2, &
+               recv_buf_curve, max_recv(3), MPI_NMSH_CURVE, src, 2, &
+               NEKO_COMM, status, ierr)
+       end select
        call MPI_Get_count(status, MPI_NMSH_CURVE, recv_size, ierr)
 
        do j = 1, recv_size
