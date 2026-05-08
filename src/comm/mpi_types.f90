@@ -33,7 +33,8 @@
 !> MPI derived types
 module neko_mpi_types
   use comm, only : NEKO_COMM, MPI_REAL_PRECISION
-  use mpi_f08, only : MPI_Type_size, MPI_Type_create_struct, MPI_Type_commit, &
+  use mpi_f08, only : MPI_Type_size, MPI_Type_create_struct, &
+       MPI_Type_create_resized, MPI_Type_commit, MPI_Type_free, &
        MPI_Get_address, MPI_REAL, MPI_DOUBLE_PRECISION, MPI_CHARACTER, &
        MPI_INTEGER, MPI_LOGICAL, MPI_INTEGER2, MPI_ADDRESS_KIND, &
        MPI_Datatype, MPI_Aint_diff
@@ -118,28 +119,32 @@ contains
 
   !> Define a MPI derived type for a 3d nmsh hex
   subroutine mpi_type_nmsh_hex_init
-    type(nmsh_hex_t) :: nmsh_hex
-    type(MPI_Datatype) :: type(17)
-    integer(kind=MPI_ADDRESS_KIND) :: disp(17), base
+    type(nmsh_hex_t) :: nmsh_hex(2)
+    type(MPI_Datatype) :: type(17), type_tmp
+    integer(kind=MPI_ADDRESS_KIND) :: disp(17), base, stride
     integer :: len(17), i, ierr
 
-    call MPI_Get_address(nmsh_hex%el_idx, disp(1), ierr)
-    call MPI_Get_address(nmsh_hex%v(1)%v_idx, disp(2), ierr)
-    call MPI_Get_address(nmsh_hex%v(1)%v_xyz, disp(3), ierr)
-    call MPI_Get_address(nmsh_hex%v(2)%v_idx, disp(4), ierr)
-    call MPI_Get_address(nmsh_hex%v(2)%v_xyz, disp(5), ierr)
-    call MPI_Get_address(nmsh_hex%v(3)%v_idx, disp(6), ierr)
-    call MPI_Get_address(nmsh_hex%v(3)%v_xyz, disp(7), ierr)
-    call MPI_Get_address(nmsh_hex%v(4)%v_idx, disp(8), ierr)
-    call MPI_Get_address(nmsh_hex%v(4)%v_xyz, disp(9), ierr)
-    call MPI_Get_address(nmsh_hex%v(5)%v_idx, disp(10), ierr)
-    call MPI_Get_address(nmsh_hex%v(5)%v_xyz, disp(11), ierr)
-    call MPI_Get_address(nmsh_hex%v(6)%v_idx, disp(12), ierr)
-    call MPI_Get_address(nmsh_hex%v(6)%v_xyz, disp(13), ierr)
-    call MPI_Get_address(nmsh_hex%v(7)%v_idx, disp(14), ierr)
-    call MPI_Get_address(nmsh_hex%v(7)%v_xyz, disp(15), ierr)
-    call MPI_Get_address(nmsh_hex%v(8)%v_idx, disp(16), ierr)
-    call MPI_Get_address(nmsh_hex%v(8)%v_xyz, disp(17), ierr)
+    call MPI_Get_address(nmsh_hex(1)%el_idx, disp(1), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(1)%v_idx, disp(2), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(1)%v_xyz, disp(3), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(2)%v_idx, disp(4), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(2)%v_xyz, disp(5), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(3)%v_idx, disp(6), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(3)%v_xyz, disp(7), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(4)%v_idx, disp(8), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(4)%v_xyz, disp(9), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(5)%v_idx, disp(10), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(5)%v_xyz, disp(11), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(6)%v_idx, disp(12), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(6)%v_xyz, disp(13), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(7)%v_idx, disp(14), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(7)%v_xyz, disp(15), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(8)%v_idx, disp(16), ierr)
+    call MPI_Get_address(nmsh_hex(1)%v(8)%v_xyz, disp(17), ierr)
+
+    call MPI_Get_address(nmsh_hex(1), base, ierr)
+    call MPI_Get_address(nmsh_hex(2), stride, ierr)
+    stride = MPI_Aint_diff(stride, base)
 
 
     base = disp(1)
@@ -154,26 +159,33 @@ contains
     type(1) = MPI_INTEGER
     type(2:16:2) = MPI_INTEGER
     type(3:17:2) = MPI_DOUBLE_PRECISION
-    call MPI_Type_create_struct(17, len, disp, type, MPI_NMSH_HEX, ierr)
+    call MPI_Type_create_struct(17, len, disp, type, type_tmp, ierr)
+    call MPI_Type_create_resized(type_tmp, 0_MPI_ADDRESS_KIND, stride, &
+         MPI_NMSH_HEX, ierr)
     call MPI_Type_commit(MPI_NMSH_HEX, ierr)
+    call MPI_Type_free(type_tmp, ierr)
   end subroutine mpi_type_nmsh_hex_init
 
   !> Define a MPI derived type for a 2d nmsh quad
   subroutine mpi_type_nmsh_quad_init
-    type(nmsh_quad_t) :: nmsh_quad
-    type(MPI_Datatype) :: type(9)
-    integer(kind=MPI_ADDRESS_KIND) :: disp(9), base
+    type(nmsh_quad_t) :: nmsh_quad(2)
+    type(MPI_Datatype) :: type(9), type_tmp
+    integer(kind=MPI_ADDRESS_KIND) :: disp(9), base, stride
     integer :: len(9), i, ierr
 
-    call MPI_Get_address(nmsh_quad%el_idx, disp(1), ierr)
-    call MPI_Get_address(nmsh_quad%v(1)%v_idx, disp(2), ierr)
-    call MPI_Get_address(nmsh_quad%v(1)%v_xyz, disp(3), ierr)
-    call MPI_Get_address(nmsh_quad%v(2)%v_idx, disp(4), ierr)
-    call MPI_Get_address(nmsh_quad%v(2)%v_xyz, disp(5), ierr)
-    call MPI_Get_address(nmsh_quad%v(3)%v_idx, disp(6), ierr)
-    call MPI_Get_address(nmsh_quad%v(3)%v_xyz, disp(7), ierr)
-    call MPI_Get_address(nmsh_quad%v(4)%v_idx, disp(8), ierr)
-    call MPI_Get_address(nmsh_quad%v(4)%v_xyz, disp(9), ierr)
+    call MPI_Get_address(nmsh_quad(1)%el_idx, disp(1), ierr)
+    call MPI_Get_address(nmsh_quad(1)%v(1)%v_idx, disp(2), ierr)
+    call MPI_Get_address(nmsh_quad(1)%v(1)%v_xyz, disp(3), ierr)
+    call MPI_Get_address(nmsh_quad(1)%v(2)%v_idx, disp(4), ierr)
+    call MPI_Get_address(nmsh_quad(1)%v(2)%v_xyz, disp(5), ierr)
+    call MPI_Get_address(nmsh_quad(1)%v(3)%v_idx, disp(6), ierr)
+    call MPI_Get_address(nmsh_quad(1)%v(3)%v_xyz, disp(7), ierr)
+    call MPI_Get_address(nmsh_quad(1)%v(4)%v_idx, disp(8), ierr)
+    call MPI_Get_address(nmsh_quad(1)%v(4)%v_xyz, disp(9), ierr)
+
+    call MPI_Get_address(nmsh_quad(1), base, ierr)
+    call MPI_Get_address(nmsh_quad(2), stride, ierr)
+    stride = MPI_Aint_diff(stride, base)
 
 
     base = disp(1)
@@ -188,23 +200,30 @@ contains
     type(1) = MPI_INTEGER
     type(2:8:2) = MPI_INTEGER
     type(3:9:2) = MPI_DOUBLE_PRECISION
-    call MPI_Type_create_struct(9, len, disp, type, MPI_NMSH_QUAD, ierr)
+    call MPI_Type_create_struct(9, len, disp, type, type_tmp, ierr)
+    call MPI_Type_create_resized(type_tmp, 0_MPI_ADDRESS_KIND, stride, &
+         MPI_NMSH_QUAD, ierr)
     call MPI_Type_commit(MPI_NMSH_QUAD, ierr)
+    call MPI_Type_free(type_tmp, ierr)
   end subroutine mpi_type_nmsh_quad_init
 
   !> Define a MPI derived type for a nmsh zone
   subroutine mpi_type_nmsh_zone_init
-    type(nmsh_zone_t) :: nmsh_zone
-    type(MPI_Datatype) :: type(6)
-    integer(kind=MPI_ADDRESS_KIND) :: disp(6), base
+    type(nmsh_zone_t) :: nmsh_zone(2)
+    type(MPI_Datatype) :: type(6), type_tmp
+    integer(kind=MPI_ADDRESS_KIND) :: disp(6), base, stride
     integer :: len(6), i, ierr
 
-    call MPI_Get_address(nmsh_zone%e, disp(1), ierr)
-    call MPI_Get_address(nmsh_zone%f, disp(2), ierr)
-    call MPI_Get_address(nmsh_zone%p_e, disp(3), ierr)
-    call MPI_Get_address(nmsh_zone%p_f, disp(4), ierr)
-    call MPI_Get_address(nmsh_zone%glb_pt_ids, disp(5), ierr)
-    call MPI_Get_address(nmsh_zone%type, disp(6), ierr)
+    call MPI_Get_address(nmsh_zone(1)%e, disp(1), ierr)
+    call MPI_Get_address(nmsh_zone(1)%f, disp(2), ierr)
+    call MPI_Get_address(nmsh_zone(1)%p_e, disp(3), ierr)
+    call MPI_Get_address(nmsh_zone(1)%p_f, disp(4), ierr)
+    call MPI_Get_address(nmsh_zone(1)%glb_pt_ids, disp(5), ierr)
+    call MPI_Get_address(nmsh_zone(1)%type, disp(6), ierr)
+
+    call MPI_Get_address(nmsh_zone(1), base, ierr)
+    call MPI_Get_address(nmsh_zone(2), stride, ierr)
+    stride = MPI_Aint_diff(stride, base)
 
     base = disp(1)
     do i = 1, 6
@@ -216,21 +235,28 @@ contains
     len(6) = 1
     type = MPI_INTEGER
 
-    call MPI_Type_create_struct(6, len, disp, type, MPI_NMSH_ZONE, ierr)
+    call MPI_Type_create_struct(6, len, disp, type, type_tmp, ierr)
+    call MPI_Type_create_resized(type_tmp, 0_MPI_ADDRESS_KIND, stride, &
+         MPI_NMSH_ZONE, ierr)
     call MPI_Type_commit(MPI_NMSH_ZONE, ierr)
+    call MPI_Type_free(type_tmp, ierr)
 
   end subroutine mpi_type_nmsh_zone_init
 
   !> Define a MPI derived type for a nmsh curved element
   subroutine mpi_type_nmsh_curve_init
-    type(nmsh_curve_el_t) :: nmsh_curve_el
-    type(MPI_Datatype) :: type(3)
-    integer(kind=MPI_ADDRESS_KIND) :: disp(3), base
+    type(nmsh_curve_el_t) :: nmsh_curve_el(2)
+    type(MPI_Datatype) :: type(3), type_tmp
+    integer(kind=MPI_ADDRESS_KIND) :: disp(3), base, stride
     integer :: len(3), i, ierr
 
-    call MPI_Get_address(nmsh_curve_el%e, disp(1), ierr)
-    call MPI_Get_address(nmsh_curve_el%curve_data, disp(2), ierr)
-    call MPI_Get_address(nmsh_curve_el%type, disp(3), ierr)
+    call MPI_Get_address(nmsh_curve_el(1)%e, disp(1), ierr)
+    call MPI_Get_address(nmsh_curve_el(1)%curve_data, disp(2), ierr)
+    call MPI_Get_address(nmsh_curve_el(1)%type, disp(3), ierr)
+
+    call MPI_Get_address(nmsh_curve_el(1), base, ierr)
+    call MPI_Get_address(nmsh_curve_el(2), stride, ierr)
+    stride = MPI_Aint_diff(stride, base)
 
     base = disp(1)
     do i = 1, 3
@@ -244,8 +270,11 @@ contains
     type(2) = MPI_DOUBLE_PRECISION
     type(3) = MPI_INTEGER
 
-    call MPI_Type_create_struct(3, len, disp, type, MPI_NMSH_CURVE, ierr)
+    call MPI_Type_create_struct(3, len, disp, type, type_tmp, ierr)
+    call MPI_Type_create_resized(type_tmp, 0_MPI_ADDRESS_KIND, stride, &
+         MPI_NMSH_CURVE, ierr)
     call MPI_Type_commit(MPI_NMSH_CURVE, ierr)
+    call MPI_Type_free(type_tmp, ierr)
 
   end subroutine mpi_type_nmsh_curve_init
 
