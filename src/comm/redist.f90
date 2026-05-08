@@ -62,14 +62,17 @@ contains
     type(stack_nz_t), allocatable :: new_zone_dist(:)
     type(stack_nc_t), allocatable :: new_curve_dist(:)
     type(nmsh_hex_t) :: el
+    type(nmsh_hex_t), allocatable :: send_buf_msh(:)
     type(nmsh_hex_t), allocatable :: recv_buf_msh(:)
+    type(nmsh_zone_t), allocatable :: send_buf_zone(:)
     type(nmsh_zone_t), allocatable :: recv_buf_zone(:)
+    type(nmsh_curve_el_t), allocatable :: send_buf_curve(:)
     type(nmsh_curve_el_t), allocatable :: recv_buf_curve(:)
     class(element_t), pointer :: ep
     integer, allocatable :: recv_buf_idx(:), send_buf_idx(:)
     type(MPI_Status) :: status
     integer :: i, j, k, ierr, max_recv_idx, label
-    integer :: src, dst, recv_size, gdim, tmp, new_el_idx, new_pel_idx
+    integer :: src, dst, recv_size, send_size, gdim, tmp, new_el_idx, new_pel_idx
     integer :: max_recv(3)
     type(point_t) :: p(8)
     type(htable_i4_t) :: el_map, glb_map
@@ -143,55 +146,77 @@ contains
 
     ! Avoid zero-sized buffers in MPI calls; some MPI+GPU stacks are
     ! sensitive even when the count is zero.
+    allocate(send_buf_msh(max(1, max_recv(1))))
     allocate(recv_buf_msh(max(1, max_recv(1))))
+    allocate(send_buf_zone(max(1, max_recv(2))))
     allocate(recv_buf_zone(max(1, max_recv(2))))
+    allocate(send_buf_curve(max(1, max_recv(3))))
     allocate(recv_buf_curve(max(1, max_recv(3))))
 
     do i = 1, pe_size - 1
        src = modulo(pe_rank - i + pe_size, pe_size)
        dst = modulo(pe_rank + i, pe_size)
 
-       ! We should use the %array() procedure, which works great for
-       ! GNU, Intel and NEC, but it breaks horribly on Cray when using
-       ! certain data types
-       select type (nmd_array => new_mesh_dist(dst)%data)
-       type is (nmsh_hex_t)
-          call MPI_Sendrecv(nmd_array, &
-               new_mesh_dist(dst)%size(), MPI_NMSH_HEX, dst, 0, recv_buf_msh, &
-               max_recv(1), MPI_NMSH_HEX, src, 0, NEKO_COMM, status, ierr)
-       end select
-       call MPI_Get_count(status, MPI_NMSH_HEX, recv_size, ierr)
+       if (max_recv(1) .gt. 0) then
+          send_size = new_mesh_dist(dst)%size()
+          if (send_size .gt. 0) then
+             ! Cray can be sensitive to polymorphic buffers in MPI calls.
+             ! Pack into a concrete temporary buffer before sendrecv.
+             select type (nmd_array => new_mesh_dist(dst)%data)
+             type is (nmsh_hex_t)
+                send_buf_msh(1:send_size) = nmd_array(1:send_size)
+             end select
+          end if
+
+          call MPI_Sendrecv(send_buf_msh, send_size, MPI_NMSH_HEX, dst, 0, &
+               recv_buf_msh, max_recv(1), MPI_NMSH_HEX, src, 0, NEKO_COMM, &
+               status, ierr)
+          call MPI_Get_count(status, MPI_NMSH_HEX, recv_size, ierr)
+       else
+          recv_size = 0
+       end if
 
        do j = 1, recv_size
           call new_mesh_dist(pe_rank)%push(recv_buf_msh(j))
        end do
 
-       ! We should use the %array() procedure, which works great for
-       ! GNU, Intel and NEC, but it breaks horribly on Cray when using
-       ! certain data types
-       select type (nzd_array => new_zone_dist(dst)%data)
-       type is (nmsh_zone_t)
-          call MPI_Sendrecv(nzd_array, &
-               new_zone_dist(dst)%size(), MPI_NMSH_ZONE, dst, 1, recv_buf_zone,&
-               max_recv(2), MPI_NMSH_ZONE, src, 1, NEKO_COMM, status, ierr)
-       end select
-       call MPI_Get_count(status, MPI_NMSH_ZONE, recv_size, ierr)
+       if (max_recv(2) .gt. 0) then
+          send_size = new_zone_dist(dst)%size()
+          if (send_size .gt. 0) then
+             ! Cray can be sensitive to polymorphic buffers in MPI calls.
+             ! Pack into a concrete temporary buffer before sendrecv.
+             select type (nzd_array => new_zone_dist(dst)%data)
+             type is (nmsh_zone_t)
+                send_buf_zone(1:send_size) = nzd_array(1:send_size)
+             end select
+          end if
+
+          call MPI_Sendrecv(send_buf_zone, send_size, MPI_NMSH_ZONE, dst, 1, &
+               recv_buf_zone, max_recv(2), MPI_NMSH_ZONE, src, 1, NEKO_COMM, &
+               status, ierr)
+          call MPI_Get_count(status, MPI_NMSH_ZONE, recv_size, ierr)
+       else
+          recv_size = 0
+       end if
 
        do j = 1, recv_size
           call new_zone_dist(pe_rank)%push(recv_buf_zone(j))
        end do
 
        if (max_recv(3) .gt. 0) then
-          ! We should use the %array() procedure, which works great for
-          ! GNU, Intel and NEC, but it breaks horribly on Cray when using
-          ! certain data types
-          select type (ncd_array => new_curve_dist(dst)%data)
-          type is (nmsh_curve_el_t)
-             call MPI_Sendrecv(ncd_array, &
-                  new_curve_dist(dst)%size(), MPI_NMSH_CURVE, dst, 2, &
-                  recv_buf_curve, max_recv(3), MPI_NMSH_CURVE, src, 2, &
-                  NEKO_COMM, status, ierr)
-          end select
+          send_size = new_curve_dist(dst)%size()
+          if (send_size .gt. 0) then
+             ! Cray can be sensitive to polymorphic buffers in MPI calls.
+             ! Pack into a concrete temporary buffer before sendrecv.
+             select type (ncd_array => new_curve_dist(dst)%data)
+             type is (nmsh_curve_el_t)
+                send_buf_curve(1:send_size) = ncd_array(1:send_size)
+             end select
+          end if
+
+          call MPI_Sendrecv(send_buf_curve, send_size, MPI_NMSH_CURVE, dst, 2,&
+               recv_buf_curve, max_recv(3), MPI_NMSH_CURVE, src, 2, NEKO_COMM,&
+               status, ierr)
           call MPI_Get_count(status, MPI_NMSH_CURVE, recv_size, ierr)
        else
           recv_size = 0
@@ -202,8 +227,11 @@ contains
        end do
     end do
 
+    deallocate(send_buf_msh)
     deallocate(recv_buf_msh)
+    deallocate(send_buf_zone)
     deallocate(recv_buf_zone)
+    deallocate(send_buf_curve)
     deallocate(recv_buf_curve)
 
     do i = 0, pe_size - 1
@@ -307,6 +335,10 @@ contains
                NEKO_COMM, status, ierr)
           call MPI_Get_count(status, MPI_INTEGER, recv_size, ierr)
 
+          if (mod(recv_size, 2) .ne. 0) then
+             call neko_error('Invalid periodic id map after redistribution')
+          end if
+
           do j = 1, recv_size, 2
              call glb_map%set(recv_buf_idx(j), recv_buf_idx(j+1))
           end do
@@ -333,7 +365,7 @@ contains
              end if
 
              call msh%mark_periodic_facet(zp(i)%f, new_el_idx, &
-                  zp(i)%p_f, zp(i)%p_e, zp(i)%glb_pt_ids)
+                  zp(i)%p_f, new_pel_idx, zp(i)%glb_pt_ids)
           case (7)
              call msh%mark_labeled_facet(zp(i)%f, new_el_idx, zp(i)%p_f)
           end select
@@ -349,7 +381,7 @@ contains
              end if
 
              call msh%apply_periodic_facet(zp(i)%f, new_el_idx, &
-                  zp(i)%p_f, zp(i)%p_e, zp(i)%glb_pt_ids)
+                  zp(i)%p_f, new_pel_idx, zp(i)%glb_pt_ids)
           end select
        end do
     end select
