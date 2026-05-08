@@ -141,9 +141,11 @@ contains
     call MPI_Allreduce(MPI_IN_PLACE, max_recv, 3, MPI_INTEGER, &
          MPI_MAX, NEKO_COMM, ierr)
 
-    allocate(recv_buf_msh(max_recv(1)))
-    allocate(recv_buf_zone(max_recv(2)))
-    allocate(recv_buf_curve(max_recv(3)))
+    ! Avoid zero-sized buffers in MPI calls; some MPI+GPU stacks are
+    ! sensitive even when the count is zero.
+    allocate(recv_buf_msh(max(1, max_recv(1))))
+    allocate(recv_buf_zone(max(1, max_recv(2))))
+    allocate(recv_buf_curve(max(1, max_recv(3))))
 
     do i = 1, pe_size - 1
        src = modulo(pe_rank - i + pe_size, pe_size)
@@ -179,17 +181,21 @@ contains
           call new_zone_dist(pe_rank)%push(recv_buf_zone(j))
        end do
 
-       ! We should use the %array() procedure, which works great for
-       ! GNU, Intel and NEC, but it breaks horribly on Cray when using
-       ! certain data types
-       select type (ncd_array => new_curve_dist(dst)%data)
-       type is (nmsh_curve_el_t)
-          call MPI_Sendrecv(ncd_array, &
-               new_curve_dist(dst)%size(), MPI_NMSH_CURVE, dst, 2, &
-               recv_buf_curve, max_recv(3), MPI_NMSH_CURVE, src, 2, &
-               NEKO_COMM, status, ierr)
-       end select
-       call MPI_Get_count(status, MPI_NMSH_CURVE, recv_size, ierr)
+       if (max_recv(3) .gt. 0) then
+          ! We should use the %array() procedure, which works great for
+          ! GNU, Intel and NEC, but it breaks horribly on Cray when using
+          ! certain data types
+          select type (ncd_array => new_curve_dist(dst)%data)
+          type is (nmsh_curve_el_t)
+             call MPI_Sendrecv(ncd_array, &
+                  new_curve_dist(dst)%size(), MPI_NMSH_CURVE, dst, 2, &
+                  recv_buf_curve, max_recv(3), MPI_NMSH_CURVE, src, 2, &
+                  NEKO_COMM, status, ierr)
+          end select
+          call MPI_Get_count(status, MPI_NMSH_CURVE, recv_size, ierr)
+       else
+          recv_size = 0
+       end if
 
        do j = 1, recv_size
           call new_curve_dist(pe_rank)%push(recv_buf_curve(j))
@@ -267,45 +273,48 @@ contains
     max_recv_idx = 2 * pe_lst%size()
     call MPI_Allreduce(MPI_IN_PLACE, max_recv_idx, 1, MPI_INTEGER, &
          MPI_MAX, NEKO_COMM, ierr)
-    allocate(recv_buf_idx(max_recv_idx))
-    allocate(send_buf_idx(max_recv_idx))
+    if (max_recv_idx .gt. 0) then
+       allocate(recv_buf_idx(max_recv_idx))
+       allocate(send_buf_idx(max_recv_idx))
 
-    do i = 1, pe_size - 1
-       src = modulo(pe_rank - i + pe_size, pe_size)
-       dst = modulo(pe_rank + i, pe_size)
+       do i = 1, pe_size - 1
+          src = modulo(pe_rank - i + pe_size, pe_size)
+          dst = modulo(pe_rank + i, pe_size)
 
-       ! We should use the %array() procedure, which works great for
-       ! GNU, Intel and NEC, but it breaks horribly on Cray when using
-       ! certain data types
-       select type (pe_lst_array => pe_lst%data)
-       type is (integer)
-          call MPI_Sendrecv(pe_lst_array, &
-               pe_lst%size(), MPI_INTEGER, dst, 0, recv_buf_idx, &
-               max_recv_idx, MPI_INTEGER, src, 0, NEKO_COMM, status, ierr)
-       end select
-       call MPI_Get_count(status, MPI_INTEGER, recv_size, ierr)
+          ! We should use the %array() procedure, which works great for
+          ! GNU, Intel and NEC, but it breaks horribly on Cray when using
+          ! certain data types
+          select type (pe_lst_array => pe_lst%data)
+          type is (integer)
+             call MPI_Sendrecv(pe_lst_array, &
+                  pe_lst%size(), MPI_INTEGER, dst, 0, recv_buf_idx, &
+                  max_recv_idx, MPI_INTEGER, src, 0, NEKO_COMM, status, ierr)
+          end select
+          call MPI_Get_count(status, MPI_INTEGER, recv_size, ierr)
 
-       k = 0
-       do j = 1, recv_size
-          if (glb_map%get(recv_buf_idx(j), tmp) .eq. 0) then
-             k = k + 1
-             send_buf_idx(k) = recv_buf_idx(j)
-             k = k + 1
-             send_buf_idx(k) = tmp
-          end if
+          k = 0
+          do j = 1, recv_size
+             if (glb_map%get(recv_buf_idx(j), tmp) .eq. 0) then
+                k = k + 1
+                send_buf_idx(k) = recv_buf_idx(j)
+                k = k + 1
+                send_buf_idx(k) = tmp
+             end if
+          end do
+
+          call MPI_Sendrecv(send_buf_idx, k, MPI_INTEGER, src, 1, &
+               recv_buf_idx, max_recv_idx, MPI_INTEGER, dst, 1, &
+               NEKO_COMM, status, ierr)
+          call MPI_Get_count(status, MPI_INTEGER, recv_size, ierr)
+
+          do j = 1, recv_size, 2
+             call glb_map%set(recv_buf_idx(j), recv_buf_idx(j+1))
+          end do
        end do
 
-       call MPI_Sendrecv(send_buf_idx, k, MPI_INTEGER, src, 1, &
-            recv_buf_idx, max_recv_idx, MPI_INTEGER, dst, 1, &
-            NEKO_COMM, status, ierr)
-       call MPI_Get_count(status, MPI_INTEGER, recv_size, ierr)
-
-       do j = 1, recv_size, 2
-          call glb_map%set(recv_buf_idx(j), recv_buf_idx(j+1))
-       end do
-    end do
-    deallocate(recv_buf_idx)
-    deallocate(send_buf_idx)
+       deallocate(recv_buf_idx)
+       deallocate(send_buf_idx)
+    end if
     call pe_lst%free()
 
     !
