@@ -34,7 +34,7 @@
 module opr_device
   use gather_scatter, only : GS_OP_ADD
   use num_types, only : rp, c_rp, i8
-  use device, only : device_get_ptr, device_event_sync, device_map, device_free
+  use device, only : device_get_ptr, device_event_sync, device_map, device_unmap
   use space, only : space_t
   use coefs, only : coef_t
   use field, only : field_t
@@ -619,14 +619,18 @@ contains
     real(kind=rp), intent(inout) :: &
          du(Xh_GLL%lx, Xh_GLL%ly, Xh_GLL%lz, coef_GL%msh%nelv)
     type(c_ptr) :: cr_d, cs_d, ct_d, u_d
-    real(kind=rp) :: ud(Xh_GL%lx*Xh_GL%lx*Xh_GL%lx)
+    real(kind=rp), allocatable :: ud(:)
     type(c_ptr) :: du_d, ud_d
     integer :: n_GL, n_GLL
 
     n_GLL = coef_GL%msh%nelv * Xh_GL%lxyz
     n_GLL = coef_GL%msh%nelv * Xh_GLL%lxyz
 
-    call device_map(ud, ud_d, n_GL)
+    if (allocated(ud)) deallocate(ud)
+    if (c_associated(ud_d)) ud_d = c_null_ptr
+
+    allocate(ud(Xh_GL%lx*Xh_GL%lx*Xh_GL%lx))
+    call device_map(ud, ud_d, Xh_GL%lx*Xh_GL%lx*Xh_GL%lx)
 
     du_d = device_get_ptr(du)
 
@@ -650,7 +654,8 @@ contains
 
     end associate
 
-    call device_free(ud_d)
+    call device_unmap(ud, ud_d)
+    deallocate(ud)
 
   end subroutine opr_device_convect_scalar
 

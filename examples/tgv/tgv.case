@@ -10,9 +10,13 @@
         "job_timelimit": "00:00:00",
         "time": {
             "end_time": 3.0,
-            "timestep": 1e-2
+            "timestep": 1e-2,
+            "variable_timestep": true,
+            "target_cfl": 4.0
         },
         "numerics": {
+            "oifs": true,
+            "oifs_target_cfl": 4.0,
             "time_order": 3,
             "polynomial_order": 7,
             "dealias": true

@@ -389,6 +389,10 @@ contains
 
     ! Determine the time-interpolation scheme
     call json_get_or_default(params, 'case.numerics.oifs', this%oifs, .false.)
+    if (this%oifs) then
+       call neko_log%message("OIFS enabled")
+    end if
+
     if (params%valid_path('case.fluid.flow_rate_force')) then
        call this%vol_flow%init(this%dm_Xh, params)
     end if
