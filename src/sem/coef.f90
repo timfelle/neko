@@ -111,14 +111,24 @@ module coefs
 
      type(tensor4_t) :: jac !< Jacobian
      real(kind=rp), allocatable :: jacinv(:,:,:,:) !< Inverted Jacobian
-     !> Mass matrix/volume matrix. Blag/Blaglag alias its `x`/`x_d`
-     !! components below (see coef_init_all) - legal because every
-     !! procedure that does so declares `this`/`c` with the TARGET
-     !! attribute, which propagates to all subobjects including `B%x`.
-     type(tensor4_t) :: B
+     type(tensor4_t) :: B !< Mass matrix/volume matrix
      real(kind=rp), allocatable :: Binv(:,:,:,:) !< Inverted Mass matrix/volume matrix
-     real(kind=rp), pointer :: Blag(:,:,:,:) => null() !< Lagged Mass matrix/volume matrix
-     real(kind=rp), pointer :: Blaglag(:,:,:,:) => null() !< lag-lagged Mass matrix/volume matrix
+     !> Backing storage for the lagged mass matrices, only allocated once
+     !! `enable_B_history` is called (i.e. for a moving mesh). A static
+     !! simulation leaves these unallocated and therefore costs no extra
+     !! memory, exactly as before - the `Blag()`/`Blaglag()` accessors
+     !! transparently hand out `B` instead while `lagged_mass` is false.
+     !! @warning Do NOT turn these back into pointers aliasing `B%x`. The
+     !! earlier implementation did exactly that, and once `B` became a
+     !! `tensor4_t` it left `coef_t` holding a pointer into an allocatable
+     !! nested inside one of its own derived-type components. gfortran
+     !! miscompiles the synthesized deep copy of any type containing such
+     !! a `coef_t` (e.g. `fluid_pnpn_t`): it corrupts neighbouring
+     !! components and segfaults before any user code runs.
+     type(tensor4_t), private :: Blag_storage
+     type(tensor4_t), private :: Blaglag_storage
+     !> True once Blag_storage/Blaglag_storage hold a distinct history.
+     logical, private :: lagged_mass = .false.
      real(kind=rp), allocatable :: area(:,:,:,:) !< Facet area
      real(kind=rp), allocatable :: nx(:,:,:,:) !< x-direction of facet normal
      real(kind=rp), allocatable :: ny(:,:,:,:) !< y-direction of facet normal
@@ -172,8 +182,6 @@ module coefs
      type(c_ptr) :: h1_d = C_NULL_PTR
      type(c_ptr) :: h2_d = C_NULL_PTR
      type(c_ptr) :: jacinv_d = C_NULL_PTR
-     type(c_ptr) :: Blag_d = C_NULL_PTR
-     type(c_ptr) :: Blaglag_d = C_NULL_PTR
      type(c_ptr) :: Binv_d = C_NULL_PTR
      type(c_ptr) :: area_d = C_NULL_PTR
      type(c_ptr) :: nx_d = C_NULL_PTR
@@ -196,6 +204,16 @@ module coefs
      procedure, pass(this) :: recompute_metrics => coef_recompute_metrics
      procedure, pass(this) :: enable_B_history => coef_enable_lagged_mass
      procedure, pass(this) :: update_B_history => coef_update_lagged_mass
+     !> Reset the mass-matrix history so that Blag = Blaglag = B.
+     procedure, pass(this) :: reset_B_history => coef_reset_lagged_mass
+     !> Lagged mass matrix, or B itself if no history is enabled.
+     procedure, pass(this) :: Blag => coef_Blag
+     !> Lag-lagged mass matrix, or B itself if no history is enabled.
+     procedure, pass(this) :: Blaglag => coef_Blaglag
+     !> Device pointer for `Blag()`.
+     procedure, pass(this) :: Blag_d => coef_Blag_d
+     !> Device pointer for `Blaglag()`.
+     procedure, pass(this) :: Blaglag_d => coef_Blaglag_d
      generic :: init => init_empty, init_all
   end type coef_t
 
@@ -308,11 +326,9 @@ contains
     call this%B%init(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv)
     allocate(this%Binv(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
 
-    ! We do this so in a static simulation we don't allocate extra memory
-    this%Blag => this%B%x
-    this%Blaglag => this%B%x
-    this%Blag_d = this%B%x_d
-    this%Blaglag_d = this%B%x_d
+    ! No lagged mass storage is allocated here; in a static simulation the
+    ! Blag()/Blaglag() accessors just hand out B, so we use no extra memory.
+    this%lagged_mass = .false.
 
     allocate(this%h1(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
     allocate(this%h2(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
@@ -515,37 +531,11 @@ contains
        deallocate(this%mult)
     end if
 
-    if (associated(this%Blag) .and. &
-         .not. associated(this%Blag, this%B%x)) then
-       if (c_associated(this%Blag_d) .and. &
-            .not. c_associated(this%Blag_d, this%B%x_d)) then
-          call device_unmap(this%Blag, this%Blag_d)
-       end if
-       deallocate(this%Blag)
-    end if
-    nullify(this%Blag)
-
-    if (associated(this%Blaglag) .and. &
-         .not. associated(this%Blaglag, this%B%x)) then
-       if (c_associated(this%Blaglag_d) .and. &
-            .not. c_associated(this%Blaglag_d, this%B%x_d)) then
-          call device_unmap(this%Blaglag, this%Blaglag_d)
-       end if
-       deallocate(this%Blaglag)
-    end if
-    nullify(this%Blaglag)
-
-    if (c_associated(this%Blag_d) .and. &
-         .not. c_associated(this%Blag_d, this%B%x_d)) then
-       this%Blag_d = C_NULL_PTR
-    end if
-    this%Blag_d = C_NULL_PTR
-
-    if (c_associated(this%Blaglag_d) .and. &
-         .not. c_associated(this%Blaglag_d, this%B%x_d)) then
-       this%Blaglag_d = C_NULL_PTR
-    end if
-    this%Blaglag_d = C_NULL_PTR
+    ! The lagged storage owns its memory outright (or was never allocated),
+    ! so there is no aliasing with B to test for any more.
+    call this%Blag_storage%free()
+    call this%Blaglag_storage%free()
+    this%lagged_mass = .false.
 
     call this%B%free()
 
@@ -1454,57 +1444,128 @@ contains
   !> Enable separate memory for lagged B matrices if needed.
   !> For eg. when mesh moves.
   subroutine coef_enable_lagged_mass(this)
-    class(coef_t), intent(inout), target :: this
+    class(coef_t), intent(inout) :: this
     integer :: n
 
-    ! Return if already allocated distinctly
-    if (.not. associated(this%Blag, this%B%x)) return
+    ! Return if a distinct history already exists
+    if (this%lagged_mass) return
 
     n = this%Xh%lx * this%Xh%ly * this%Xh%lz * this%msh%nelv
 
+    call this%Blag_storage%init(this%Xh%lx, this%Xh%ly, this%Xh%lz, &
+         this%msh%nelv)
+    call this%Blaglag_storage%init(this%Xh%lx, this%Xh%ly, this%Xh%lz, &
+         this%msh%nelv)
 
-    nullify(this%Blag)
-    nullify(this%Blaglag)
-
-    allocate(this%Blag(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
-    allocate(this%Blaglag(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
-
-    this%Blag = this%B%x
-    this%Blaglag = this%B%x
+    this%Blag_storage%x = this%B%x
+    this%Blaglag_storage%x = this%B%x
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-
-       this%Blag_d = C_NULL_PTR
-       this%Blaglag_d = C_NULL_PTR
-
-       call device_map(this%Blag, this%Blag_d, n)
-       call device_map(this%Blaglag, this%Blaglag_d, n)
-
-       call device_memcpy(this%Blag, this%Blag_d, n, &
+       call device_memcpy(this%Blag_storage%x, this%Blag_storage%x_d, n, &
             HOST_TO_DEVICE, sync = .false.)
-       call device_memcpy(this%Blaglag, this%Blaglag_d, n, &
-            HOST_TO_DEVICE, sync = .true.)
+       call device_memcpy(this%Blaglag_storage%x, this%Blaglag_storage%x_d, &
+            n, HOST_TO_DEVICE, sync = .true.)
     end if
+
+    this%lagged_mass = .true.
 
   end subroutine coef_enable_lagged_mass
 
 
   !> Update history: Blaglag = Blag, Blag = B
   subroutine coef_update_lagged_mass(this)
-    class(coef_t), intent(inout), target :: this
+    class(coef_t), intent(inout) :: this
     integer :: n
 
-    ! If this%Blag does not have separate memory, we don't need to update it.
-    if (associated(this%Blag, this%B%x)) return
+    ! If there is no distinct history, there is nothing to update.
+    if (.not. this%lagged_mass) return
     n = this%Xh%lx * this%Xh%ly * this%Xh%lz * this%msh%nelv
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(this%Blaglag_d, this%Blag_d, n)
-       call device_copy(this%Blag_d, this%B%x_d, n)
+       call device_copy(this%Blaglag_storage%x_d, this%Blag_storage%x_d, n)
+       call device_copy(this%Blag_storage%x_d, this%B%x_d, n)
     else
-       this%Blaglag = this%Blag
-       this%Blag = this%B%x
+       this%Blaglag_storage%x = this%Blag_storage%x
+       this%Blag_storage%x = this%B%x
     end if
 
   end subroutine coef_update_lagged_mass
+
+  !> Reset the mass-matrix history so that Blag = Blaglag = B.
+  !! @note Used on restart when the polynomial order changed, where the
+  !! stored history no longer matches the current mesh. A no-op when no
+  !! distinct history is allocated, since the accessors already return B.
+  subroutine coef_reset_lagged_mass(this)
+    class(coef_t), intent(inout) :: this
+    integer :: n
+
+    if (.not. this%lagged_mass) return
+    n = this%Xh%lx * this%Xh%ly * this%Xh%lz * this%msh%nelv
+
+    this%Blag_storage%x = this%B%x
+    this%Blaglag_storage%x = this%B%x
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(this%Blag_storage%x, this%Blag_storage%x_d, n, &
+            HOST_TO_DEVICE, sync = .false.)
+       call device_memcpy(this%Blaglag_storage%x, this%Blaglag_storage%x_d, &
+            n, HOST_TO_DEVICE, sync = .true.)
+    end if
+
+  end subroutine coef_reset_lagged_mass
+
+  !> Lagged mass matrix, or B itself when no history is enabled.
+  !! @note Returns a pointer rather than exposing a pointer component, so
+  !! that coef_t never stores a pointer into its own B - see the
+  !! Blag_storage declaration for why that matters.
+  function coef_Blag(this) result(p)
+    class(coef_t), intent(in), target :: this
+    real(kind=rp), pointer :: p(:,:,:,:)
+
+    if (this%lagged_mass) then
+       p => this%Blag_storage%x
+    else
+       p => this%B%x
+    end if
+
+  end function coef_Blag
+
+  !> Lag-lagged mass matrix, or B itself when no history is enabled.
+  function coef_Blaglag(this) result(p)
+    class(coef_t), intent(in), target :: this
+    real(kind=rp), pointer :: p(:,:,:,:)
+
+    if (this%lagged_mass) then
+       p => this%Blaglag_storage%x
+    else
+       p => this%B%x
+    end if
+
+  end function coef_Blaglag
+
+  !> Device pointer matching `Blag()`.
+  function coef_Blag_d(this) result(p)
+    class(coef_t), intent(in) :: this
+    type(c_ptr) :: p
+
+    if (this%lagged_mass) then
+       p = this%Blag_storage%x_d
+    else
+       p = this%B%x_d
+    end if
+
+  end function coef_Blag_d
+
+  !> Device pointer matching `Blaglag()`.
+  function coef_Blaglag_d(this) result(p)
+    class(coef_t), intent(in) :: this
+    type(c_ptr) :: p
+
+    if (this%lagged_mass) then
+       p = this%Blaglag_storage%x_d
+    else
+       p = this%B%x_d
+    end if
+
+  end function coef_Blaglag_d
 
 end module coefs

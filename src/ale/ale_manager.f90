@@ -83,7 +83,7 @@ module ale_manager
   use device, only : device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST, device_sync
   use operators, only : rotate_cyc
   use fld_file_output, only : fld_file_output_t
-  use, intrinsic :: iso_c_binding, only : c_associated
+  use, intrinsic :: iso_c_binding, only : c_associated, c_ptr
   implicit none
   private
 
@@ -1609,11 +1609,18 @@ contains
   subroutine sync_chkp(this, coef, Xh, adv, chkp, gs_Xh)
     class(ale_manager_t), intent(inout) :: this
     class(advection_t), intent(inout) :: adv
-    type(coef_t), intent(inout) :: coef
+    type(coef_t), intent(inout), target :: coef
     type(space_t), intent(inout) :: Xh
     type(chkp_t), intent(in) :: chkp
     type(gs_t), intent(inout) :: gs_Xh
     integer :: i, j, n
+    !> device_memcpy takes both its array and its device pointer as
+    !! variables (the latter intent(inout)), and a function result is not
+    !! a valid actual argument for either, so bind the lagged-mass
+    !! accessors to locals first. device_memcpy only reads the device
+    !! pointer, so a local copy is safe.
+    real(kind=rp), pointer :: Blag(:,:,:,:), Blaglag(:,:,:,:)
+    type(c_ptr) :: Blag_d, Blaglag_d
 
     ! Return if ALE is not active.
     if (.not. this%active) return
@@ -1677,14 +1684,19 @@ contains
                size(coef%dof%z), HOST_TO_DEVICE, sync = .false.)
        end if
 
-       if (c_associated(coef%Blag_d)) then
-          call device_memcpy(coef%Blag, coef%Blag_d, size(coef%Blag), &
+       Blag => coef%Blag()
+       Blaglag => coef%Blaglag()
+       Blag_d = coef%Blag_d()
+       Blaglag_d = coef%Blaglag_d()
+
+       if (c_associated(Blag_d)) then
+          call device_memcpy(Blag, Blag_d, size(Blag), &
                HOST_TO_DEVICE, sync = .false.)
        end if
 
-       if (c_associated(coef%Blaglag_d)) then
-          call device_memcpy(coef%Blaglag, coef%Blaglag_d, &
-               size(coef%Blaglag), HOST_TO_DEVICE, sync = .false.)
+       if (c_associated(Blaglag_d)) then
+          call device_memcpy(Blaglag, Blaglag_d, size(Blaglag), &
+               HOST_TO_DEVICE, sync = .false.)
        end if
        call device_sync()
     end if
@@ -1718,19 +1730,7 @@ contains
     ! not restarting at all. Otherwise we need to save lagged mesh coordinates
     ! as well in order to be more accurate.
     if (chkp%previous_Xh%lx .ne. Xh%lx) then
-       coef%Blag = coef%B%x
-       coef%Blaglag = coef%B%x
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          if (c_associated(coef%Blag_d)) then
-             call device_memcpy(coef%Blag, coef%Blag_d, n, &
-                  HOST_TO_DEVICE, sync = .false.)
-          end if
-          if (c_associated(coef%Blaglag_d)) then
-             call device_memcpy(coef%Blaglag, coef%Blaglag_d, n, &
-                  HOST_TO_DEVICE, sync = .false.)
-          end if
-          call device_sync()
-       end if
+       call coef%reset_B_history()
     end if
 
     call adv%recompute_metrics(coef, .true.)
@@ -2270,17 +2270,24 @@ contains
   ! Register ALE fields for checkpointing.
   subroutine register_checkpoint_fields(this, coef, checkpoint)
     class(ale_manager_t), intent(inout), target :: this
-    type(coef_t), intent(inout) :: coef
+    type(coef_t), intent(inout), target :: coef
     type(chkp_t), intent(inout) :: checkpoint
     integer :: i
+    !> add_ale takes POINTER dummies, and a function reference is not a
+    !! valid actual argument for one, so bind the accessor results to real
+    !! pointer variables first.
+    real(kind=rp), pointer :: Blag(:,:,:,:), Blaglag(:,:,:,:)
 
     if (.not. this%active) return
+
+    Blag => coef%Blag()
+    Blaglag => coef%Blaglag()
 
     ! Add checkpoint data for ALE.
     call checkpoint%add_ale(coef%dof%x, coef%dof%y, &
          coef%dof%z, coef%dof%x_d, coef%dof%y_d, &
          coef%dof%z_d, &
-         coef%Blag, coef%Blaglag, coef%Blag_d, coef%Blaglag_d, &
+         Blag, Blaglag, coef%Blag_d(), coef%Blaglag_d(), &
          this%wm_x, this%wm_y, this%wm_z, &
          this%wm_x_lag, this%wm_y_lag, &
          this%wm_z_lag, &

@@ -768,10 +768,11 @@ contains
 
          ! Add the RHS contributions coming from the BDF scheme.
          ! Blag and Blaglag are history of B matrices, mainly used for ALE.
-         ! For a normal simulation (no moving mesh), Blag and Blaglag
-         ! are just the initial B matrix, filled at initialization.
+         ! For a normal simulation (no moving mesh), Blag() and Blaglag()
+         ! simply return B itself.
          call makebdf%compute_fluid(ulag, vlag, wlag, f_x%x, f_y%x, f_z%x, &
-              u, v, w, c_Xh%B%x, c_Xh%Blag, c_Xh%Blaglag, rho%x(1,1,1,1), dt, &
+              u, v, w, c_Xh%B%x, c_Xh%Blag(), c_Xh%Blaglag(), &
+              rho%x(1,1,1,1), dt, &
               ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n)
 
       end if
