@@ -158,7 +158,7 @@ contains
       !$omp end parallel
 
       call col2(this%d, coef%h1, coef%dof%size())
-      if (coef%ifh2) call addcol3(this%d, coef%h2, coef%B, coef%dof%size())
+      if (coef%ifh2) call addcol3(this%d, coef%h2, coef%B%x, coef%dof%size())
       call gs_h%op(this%d, dof%size(), GS_OP_ADD)
       call invcol1(this%d, dof%size())
     end associate

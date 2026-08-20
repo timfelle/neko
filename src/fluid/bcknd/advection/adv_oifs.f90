@@ -458,18 +458,18 @@ contains
       do ilag = oifs_scheme%ndiff, 1, -1
          if (NEKO_BCKND_DEVICE .eq. 1) then
             if (ilag .eq. 1) then
-               call device_addcol3s2(fx%x_d, vx%x_d, coef%B_d, &
+               call device_addcol3s2(fx%x_d, vx%x_d, coef%B%x_d, &
                     oifs_scheme%diffusion_coeffs%x(2), n)
-               call device_addcol3s2(fy%x_d, vy%x_d, coef%B_d, &
+               call device_addcol3s2(fy%x_d, vy%x_d, coef%B%x_d, &
                     oifs_scheme%diffusion_coeffs%x(2), n)
-               call device_addcol3s2(fz%x_d, vz%x_d, coef%B_d, &
+               call device_addcol3s2(fz%x_d, vz%x_d, coef%B%x_d, &
                     oifs_scheme%diffusion_coeffs%x(2), n)
             else
-               call device_addcol3s2(fx%x_d, ulag%lf(ilag-1)%x_d, coef%B_d, &
+               call device_addcol3s2(fx%x_d, ulag%lf(ilag-1)%x_d, coef%B%x_d, &
                     oifs_scheme%diffusion_coeffs%x(ilag+1), n)
-               call device_addcol3s2(fy%x_d, vlag%lf(ilag-1)%x_d, coef%B_d, &
+               call device_addcol3s2(fy%x_d, vlag%lf(ilag-1)%x_d, coef%B%x_d, &
                     oifs_scheme%diffusion_coeffs%x(ilag+1), n)
-               call device_addcol3s2(fz%x_d, wlag%lf(ilag-1)%x_d, coef%B_d, &
+               call device_addcol3s2(fz%x_d, wlag%lf(ilag-1)%x_d, coef%B%x_d, &
                     oifs_scheme%diffusion_coeffs%x(ilag+1), n)
             end if
          else
@@ -477,28 +477,28 @@ contains
                do i = 1, n
                   fx%x(i,1,1,1) = fx%x(i,1,1,1) + &
                        oifs_scheme%diffusion_coeffs%x(2) &
-                       * vx%x(i,1,1,1) * coef%B(i,1,1,1)
+                       * vx%x(i,1,1,1) * coef%B%x(i,1,1,1)
                   fy%x(i,1,1,1) = fy%x(i,1,1,1) + &
                        oifs_scheme%diffusion_coeffs%x(2) &
-                       * vy%x(i,1,1,1) * coef%B(i,1,1,1)
+                       * vy%x(i,1,1,1) * coef%B%x(i,1,1,1)
                   fz%x(i,1,1,1) = fz%x(i,1,1,1) + &
                        oifs_scheme%diffusion_coeffs%x(2) &
-                       * vz%x(i,1,1,1) * coef%B(i,1,1,1)
+                       * vz%x(i,1,1,1) * coef%B%x(i,1,1,1)
                end do
             else
                do i = 1, n
                   fx%x(i,1,1,1) = fx%x(i,1,1,1) + &
                        oifs_scheme%diffusion_coeffs%x(ilag+1) &
                        * ulag%lf(ilag-1)%x(i,1,1,1) &
-                       * coef%B(i,1,1,1)
+                       * coef%B%x(i,1,1,1)
                   fy%x(i,1,1,1) = fy%x(i,1,1,1) + &
                        oifs_scheme%diffusion_coeffs%x(ilag+1) &
                        * vlag%lf(ilag-1)%x(i,1,1,1) &
-                       * coef%B(i,1,1,1)
+                       * coef%B%x(i,1,1,1)
                   fz%x(i,1,1,1) = fz%x(i,1,1,1) + &
                        oifs_scheme%diffusion_coeffs%x(ilag+1) &
                        * wlag%lf(ilag-1)%x(i,1,1,1) &
-                       * coef%B(i,1,1,1)
+                       * coef%B%x(i,1,1,1)
                end do
             end if
          end if
@@ -584,10 +584,10 @@ contains
       do ilag = oifs_scheme%ndiff, 1, -1
          if (NEKO_BCKND_DEVICE .eq. 1) then
             if (ilag .eq. 1) then
-               call device_addcol3s2(fs%x_d, s%x_d, coef%B_d, &
+               call device_addcol3s2(fs%x_d, s%x_d, coef%B%x_d, &
                     oifs_scheme%diffusion_coeffs%x(2), n)
             else
-               call device_addcol3s2(fs%x_d, slag%lf(ilag-1)%x_d, coef%B_d, &
+               call device_addcol3s2(fs%x_d, slag%lf(ilag-1)%x_d, coef%B%x_d, &
                     oifs_scheme%diffusion_coeffs%x(ilag+1), n)
             end if
          else
@@ -595,13 +595,13 @@ contains
                do i = 1, n
                   fs%x(i,1,1,1) = fs%x(i,1,1,1) + &
                        oifs_scheme%diffusion_coeffs%x(2) &
-                       * s%x(i,1,1,1) * coef%B(i,1,1,1)
+                       * s%x(i,1,1,1) * coef%B%x(i,1,1,1)
                end do
             else
                do i = 1, n
                   fs%x(i,1,1,1) = fs%x(i,1,1,1) + &
                        oifs_scheme%diffusion_coeffs%x(ilag+1) &
-                       * slag%lf(ilag-1)%x(i,1,1,1) * coef%B(i,1,1,1)
+                       * slag%lf(ilag-1)%x(i,1,1,1) * coef%B%x(i,1,1,1)
                end do
             end if
          end if

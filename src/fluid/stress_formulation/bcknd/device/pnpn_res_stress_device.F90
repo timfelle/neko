@@ -335,25 +335,25 @@ contains
          wa1%x_d, wa2%x_d, wa3%x_d, &
          s11%x_d, s22%x_d, s33%x_d, s12%x_d, s13%x_d, s23%x_d, &
          f_x%x_d, f_y%x_d, f_z%x_d, &
-         c_Xh%B_d, c_Xh%h1_d, rho%x_d, n)
+         c_Xh%B%x_d, c_Xh%h1_d, rho%x_d, n)
 #elif HAVE_CUDA
     call pnpn_prs_stress_res_part1_cuda(ta1%x_d, ta2%x_d, ta3%x_d, &
          wa1%x_d, wa2%x_d, wa3%x_d, &
          s11%x_d, s22%x_d, s33%x_d, s12%x_d, s13%x_d, s23%x_d, &
          f_x%x_d, f_y%x_d, f_z%x_d, &
-         c_Xh%B_d, c_Xh%h1_d, rho%x_d, n)
+         c_Xh%B%x_d, c_Xh%h1_d, rho%x_d, n)
 #elif HAVE_OPENCL
     call pnpn_prs_stress_res_part1_opencl(ta1%x_d, ta2%x_d, ta3%x_d, &
          wa1%x_d, wa2%x_d, wa3%x_d, &
          s11%x_d, s22%x_d, s33%x_d, s12%x_d, s13%x_d, s23%x_d, &
          f_x%x_d, f_y%x_d, f_z%x_d, &
-         c_Xh%B_d, c_Xh%h1_d, rho%x_d, n)
+         c_Xh%B%x_d, c_Xh%h1_d, rho%x_d, n)
 #elif HAVE_METAL
     call pnpn_prs_stress_res_part1_metal(ta1%x_d, ta2%x_d, ta3%x_d, &
          wa1%x_d, wa2%x_d, wa3%x_d, &
          s11%x_d, s22%x_d, s33%x_d, s12%x_d, s13%x_d, s23%x_d, &
          f_x%x_d, f_y%x_d, f_z%x_d, &
-         c_Xh%B_d, c_Xh%h1_d, rho%x_d, n)
+         c_Xh%B%x_d, c_Xh%h1_d, rho%x_d, n)
 #endif
 
     call rotate_cyc(ta1%x_d, ta2%x_d, ta3%x_d, 1, c_Xh)

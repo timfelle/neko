@@ -126,11 +126,11 @@ contains
        !$omp do private(i)
        do i = 1, coef%dof%size()
           au(i,1,1,1) = au(i,1,1,1) + &
-               coef%h2(i,1,1,1) * coef%B(i,1,1,1) * u(i,1,1,1)
+               coef%h2(i,1,1,1) * coef%B%x(i,1,1,1) * u(i,1,1,1)
           av(i,1,1,1) = av(i,1,1,1) + &
-               coef%h2(i,1,1,1) * coef%B(i,1,1,1) * v(i,1,1,1)
+               coef%h2(i,1,1,1) * coef%B%x(i,1,1,1) * v(i,1,1,1)
           aw(i,1,1,1) = aw(i,1,1,1) + &
-               coef%h2(i,1,1,1) * coef%B(i,1,1,1) * w(i,1,1,1)
+               coef%h2(i,1,1,1) * coef%B%x(i,1,1,1) * w(i,1,1,1)
        end do
        !$omp end do
     end if

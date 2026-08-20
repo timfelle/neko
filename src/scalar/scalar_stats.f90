@@ -776,11 +776,11 @@ contains
 
     if (this%n_stats .eq. 5) return
 
-    n = size(this%coef%B)
+    n = size(this%coef%B%x)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_cfill(this%stats_work%x_d, 1.0_rp, n)
-       call device_invcol2(this%stats_work%x_d, this%coef%B_d, n)
+       call device_invcol2(this%stats_work%x_d, this%coef%B%x_d, n)
 
        call device_col2(this%pdsdx%mf%x_d, this%stats_work%x_d, n)
        call device_col2(this%pdsdy%mf%x_d, this%stats_work%x_d, n)
@@ -815,7 +815,7 @@ contains
 
     else
        do concurrent (i = 1:n)
-          wrk = 1.0_rp / this%coef%B(i,1,1,1)
+          wrk = 1.0_rp / this%coef%B%x(i,1,1,1)
           this%pdsdx%mf%x(i,1,1,1) = this%pdsdx%mf%x(i,1,1,1) * wrk
           this%pdsdy%mf%x(i,1,1,1) = this%pdsdy%mf%x(i,1,1,1) * wrk
           this%pdsdz%mf%x(i,1,1,1) = this%pdsdz%mf%x(i,1,1,1) * wrk

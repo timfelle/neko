@@ -171,7 +171,7 @@ contains
     call sub3(w3, work1, work2, n)
     !!    BC dependent, Needs to change if cyclic
 
-    call opcolv(w1, w2, w3, c_Xh%B, gdim, n)
+    call opcolv(w1, w2, w3, c_Xh%B%x, gdim, n)
     if (c_Xh%cyclic) call opr_cpu_rotate_cyc_r4(w1, w2, w3, 1, c_Xh)
     call c_Xh%gs_h%op(w1, w2, w3, n, GS_OP_ADD)
     if (c_Xh%cyclic) call opr_cpu_rotate_cyc_r4(w1, w2, w3, 0, c_Xh)
@@ -323,7 +323,7 @@ contains
                .le. eigen(3) .and. eigen(3) .le. eigen(1))
 
           l2 = msk1 * eigen(1) + msk2 * eigen(2) + msk3 * eigen(3)
-          lambda2(i, 1, 1, e) = l2 / real(coef%B(i, 1, 1, e)**2, xp)
+          lambda2(i, 1, 1, e) = l2 / real(coef%B%x(i, 1, 1, e)**2, xp)
        end do
     end do
     !$omp end parallel do

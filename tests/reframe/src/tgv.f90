@@ -126,8 +126,8 @@ contains
 !    do i = 1, ntot
 !       vv = u%x(i,1,1,1)**2 + v%x(i,1,1,1)**2 + w%x(i,1,1,1)**2
 !       oo = om1%x(i,1,1,1)**2 + om2%x(i,1,1,1)**2 + om3%x(i,1,1,1)**2
-!       sum_e1 = sum_e1 + vv*coef%B(i,1,1,1)
-!       sum_e2 = sum_e2 + oo*coef%B(i,1,1,1)
+!       sum_e1 = sum_e1 + vv*coef%B%x(i,1,1,1)
+!       sum_e2 = sum_e2 + oo*coef%B%x(i,1,1,1)
 !    end do
 !    e1 = 0.5 * glsum(sum_e1,1) / coef%volume
 !    e2 = 0.5 * glsum(sum_e2,1) / coef%volume
@@ -137,14 +137,14 @@ contains
 !       w1%x(i,1,1,1) = u%x(i,1,1,1)**2 + v%x(i,1,1,1)**2 + w%x(i,1,1,1)**2
 !       w2%x(i,1,1,1) = om1%x(i,1,1,1)**2 + om2%x(i,1,1,1)**2 + om3%x(i,1,1,1)**2
 !    end do
-!    e1 = 0.5 * glsc2(w1%x,coef%B,ntot) / coef%volume
-!    e2 = 0.5 * glsc2(w2%x,coef%B,ntot) / coef%volume
+!    e1 = 0.5 * glsc2(w1%x,coef%B%x,ntot) / coef%volume
+!    e2 = 0.5 * glsc2(w2%x,coef%B%x,ntot) / coef%volume
 
 !    Option 3:
 !    w1%x = u%x**2 + v%x**2 + w%x**2
 !    w2%x = om1%x**2 + om2%x**2 + om3%x**2
-!    e1 = 0.5 * glsc2(w1%x,coef%B,ntot) / coef%volume
-!    e2 = 0.5 * glsc2(w2%x,coef%B,ntot) / coef%volume
+!    e1 = 0.5 * glsc2(w1%x,coef%B%x,ntot) / coef%volume
+!    e2 = 0.5 * glsc2(w2%x,coef%B%x,ntot) / coef%volume
 
 !    Option 4:
 
@@ -152,18 +152,18 @@ contains
     call field_addcol3(w1, v, v)
     call field_addcol3(w1, w, w)
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       e1 = 0.5_rp * device_glsc2(w1%x_d, coef%B_d, w1%size()) / coef%volume
+       e1 = 0.5_rp * device_glsc2(w1%x_d, coef%B%x_d, w1%size()) / coef%volume
     else
-       e1 = 0.5_rp * glsc2(w1%x, coef%B, w1%size()) / coef%volume
+       e1 = 0.5_rp * glsc2(w1%x, coef%B%x, w1%size()) / coef%volume
     end if
     call field_col3(w1, omega_x, omega_x)
     call field_addcol3(w1, omega_y, omega_y)
     call field_addcol3(w1, omega_z, omega_z)
     if (NEKO_BCKND_DEVICE .eq. 1) then
 
-       e2 = 0.5_rp * device_glsc2(w1%x_d, coef%B_d, w1%size()) / coef%volume
+       e2 = 0.5_rp * device_glsc2(w1%x_d, coef%B%x_d, w1%size()) / coef%volume
     else
-       e2 = 0.5_rp * glsc2(w1%x, coef%B, w1%size()) / coef%volume
+       e2 = 0.5_rp * glsc2(w1%x, coef%B%x, w1%size()) / coef%volume
     end if
 
     if (pe_rank .eq. 0) then

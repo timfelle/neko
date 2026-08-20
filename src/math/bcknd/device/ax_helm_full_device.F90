@@ -243,16 +243,16 @@ contains
     if (coef%ifh2) then
 #ifdef HAVE_HIP
        call hip_ax_helm_stress_vector_part2(au_d, av_d, aw_d, u_d, v_d, w_d, &
-            coef%h2_d, coef%B_d, coef%dof%size())
+            coef%h2_d, coef%B%x_d, coef%dof%size())
 #elif HAVE_CUDA
        call cuda_ax_helm_stress_vector_part2(au_d, av_d, aw_d, u_d, v_d, w_d, &
-            coef%h2_d, coef%B_d, coef%dof%size())
+            coef%h2_d, coef%B%x_d, coef%dof%size())
 #elif HAVE_OPENCL
        call opencl_ax_helm_stress_vector_part2(au_d, av_d, aw_d, u_d, v_d, &
-            w_d, coef%h2_d, coef%B_d, coef%dof%size())
+            w_d, coef%h2_d, coef%B%x_d, coef%dof%size())
 #elif HAVE_METAL
        call metal_ax_helm_stress_vector_part2(au_d, av_d, aw_d, u_d, v_d, &
-            w_d, coef%h2_d, coef%B_d, coef%dof%size())
+            w_d, coef%h2_d, coef%B%x_d, coef%dof%size())
 #endif
     end if
 

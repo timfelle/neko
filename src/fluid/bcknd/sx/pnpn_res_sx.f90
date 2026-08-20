@@ -75,9 +75,9 @@ contains
     call curl(wa1, wa2, wa3, ta1, ta2, ta3, work1, work2, c_Xh)
 
     do i = 1, n
-       wa1%x(i,1,1,1) = (wa1%x(i,1,1,1) * mu_val / rho_val) * c_Xh%B(i,1,1,1)
-       wa2%x(i,1,1,1) = (wa2%x(i,1,1,1) * mu_val / rho_val) * c_Xh%B(i,1,1,1)
-       wa3%x(i,1,1,1) = (wa3%x(i,1,1,1) * mu_val / rho_val) * c_Xh%B(i,1,1,1)
+       wa1%x(i,1,1,1) = (wa1%x(i,1,1,1) * mu_val / rho_val) * c_Xh%B%x(i,1,1,1)
+       wa2%x(i,1,1,1) = (wa2%x(i,1,1,1) * mu_val / rho_val) * c_Xh%B%x(i,1,1,1)
+       wa3%x(i,1,1,1) = (wa3%x(i,1,1,1) * mu_val / rho_val) * c_Xh%B%x(i,1,1,1)
     end do
 
     do i = 1, n

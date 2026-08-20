@@ -113,25 +113,25 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
 
        call conv1(temp%x, vx%x, vx%x, vy%x, vz%x, Xh, coef)
-       call device_subcol3 (fx%x_d, coef%B_d, temp%x_d, n)
+       call device_subcol3 (fx%x_d, coef%B%x_d, temp%x_d, n)
        call conv1(temp%x, vy%x, vx%x, vy%x, vz%x, Xh, coef)
-       call device_subcol3 (fy%x_d, coef%B_d, temp%x_d, n)
+       call device_subcol3 (fy%x_d, coef%B%x_d, temp%x_d, n)
        if (coef%Xh%lz .eq. 1) then
           call device_rzero (temp%x_d, n)
        else
           call conv1(temp%x, vz%x, vx%x, vy%x, vz%x, Xh, coef)
-          call device_subcol3(fz%x_d, coef%B_d, temp%x_d, n)
+          call device_subcol3(fz%x_d, coef%B%x_d, temp%x_d, n)
        end if
     else
        call conv1(temp%x, vx%x, vx%x, vy%x, vz%x, Xh, coef)
-       call subcol3 (fx%x, coef%B, temp%x, n)
+       call subcol3 (fx%x, coef%B%x, temp%x, n)
        call conv1(temp%x, vy%x, vx%x, vy%x, vz%x, Xh, coef)
-       call subcol3 (fy%x, coef%B, temp%x, n)
+       call subcol3 (fy%x, coef%B%x, temp%x, n)
        if (coef%Xh%lz .eq. 1) then
           call rzero (temp%x, n)
        else
           call conv1(temp%x, vz%x, vx%x, vy%x, vz%x, Xh, coef)
-          call subcol3(fz%x, coef%B, temp%x, n)
+          call subcol3(fz%x, coef%B%x, temp%x, n)
        end if
     end if
 
@@ -168,7 +168,7 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
 
        call conv1(temp%x, s%x, vx%x, vy%x, vz%x, Xh, coef)
-       call device_subcol3 (fs%x_d, coef%B_d, temp%x_d, n)
+       call device_subcol3 (fs%x_d, coef%B%x_d, temp%x_d, n)
        if (coef%Xh%lz .eq. 1) then
           call device_rzero (temp%x_d, n)
        end if
@@ -177,7 +177,7 @@ contains
        call conv1(temp%x, s%x, vx%x, vy%x, vz%x, Xh, coef)
 
        ! fs = fs - B*temp
-       call subcol3 (fs%x, coef%B, temp%x, n)
+       call subcol3 (fs%x, coef%B%x, temp%x, n)
        if (coef%Xh%lz .eq. 1) then
           call rzero (temp%x, n)
        end if
@@ -218,10 +218,10 @@ contains
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call div(temp%x_d, work_x%x_d, work_y%x_d, work_z%x_d, coef)
-       call device_addcol3(fx%x_d, coef%B_d, temp%x_d, n)
+       call device_addcol3(fx%x_d, coef%B%x_d, temp%x_d, n)
     else
        call div(temp%x, work_x%x, work_y%x, work_z%x, coef)
-       call addcol3(fx%x, coef%B, temp%x, n)
+       call addcol3(fx%x, coef%B%x, temp%x, n)
     end if
 
     ! v.wm_*
@@ -231,10 +231,10 @@ contains
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call div(temp%x_d, work_x%x_d, work_y%x_d, work_z%x_d, coef)
-       call device_addcol3(fy%x_d, coef%B_d, temp%x_d, n)
+       call device_addcol3(fy%x_d, coef%B%x_d, temp%x_d, n)
     else
        call div(temp%x, work_x%x, work_y%x, work_z%x, coef)
-       call addcol3(fy%x, coef%B, temp%x, n)
+       call addcol3(fy%x, coef%B%x, temp%x, n)
     end if
 
     ! w.wm_*
@@ -244,10 +244,10 @@ contains
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call div(temp%x_d, work_x%x_d, work_y%x_d, work_z%x_d, coef)
-       call device_addcol3(fz%x_d, coef%B_d, temp%x_d, n)
+       call device_addcol3(fz%x_d, coef%B%x_d, temp%x_d, n)
     else
        call div(temp%x, work_x%x, work_y%x, work_z%x, coef)
-       call addcol3(fz%x, coef%B, temp%x, n)
+       call addcol3(fz%x, coef%B%x, temp%x, n)
     end if
 
     call neko_scratch_registry%relinquish_field(id)

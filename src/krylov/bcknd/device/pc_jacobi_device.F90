@@ -198,7 +198,7 @@ contains
       call device_col2(this%d_d, coef%h1_d, coef%dof%size())
 
       if (coef%ifh2) then
-         call device_addcol3(this%d_d, coef%h2_d, coef%B_d, coef%dof%size())
+         call device_addcol3(this%d_d, coef%h2_d, coef%B%x_d, coef%dof%size())
       end if
 
       call gs_h%op(this%d, dof%size(), GS_OP_ADD, this%gs_event)

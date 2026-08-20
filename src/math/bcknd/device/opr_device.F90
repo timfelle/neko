@@ -991,7 +991,7 @@ contains
     call device_sub3(w3%x_d, work1%x_d, work2%x_d, n)
     !!    BC dependent, Needs to change if cyclic
 
-    call device_opcolv(w1%x_d, w2%x_d, w3%x_d, c_Xh%B_d, gdim, n)
+    call device_opcolv(w1%x_d, w2%x_d, w3%x_d, c_Xh%B%x_d, gdim, n)
 
     if(c_Xh%cyclic) call opr_device_rotate_cyc(w1%x_d, w2%x_d, w3%x_d, 1, c_Xh)
     if (present(event)) then

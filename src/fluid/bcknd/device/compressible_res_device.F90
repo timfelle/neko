@@ -847,7 +847,7 @@ contains
     call compressible_ops_device_ns_flux_finalize(visc_m_x%x_d, &
          visc_m_y%x_d, visc_m_z%x_d, visc_E%x_d, f_x%x_d, f_y%x_d, &
          f_z%x_d, dudx%x_d, dudy%x_d, dudz%x_d, u%x_d, v%x_d, w%x_d, &
-         coef%B_d, dissipation%x_d, n)
+         coef%B%x_d, dissipation%x_d, n)
 
     call compressible_ops_device_ns_flux_temperature(div_flux%x_d, coef%h1_d, &
          p%x_d, rho_field%x_d, kappa%x_d, compressible_res_device_gamma, n)

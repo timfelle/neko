@@ -409,7 +409,7 @@ contains
       else
 
          ! Add the RHS contributions coming from the BDF scheme.
-         call makebdf%compute_scalar(slag, f_Xh%x, s, c_Xh%B, &
+         call makebdf%compute_scalar(slag, f_Xh%x, s, c_Xh%B%x, &
               rho_cp, dt, ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n)
       end if
 

@@ -724,11 +724,11 @@ contains
 
     if (this%n_stats .eq. 11) return
 
-    n = size(this%coef%B)
+    n = size(this%coef%B%x)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_cfill(this%stats_work%x_d, 1.0_rp, n)
-       call device_invcol2(this%stats_work%x_d, this%coef%B_d, n)
+       call device_invcol2(this%stats_work%x_d, this%coef%B%x_d, n)
        call device_col2(this%pdudx%mf%x_d, this%stats_work%x_d, n)
        call device_col2(this%pdudy%mf%x_d, this%stats_work%x_d, n)
        call device_col2(this%pdudz%mf%x_d, this%stats_work%x_d, n)
@@ -750,7 +750,7 @@ contains
 
     else
        do concurrent (i = 1:n)
-          wrk = 1.0_rp / this%coef%B(i,1,1,1)
+          wrk = 1.0_rp / this%coef%B%x(i,1,1,1)
           this%pdudx%mf%x(i,1,1,1) = this%pdudx%mf%x(i,1,1,1) * wrk
           this%pdudy%mf%x(i,1,1,1) = this%pdudy%mf%x(i,1,1,1) * wrk
           this%pdudz%mf%x(i,1,1,1) = this%pdudz%mf%x(i,1,1,1) * wrk
@@ -891,7 +891,7 @@ contains
        end if
 
        do concurrent (i = 1:n)
-          wrk = 1.0_rp / this%coef%B(i,1,1,1)
+          wrk = 1.0_rp / this%coef%B%x(i,1,1,1)
           mean_vel_grad%items(1)%ptr%x(i,1,1,1) = this%dudx%x(i,1,1,1) * wrk
           mean_vel_grad%items(2)%ptr%x(i,1,1,1) = this%dudy%x(i,1,1,1) * wrk
           mean_vel_grad%items(3)%ptr%x(i,1,1,1) = this%dudz%x(i,1,1,1) * wrk

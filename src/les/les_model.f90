@@ -320,7 +320,7 @@ contains
        do e = 1, this%coef%msh%nelv
           volume_element = 0.0_rp
           do k = 1, this%coef%Xh%lx * this%coef%Xh%ly * this%coef%Xh%lz
-             volume_element = volume_element + this%coef%B(k, 1, 1, e)
+             volume_element = volume_element + this%coef%B%x(k, 1, 1, e)
           end do
           this%delta%x(:,:,:,e) = (volume_element / &
                (this%coef%Xh%lx - 1.0_rp) / &

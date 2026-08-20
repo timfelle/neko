@@ -38,6 +38,7 @@ module coefs
   use num_types, only : rp
   use dofmap, only : dofmap_t
   use space, only : space_t
+  use tensor4, only : tensor4_t
   use math, only : rone, invcol1, addcol3, subcol3, copy, &
        chsign, rzero, invers2, glsum, NEKO_EPS
   use mesh, only : mesh_t
@@ -108,9 +109,13 @@ module coefs
      real(kind=rp), allocatable :: h2(:,:,:,:) !< Mass scaling
      logical :: ifh2 !< True if h2 .ne. 0
 
-     real(kind=rp), allocatable :: jac(:,:,:,:) !< Jacobian
+     type(tensor4_t) :: jac !< Jacobian
      real(kind=rp), allocatable :: jacinv(:,:,:,:) !< Inverted Jacobian
-     real(kind=rp), allocatable :: B(:,:,:,:) !< Mass matrix/volume matrix
+     !> Mass matrix/volume matrix. Blag/Blaglag alias its `x`/`x_d`
+     !! components below (see coef_init_all) - legal because every
+     !! procedure that does so declares `this`/`c` with the TARGET
+     !! attribute, which propagates to all subobjects including `B%x`.
+     type(tensor4_t) :: B
      real(kind=rp), allocatable :: Binv(:,:,:,:) !< Inverted Mass matrix/volume matrix
      real(kind=rp), pointer :: Blag(:,:,:,:) => null() !< Lagged Mass matrix/volume matrix
      real(kind=rp), pointer :: Blaglag(:,:,:,:) => null() !< lag-lagged Mass matrix/volume matrix
@@ -166,9 +171,7 @@ module coefs
      type(c_ptr) :: mult_d = C_NULL_PTR
      type(c_ptr) :: h1_d = C_NULL_PTR
      type(c_ptr) :: h2_d = C_NULL_PTR
-     type(c_ptr) :: jac_d = C_NULL_PTR
      type(c_ptr) :: jacinv_d = C_NULL_PTR
-     type(c_ptr) :: B_d = C_NULL_PTR
      type(c_ptr) :: Blag_d = C_NULL_PTR
      type(c_ptr) :: Blaglag_d = C_NULL_PTR
      type(c_ptr) :: Binv_d = C_NULL_PTR
@@ -291,7 +294,10 @@ contains
     allocate(this%dsdz(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
     allocate(this%dtdz(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
 
-    allocate(this%jac(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
+    ! jac/B's alloc+device_map is handled by tensor4_t%init itself, unlike
+    ! the bare allocatable fields around it, which still need the separate
+    ! device_map call further down.
+    call this%jac%init(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv)
     allocate(this%jacinv(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
 
     allocate(this%area(this%Xh%lx, this%Xh%ly, 6, this%msh%nelv))
@@ -299,12 +305,14 @@ contains
     allocate(this%ny(this%Xh%lx, this%Xh%ly, 6, this%msh%nelv))
     allocate(this%nz(this%Xh%lx, this%Xh%ly, 6, this%msh%nelv))
 
-    allocate(this%B(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
+    call this%B%init(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv)
     allocate(this%Binv(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
 
     ! We do this so in a static simulation we don't allocate extra memory
-    this%Blag => this%B
-    this%Blaglag => this%B
+    this%Blag => this%B%x
+    this%Blaglag => this%B%x
+    this%Blag_d = this%B%x_d
+    this%Blaglag_d = this%B%x_d
 
     allocate(this%h1(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
     allocate(this%h2(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
@@ -353,13 +361,8 @@ contains
        call device_map(this%h1, this%h1_d, n)
        call device_map(this%h2, this%h2_d, n)
 
-       call device_map(this%jac, this%jac_d, n)
        call device_map(this%jacinv, this%jacinv_d, n)
-       call device_map(this%B, this%B_d, n)
        call device_map(this%Binv, this%Binv_d, n)
-
-       this%Blag_d = this%B_d
-       this%Blaglag_d = this%B_d
 
        m = this%Xh%lx * this%Xh%ly * 6 * this%msh%nelv
 
@@ -513,9 +516,9 @@ contains
     end if
 
     if (associated(this%Blag) .and. &
-         .not. associated(this%Blag, this%B)) then
+         .not. associated(this%Blag, this%B%x)) then
        if (c_associated(this%Blag_d) .and. &
-            .not. c_associated(this%Blag_d, this%B_d)) then
+            .not. c_associated(this%Blag_d, this%B%x_d)) then
           call device_unmap(this%Blag, this%Blag_d)
        end if
        deallocate(this%Blag)
@@ -523,9 +526,9 @@ contains
     nullify(this%Blag)
 
     if (associated(this%Blaglag) .and. &
-         .not. associated(this%Blaglag, this%B)) then
+         .not. associated(this%Blaglag, this%B%x)) then
        if (c_associated(this%Blaglag_d) .and. &
-            .not. c_associated(this%Blaglag_d, this%B_d)) then
+            .not. c_associated(this%Blaglag_d, this%B%x_d)) then
           call device_unmap(this%Blaglag, this%Blaglag_d)
        end if
        deallocate(this%Blaglag)
@@ -533,21 +536,18 @@ contains
     nullify(this%Blaglag)
 
     if (c_associated(this%Blag_d) .and. &
-         .not. c_associated(this%Blag_d, this%B_d)) then
+         .not. c_associated(this%Blag_d, this%B%x_d)) then
        this%Blag_d = C_NULL_PTR
     end if
     this%Blag_d = C_NULL_PTR
 
     if (c_associated(this%Blaglag_d) .and. &
-         .not. c_associated(this%Blaglag_d, this%B_d)) then
+         .not. c_associated(this%Blaglag_d, this%B%x_d)) then
        this%Blaglag_d = C_NULL_PTR
     end if
     this%Blaglag_d = C_NULL_PTR
 
-    if (allocated(this%B)) then
-       if (NEKO_BCKND_DEVICE .eq. 1) call device_unmap(this%B, this%B_d)
-       deallocate(this%B)
-    end if
+    call this%B%free()
 
     if (allocated(this%Binv)) then
        if (NEKO_BCKND_DEVICE .eq. 1) call device_unmap(this%Binv, this%Binv_d)
@@ -644,10 +644,7 @@ contains
        deallocate(this%dtdz)
     end if
 
-    if (allocated(this%jac)) then
-       if (NEKO_BCKND_DEVICE .eq. 1) call device_unmap(this%jac, this%jac_d)
-       deallocate(this%jac)
-    end if
+    call this%jac%free()
 
     if (allocated(this%jacinv)) then
        if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -729,7 +726,7 @@ contains
          x => c%dof%x, y => c%dof%y, z => c%dof%z, &
          lx => c%Xh%lx, ly => c%Xh%ly, lz => c%Xh%lz, &
          dyt => c%Xh%dyt, dzt => c%Xh%dzt, &
-         jacinv => c%jacinv, jac => c%jac)
+         jacinv => c%jacinv, jac => c%jac%x)
 
       if (NEKO_BCKND_DEVICE .eq. 1) then
 
@@ -737,7 +734,7 @@ contains
               c%dsdx_d, c%dsdy_d, c%dsdz_d, c%dtdx_d, c%dtdy_d, c%dtdz_d, &
               c%dxdr_d, c%dydr_d, c%dzdr_d, c%dxds_d, c%dyds_d, c%dzds_d, &
               c%dxdt_d, c%dydt_d, c%dzdt_d, c%Xh%dx_d, c%Xh%dy_d, c%Xh%dz_d, &
-              c%dof%x_d, c%dof%y_d, c%dof%z_d, c%jacinv_d, c%jac_d, &
+              c%dof%x_d, c%dof%y_d, c%dof%z_d, c%jacinv_d, c%jac%x_d, &
               c%Xh%lx, c%msh%nelv)
 
          ! copy to host only at initialization.
@@ -778,7 +775,7 @@ contains
                  sync = .false.)
             call device_memcpy(dtdz, c%dtdz_d, ntot, DEVICE_TO_HOST, &
                  sync = .false.)
-            call device_memcpy(jac, c%jac_d, ntot, DEVICE_TO_HOST, &
+            call device_memcpy(jac, c%jac%x_d, ntot, DEVICE_TO_HOST, &
                  sync = .false.)
             call device_memcpy(jacinv, c%jacinv_d, ntot, DEVICE_TO_HOST, &
                  sync = .true.)
@@ -827,30 +824,30 @@ contains
             !$omp parallel private(i)
             !$omp do simd
             do i = 1, ntot
-               c%jac(i, 1, 1, 1) = 0.0_rp
+               jac(i, 1, 1, 1) = 0.0_rp
             end do
             !$omp end do simd
             !$omp do simd
             do i = 1, ntot
-               c%jac(i, 1, 1, 1) = c%jac(i, 1, 1, 1) + ( c%dxdr(i, 1, 1, 1) &
+               jac(i, 1, 1, 1) = jac(i, 1, 1, 1) + ( c%dxdr(i, 1, 1, 1) &
                     * c%dyds(i, 1, 1, 1) * c%dzdt(i, 1, 1, 1) )
 
-               c%jac(i, 1, 1, 1) = c%jac(i, 1, 1, 1) + ( c%dxdt(i, 1, 1, 1) &
+               jac(i, 1, 1, 1) = jac(i, 1, 1, 1) + ( c%dxdt(i, 1, 1, 1) &
                     * c%dydr(i, 1, 1, 1) * c%dzds(i, 1, 1, 1) )
 
-               c%jac(i, 1, 1, 1) = c%jac(i, 1, 1, 1) + ( c%dxds(i, 1, 1, 1) &
+               jac(i, 1, 1, 1) = jac(i, 1, 1, 1) + ( c%dxds(i, 1, 1, 1) &
                     * c%dydt(i, 1, 1, 1) * c%dzdr(i, 1, 1, 1) )
             end do
             !$omp end do simd
             !$omp do simd
             do i = 1, ntot
-               c%jac(i, 1, 1, 1) = c%jac(i, 1, 1, 1) - ( c%dxdr(i, 1, 1, 1) &
+               jac(i, 1, 1, 1) = jac(i, 1, 1, 1) - ( c%dxdr(i, 1, 1, 1) &
                     * c%dydt(i, 1, 1, 1) * c%dzds(i, 1, 1, 1) )
 
-               c%jac(i, 1, 1, 1) = c%jac(i, 1, 1, 1) - ( c%dxds(i, 1, 1, 1) &
+               jac(i, 1, 1, 1) = jac(i, 1, 1, 1) - ( c%dxds(i, 1, 1, 1) &
                     * c%dydr(i, 1, 1, 1) * c%dzdt(i, 1, 1, 1) )
 
-               c%jac(i, 1, 1, 1) = c%jac(i, 1, 1, 1) - ( c%dxdt(i, 1, 1, 1) &
+               jac(i, 1, 1, 1) = jac(i, 1, 1, 1) - ( c%dxdt(i, 1, 1, 1) &
                     * c%dyds(i, 1, 1, 1) * c%dzdr(i, 1, 1, 1) )
             end do
             !$omp end do simd
@@ -1117,18 +1114,19 @@ contains
     ntot = c%dof%size()
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_coef_generate_mass(c%B_d, c%Binv_d, c%jac_d, c%Xh%w3_d, &
-            lxyz, c%msh%nelv)
+       call device_coef_generate_mass(c%B%x_d, c%Binv_d, c%jac%x_d, &
+            c%Xh%w3_d, lxyz, c%msh%nelv)
        ! copy to host only at initialization.
        if (.not. c%coef_metrics_initialized) then
-          call device_memcpy(c%B, c%B_d, ntot, DEVICE_TO_HOST, sync = .false.)
+          call device_memcpy(c%B%x, c%B%x_d, ntot, DEVICE_TO_HOST, &
+               sync = .false.)
        end if
     else
        do concurrent (e = 1:c%msh%nelv)
           ! Here we need to handle things differently for axis symmetric elements
           do concurrent (i = 1:lxyz)
-             c%B(i,1,1,e) = c%jac(i,1,1,e) * c%Xh%w3(i,1,1)
-             c%Binv(i,1,1,e) = c%B(i,1,1,e)
+             c%B%x(i,1,1,e) = c%jac%x(i,1,1,e) * c%Xh%w3(i,1,1)
+             c%Binv(i,1,1,e) = c%B%x(i,1,1,e)
           end do
        end do
     end if
@@ -1148,9 +1146,9 @@ contains
 
     !>  @todo cleanup once we have device math in place
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       c%volume = device_glsum(c%B_d, ntot)
+       c%volume = device_glsum(c%B%x_d, ntot)
     else
-       c%volume = glsum(c%B, ntot)
+       c%volume = glsum(c%B%x, ntot)
     end if
 
   end subroutine coef_generate_mass
@@ -1460,7 +1458,7 @@ contains
     integer :: n
 
     ! Return if already allocated distinctly
-    if (.not. associated(this%Blag, this%B)) return
+    if (.not. associated(this%Blag, this%B%x)) return
 
     n = this%Xh%lx * this%Xh%ly * this%Xh%lz * this%msh%nelv
 
@@ -1471,8 +1469,8 @@ contains
     allocate(this%Blag(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
     allocate(this%Blaglag(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
 
-    this%Blag = this%B
-    this%Blaglag = this%B
+    this%Blag = this%B%x
+    this%Blaglag = this%B%x
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
 
@@ -1497,14 +1495,14 @@ contains
     integer :: n
 
     ! If this%Blag does not have separate memory, we don't need to update it.
-    if (associated(this%Blag, this%B)) return
+    if (associated(this%Blag, this%B%x)) return
     n = this%Xh%lx * this%Xh%ly * this%Xh%lz * this%msh%nelv
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%Blaglag_d, this%Blag_d, n)
-       call device_copy(this%Blag_d, this%B_d, n)
+       call device_copy(this%Blag_d, this%B%x_d, n)
     else
        this%Blaglag = this%Blag
-       this%Blag = this%B
+       this%Blag = this%B%x
     end if
 
   end subroutine coef_update_lagged_mass

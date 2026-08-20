@@ -1718,8 +1718,8 @@ contains
     ! not restarting at all. Otherwise we need to save lagged mesh coordinates
     ! as well in order to be more accurate.
     if (chkp%previous_Xh%lx .ne. Xh%lx) then
-       coef%Blag = coef%B
-       coef%Blaglag = coef%B
+       coef%Blag = coef%B%x
+       coef%Blaglag = coef%B%x
        if (NEKO_BCKND_DEVICE .eq. 1) then
           if (c_associated(coef%Blag_d)) then
              call device_memcpy(coef%Blag, coef%Blag_d, n, &
@@ -1871,9 +1871,9 @@ contains
     n = coef%dof%size()
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       min_jac = device_glmin(coef%jac_d, n)
+       min_jac = device_glmin(coef%jac%x_d, n)
     else
-       min_jac = glmin(coef%jac, n)
+       min_jac = glmin(coef%jac%x, n)
     end if
 
     call sync_mesh_preview_step(coef, dummy_field)
@@ -1896,9 +1896,9 @@ contains
 
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          min_jac = device_glmin(coef%jac_d, n)
+          min_jac = device_glmin(coef%jac%x_d, n)
        else
-          min_jac = glmin(coef%jac, n)
+          min_jac = glmin(coef%jac%x, n)
        end if
 
        if (min_jac .le. 0.0_rp) then
@@ -1950,9 +1950,9 @@ contains
 
     n = coef%dof%size()
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(dummy_field%x_d, coef%B_d, n)
+       call device_copy(dummy_field%x_d, coef%B%x_d, n)
     else
-       call copy(dummy_field%x, coef%B, n)
+       call copy(dummy_field%x, coef%B%x, n)
     end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then

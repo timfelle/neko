@@ -135,11 +135,11 @@ contains
 
     do concurrent (i = 1:n)
        ta1%x(i,1,1,1) = f_x%x(i,1,1,1) / rho%x(i,1,1,1) &
-            - ((wa1%x(i,1,1,1) / rho%x(i,1,1,1)) * c_Xh%B(i,1,1,1))
+            - ((wa1%x(i,1,1,1) / rho%x(i,1,1,1)) * c_Xh%B%x(i,1,1,1))
        ta2%x(i,1,1,1) = f_y%x(i,1,1,1) / rho%x(i,1,1,1) &
-            - ((wa2%x(i,1,1,1) / rho%x(i,1,1,1)) * c_Xh%B(i,1,1,1))
+            - ((wa2%x(i,1,1,1) / rho%x(i,1,1,1)) * c_Xh%B%x(i,1,1,1))
        ta3%x(i,1,1,1) = f_z%x(i,1,1,1) / rho%x(i,1,1,1) &
-            - ((wa3%x(i,1,1,1) / rho%x(i,1,1,1)) * c_Xh%B(i,1,1,1))
+            - ((wa3%x(i,1,1,1) / rho%x(i,1,1,1)) * c_Xh%B%x(i,1,1,1))
     end do
 
     call rotate_cyc(ta1%x, ta2%x, ta3%x, 1, c_Xh)

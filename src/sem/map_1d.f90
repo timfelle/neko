@@ -335,7 +335,7 @@ contains
     do i = 1, n
        this%volume_per_gll_lvl(this%pt_lvl(i, 1, 1, 1)) = &
             this%volume_per_gll_lvl(this%pt_lvl(i, 1, 1, 1)) + &
-            coef%B(i, 1, 1, 1)
+            coef%B%x(i, 1, 1, 1)
     end do
 
     call MPI_Allreduce(MPI_IN_PLACE, this%volume_per_gll_lvl, this%n_gll_lvls, &
@@ -404,14 +404,14 @@ contains
        if (this%dir .eq. 3) coord = this%dof%z(i,1,1,1)
        avg_planes%x(this%pt_lvl(i,1,1,1), 1) = &
             avg_planes%x(this%pt_lvl(i,1,1,1), 1) + &
-            coord * this%coef%B(i,1,1,1) / &
+            coord * this%coef%B%x(i,1,1,1) / &
             this%volume_per_gll_lvl(this%pt_lvl(i,1,1,1))
     end do
     do j = 2, field_list%size() + 1
        do i = 1, n
           avg_planes%x(this%pt_lvl(i,1,1,1), j) = &
                avg_planes%x(this%pt_lvl(i,1,1,1), j) + &
-               field_list%items(j-1)%ptr%x(i,1,1,1) * this%coef%B(i,1,1,1) &
+               field_list%items(j-1)%ptr%x(i,1,1,1) * this%coef%B%x(i,1,1,1) &
                /this%volume_per_gll_lvl(this%pt_lvl(i,1,1,1))
        end do
     end do
@@ -448,14 +448,14 @@ contains
        if (this%dir .eq. 3) coord = this%dof%z(i,1,1,1)
        avg_planes%x(this%pt_lvl(i,1,1,1), 1) = &
             avg_planes%x(this%pt_lvl(i,1,1,1), 1) + &
-            coord * this%coef%B(i,1,1,1) / &
+            coord * this%coef%B%x(i,1,1,1) / &
             this%volume_per_gll_lvl(this%pt_lvl(i,1,1,1))
     end do
     do j = 2, size(vector_ptr) + 1
        do i = 1, n
           avg_planes%x(this%pt_lvl(i,1,1,1), j) = &
                avg_planes%x(this%pt_lvl(i,1,1,1), j) + &
-               vector_ptr(j-1)%ptr%x(i)*this%coef%B(i,1,1,1) &
+               vector_ptr(j-1)%ptr%x(i)*this%coef%B%x(i,1,1,1) &
                /this%volume_per_gll_lvl(this%pt_lvl(i,1,1,1))
        end do
     end do

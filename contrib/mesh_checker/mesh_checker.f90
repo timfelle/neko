@@ -193,8 +193,8 @@ program mesh_checker
         do i = 1, dofmap%Xh%lx
            do j = 1, dofmap%Xh%ly
               do k = 1, dofmap%Xh%lz
-                 bdry_field%x(i, j, k, e) = coef%jac(i, j, k, e)
-                 if (coef%jac(i, j, k, e) .lt. 0.0_rp) then
+                 bdry_field%x(i, j, k, e) = coef%jac%x(i, j, k, e)
+                 if (coef%jac%x(i, j, k, e) .lt. 0.0_rp) then
                     write(*,*) 'Warning: Found negative jacobian at element ', &
                          e, &
                          ' at local point (', i, ',', j, ',', k, ')'

@@ -272,8 +272,8 @@ contains
     end if
 
     do e = 1, coef%msh%nelv
-       call col3(wx, coef%B(1,1,1,e), x(1,e), Xh%lxyz)
-       call invcol2(wx, coef%jac(1,1,1,e), Xh%lxyz)
+       call col3(wx, coef%B%x(1,1,1,e), x(1,e), Xh%lxyz)
+       call invcol2(wx, coef%jac%x(1,1,1,e), Xh%lxyz)
        call col3(ta1, wx, dr(1,e), Xh%lxyz)
        call libxsmm_mmcall(cdtp_xmm1, Xh%dxt, ta1, dtx(1,e))
        call col3 (ta1, wx, ds(1,e), Xh%lxyz)
@@ -464,7 +464,7 @@ contains
     call sub3(w3, work1, work2, n)
     !!    BC dependent, Needs to change if cyclic
 
-    call opcolv(w1, w2, w3, c_Xh%B, gdim, n)
+    call opcolv(w1, w2, w3, c_Xh%B%x, gdim, n)
     call c_Xh%gs_h%op(w1, w2, w3, n, GS_OP_ADD)
     call opcolv(w1, w2, w3, c_Xh%Binv, gdim, n)
 

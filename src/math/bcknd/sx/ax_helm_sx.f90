@@ -100,7 +100,7 @@ contains
             msh%nelv, Xh%lx)
     end select
 
-    if (coef%ifh2) call addcol4 (w,coef%h2,coef%B,u,coef%dof%size())
+    if (coef%ifh2) call addcol4 (w,coef%h2,coef%B%x,u,coef%dof%size())
 
   end subroutine ax_helm_sx_compute
 

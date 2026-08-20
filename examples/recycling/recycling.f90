@@ -48,7 +48,7 @@ contains
           xyz%x(1,i) = coef%dof%x(msk_idx,1,1,1) + 10.0
           xyz%x(2,i) = coef%dof%y(msk_idx,1,1,1)
           xyz%x(3,i) = coef%dof%z(msk_idx,1,1,1)
-          B%x(i) = coef%B(msk_idx,1,1,1)
+          B%x(i) = coef%B%x(msk_idx,1,1,1)
        end do
        vol = glsum(B%x,n_pts)
        call xyz%copy_from(HOST_TO_DEVICE,.false.)

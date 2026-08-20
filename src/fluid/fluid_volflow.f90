@@ -241,14 +241,14 @@ contains
 
       if (NEKO_BCKND_DEVICE .eq. 1) then
          call device_opchsign(u_res%x_d, v_res%x_d, w_res%x_d, msh%gdim, n)
-         call device_copy(ta1%x_d, c_Xh%B_d, n)
-         call device_copy(ta2%x_d, c_Xh%B_d, n)
-         call device_copy(ta3%x_d, c_Xh%B_d, n)
+         call device_copy(ta1%x_d, c_Xh%B%x_d, n)
+         call device_copy(ta2%x_d, c_Xh%B%x_d, n)
+         call device_copy(ta3%x_d, c_Xh%B%x_d, n)
       else
          call opchsign(u_res%x, v_res%x, w_res%x, msh%gdim, n)
-         call copy(ta1%x, c_Xh%B, n)
-         call copy(ta2%x, c_Xh%B, n)
-         call copy(ta3%x, c_Xh%B, n)
+         call copy(ta1%x, c_Xh%B%x, n)
+         call copy(ta2%x, c_Xh%B%x, n)
+         call copy(ta3%x, c_Xh%B%x, n)
       end if
       call bclst_vel_res%apply_vector(ta1%x, ta2%x, ta3%x, n)
 
@@ -298,29 +298,29 @@ contains
       if (NEKO_BCKND_DEVICE .eq. 1) then
          if (this%flow_dir .eq. 1) then
             this%base_flow = &
-                 device_glsc2(u_vol%x_d, c_Xh%B_d, n) / this%domain_length
+                 device_glsc2(u_vol%x_d, c_Xh%B%x_d, n) / this%domain_length
          end if
 
          if (this%flow_dir .eq. 2) then
             this%base_flow = &
-                 device_glsc2(v_vol%x_d, c_Xh%B_d, n) / this%domain_length
+                 device_glsc2(v_vol%x_d, c_Xh%B%x_d, n) / this%domain_length
          end if
 
          if (this%flow_dir .eq. 3) then
             this%base_flow = &
-                 device_glsc2(w_vol%x_d, c_Xh%B_d, n) / this%domain_length
+                 device_glsc2(w_vol%x_d, c_Xh%B%x_d, n) / this%domain_length
          end if
       else
          if (this%flow_dir .eq. 1) then
-            this%base_flow = glsc2(u_vol%x, c_Xh%B, n) / this%domain_length
+            this%base_flow = glsc2(u_vol%x, c_Xh%B%x, n) / this%domain_length
          end if
 
          if (this%flow_dir .eq. 2) then
-            this%base_flow = glsc2(v_vol%x, c_Xh%B, n) / this%domain_length
+            this%base_flow = glsc2(v_vol%x, c_Xh%B%x, n) / this%domain_length
          end if
 
          if (this%flow_dir .eq. 3) then
-            this%base_flow = glsc2(w_vol%x, c_Xh%B, n) / this%domain_length
+            this%base_flow = glsc2(w_vol%x, c_Xh%B%x, n) / this%domain_length
          end if
       end if
     end associate
@@ -399,21 +399,21 @@ contains
       if (NEKO_BCKND_DEVICE .eq. 1) then
          if (this%flow_dir .eq. 1) then
             current_flow = &
-                 device_glsc2(u%x_d, c_Xh%B_d, n) / this%domain_length ! for X
+                 device_glsc2(u%x_d, c_Xh%B%x_d, n) / this%domain_length ! for X
          else if (this%flow_dir .eq. 2) then
             current_flow = &
-                 device_glsc2(v%x_d, c_Xh%B_d, n) / this%domain_length ! for Y
+                 device_glsc2(v%x_d, c_Xh%B%x_d, n) / this%domain_length ! for Y
          else if (this%flow_dir .eq. 3) then
             current_flow = &
-                 device_glsc2(w%x_d, c_Xh%B_d, n) / this%domain_length ! for Z
+                 device_glsc2(w%x_d, c_Xh%B%x_d, n) / this%domain_length ! for Z
          end if
       else
          if (this%flow_dir .eq. 1) then
-            current_flow = glsc2(u%x, c_Xh%B, n) / this%domain_length ! for X
+            current_flow = glsc2(u%x, c_Xh%B%x, n) / this%domain_length ! for X
          else if (this%flow_dir .eq. 2) then
-            current_flow = glsc2(v%x, c_Xh%B, n) / this%domain_length ! for Y
+            current_flow = glsc2(v%x, c_Xh%B%x, n) / this%domain_length ! for Y
          else if (this%flow_dir .eq. 3) then
-            current_flow = glsc2(w%x, c_Xh%B, n) / this%domain_length ! for Z
+            current_flow = glsc2(w%x, c_Xh%B%x, n) / this%domain_length ! for Z
          end if
       end if
 

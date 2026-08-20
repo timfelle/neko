@@ -133,9 +133,9 @@ contains
     call field_addcol3(w1, w, w, ntot)
     ! For glsc2 we need to call the correct backend
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       ekin = 0.5_rp * device_glsc2(w1%x_d, coef%B_d,ntot) / coef%volume
+       ekin = 0.5_rp * device_glsc2(w1%x_d, coef%B%x_d,ntot) / coef%volume
     else
-       ekin = 0.5_rp * glsc2(w1%x, coef%B, ntot) / coef%volume
+       ekin = 0.5_rp * glsc2(w1%x, coef%B%x, ntot) / coef%volume
     end if
 
     ! compute enstrophy
@@ -147,9 +147,9 @@ contains
     call field_addcol3(w1, vort2, vort2, ntot)
     call field_addcol3(w1, vort3, vort3, ntot)
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       enst = 0.5_rp * device_glsc2(w1%x_d, coef%B_d, ntot) / coef%volume
+       enst = 0.5_rp * device_glsc2(w1%x_d, coef%B%x_d, ntot) / coef%volume
     else
-       enst = 0.5_rp * glsc2(w1%x, coef%B, ntot) / coef%volume
+       enst = 0.5_rp * glsc2(w1%x, coef%B%x, ntot) / coef%volume
     end if
 
 

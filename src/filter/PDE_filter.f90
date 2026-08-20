@@ -250,12 +250,12 @@ contains
          this%coef%Xh)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_subcol3(RHS%x_d, F_in%x_d, this%coef%B_d, n)
+       call device_subcol3(RHS%x_d, F_in%x_d, this%coef%B%x_d, n)
        call device_cmult(RHS%x_d, -1.0_rp, n)
     else
        do i = 1, n
           ! mass matrix should be included here
-          RHS%x(i,1,1,1) = F_in%x(i,1,1,1) * this%coef%B(i,1,1,1) &
+          RHS%x(i,1,1,1) = F_in%x(i,1,1,1) * this%coef%B%x(i,1,1,1) &
                - RHS%x(i,1,1,1)
        end do
     end if

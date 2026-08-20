@@ -166,7 +166,7 @@ contains
        end if
     end do
 
-    if (coef%ifh2) call addcol4 (w, coef%h2, coef%B, u, coef%dof%n_dofs)
+    if (coef%ifh2) call addcol4 (w, coef%h2, coef%B%x, u, coef%dof%n_dofs)
 #endif
 
   end subroutine ax_helm_xsmm_compute

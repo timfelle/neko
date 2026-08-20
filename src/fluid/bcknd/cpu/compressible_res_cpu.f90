@@ -611,7 +611,7 @@ contains
             + u%x(i,1,1,1) * f_x%x(i,1,1,1) &
             + v%x(i,1,1,1) * f_y%x(i,1,1,1) &
             + w%x(i,1,1,1) * f_z%x(i,1,1,1) &
-            - coef%B(i,1,1,1) * dissipation%x(i,1,1,1)
+            - coef%B%x(i,1,1,1) * dissipation%x(i,1,1,1)
        div_flux%x(i,1,1,1) = p%x(i,1,1,1) / &
             (rho_field%x(i,1,1,1) * (compressible_res_cpu_gamma - 1.0_rp))
        coef%h1(i,1,1,1) = kappa%x(i,1,1,1)

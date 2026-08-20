@@ -173,9 +173,9 @@ contains
        do i = 1, this%rhs_fields%size()
           f => this%rhs_fields%get(i)
           if (NEKO_BCKND_DEVICE .eq. 1) then
-             call device_col2(f%x_d, this%coef%B_d, f%size())
+             call device_col2(f%x_d, this%coef%B%x_d, f%size())
           else
-             call col2(f%x, this%coef%B, f%size())
+             call col2(f%x, this%coef%B%x, f%size())
           end if
        end do
 

@@ -475,19 +475,19 @@ contains
     nxyz = coef%Xh%lx*coef%Xh%lx*coef%Xh%lx
     vole=0
     do i = 1, nxyz
-       vole = vole+coef%B(i,1,1,e)
+       vole = vole+coef%B%x(i,1,1,e)
     end do
 
     ! Get the weighted l2 norm of the element
     suma = 0
     if (space .eq. 'spec') then
        do i = 1, nxyz
-          suma = suma+elemdata(i,1,1)*elemdata(i,1,1)*coef%jac(i,1,1,e)
+          suma = suma+elemdata(i,1,1)*elemdata(i,1,1)*coef%jac%x(i,1,1,e)
        end do
     end if
     if (space .eq. 'phys') then
        do i = 1, nxyz
-          suma = suma+elemdata(i,1,1)*elemdata(i,1,1)*coef%B(i,1,1,e)
+          suma = suma+elemdata(i,1,1)*elemdata(i,1,1)*coef%B%x(i,1,1,e)
        end do
     end if
 

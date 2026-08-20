@@ -319,20 +319,20 @@ contains
 #ifdef HAVE_HIP
     call pnpn_prs_res_part1_hip(ta1%x_d, ta2%x_d, ta3%x_d, &
          wa1%x_d, wa2%x_d, wa3%x_d, f_x%x_d, f_y%x_d, f_z%x_d, &
-         c_Xh%B_d, c_Xh%h1_d, mu_val, rho_val, n)
+         c_Xh%B%x_d, c_Xh%h1_d, mu_val, rho_val, n)
 
 #elif HAVE_CUDA
     call pnpn_prs_res_part1_cuda(ta1%x_d, ta2%x_d, ta3%x_d, &
          wa1%x_d, wa2%x_d, wa3%x_d, f_x%x_d, f_y%x_d, f_z%x_d, &
-         c_Xh%B_d, c_Xh%h1_d, mu_val, rho_val, n)
+         c_Xh%B%x_d, c_Xh%h1_d, mu_val, rho_val, n)
 #elif HAVE_OPENCL
     call pnpn_prs_res_part1_opencl(ta1%x_d, ta2%x_d, ta3%x_d, &
          wa1%x_d, wa2%x_d, wa3%x_d, f_x%x_d, f_y%x_d, f_z%x_d, &
-         c_Xh%B_d, c_Xh%h1_d, mu_val, rho_val, n)
+         c_Xh%B%x_d, c_Xh%h1_d, mu_val, rho_val, n)
 #elif HAVE_METAL
     call pnpn_prs_res_part1_metal(ta1%x_d, ta2%x_d, ta3%x_d, &
          wa1%x_d, wa2%x_d, wa3%x_d, f_x%x_d, f_y%x_d, f_z%x_d, &
-         c_Xh%B_d, c_Xh%h1_d, mu_val, rho_val, n)
+         c_Xh%B%x_d, c_Xh%h1_d, mu_val, rho_val, n)
 #endif
     c_Xh%ifh2 = .false.
     call device_cfill(c_Xh%h1_d, 1.0_rp / rho_val, n)

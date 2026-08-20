@@ -52,126 +52,126 @@ contains
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (17)
          call sx_lambda2_lx17(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (16)
          call sx_lambda2_lx16(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (15)
          call sx_lambda2_lx15(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (14)
          call sx_lambda2_lx14(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (13)
          call sx_lambda2_lx13(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (12)
          call sx_lambda2_lx12(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (11)
          call sx_lambda2_lx11(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (10)
          call sx_lambda2_lx10(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (9)
          call sx_lambda2_lx9(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (8)
          call sx_lambda2_lx8(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (7)
          call sx_lambda2_lx7(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (6)
          call sx_lambda2_lx6(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (5)
          call sx_lambda2_lx5(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (4)
          call sx_lambda2_lx4(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (3)
          call sx_lambda2_lx3(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case (2)
          call sx_lambda2_lx2(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv)
+              Xh%w3, coef%B%x, msh%nelv)
       case default
          call sx_lambda2_lx(lambda2, u, v, w, &
               Xh%dx, Xh%dy, Xh%dz, &
               coef%drdx, coef%dsdx, coef%dtdx, &
               coef%drdy, coef%dsdy, coef%dtdy, &
               coef%drdz, coef%dsdz, coef%dtdz, &
-              Xh%w3, coef%B, msh%nelv, Xh%lx)
+              Xh%w3, coef%B%x, msh%nelv, Xh%lx)
       end select
     end associate
 
