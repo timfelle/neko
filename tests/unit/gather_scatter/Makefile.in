@@ -17,6 +17,13 @@ NEKO_LIB := $(wildcard @top_builddir@/src/libneko.la)
 
 check: gather_scatter_suite
 
+# Regenerate this Makefile from Makefile.in via config.status
+# whenever it changes, so an already-configured build tree picks up
+# fixes to this file (e.g. the NEKO_LIB dependency above) without
+# requiring a full reconfigure.
+Makefile: Makefile.in @top_builddir@/config.status
+	cd @top_builddir@ && $(SHELL) ./config.status tests/unit/gather_scatter/Makefile
+
 
 gather_scatter_suite_TESTS := test_gather_scatter_parallel.pf
 gather_scatter_suite_OTHER_LIBRARIES = -L@top_builddir@/src/.libs -lneko @LDFLAGS@ @LIBS@

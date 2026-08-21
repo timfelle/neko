@@ -17,6 +17,13 @@ NEKO_LIB := $(wildcard @top_builddir@/src/libneko.la)
 
 check: device_math_suite
 
+# Regenerate this Makefile from Makefile.in via config.status
+# whenever it changes, so an already-configured build tree picks up
+# fixes to this file (e.g. the NEKO_LIB dependency above) without
+# requiring a full reconfigure.
+Makefile: Makefile.in @top_builddir@/config.status
+	cd @top_builddir@ && $(SHELL) ./config.status tests/unit/device_math/Makefile
+
 
 device_math_suite_TESTS := test_device_math_parallel.pf
 device_math_suite_OTHER_LIBRARIES = -L@top_builddir@/src/.libs/ -lneko @LDFLAGS@ @LIBS@

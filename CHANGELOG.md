@@ -2,11 +2,17 @@
 
 ## Develop
 
-- Fixed the unit tests' build rules, which tracked only the `.pf` sources and
+- Fixed the unit tests' build rules, which tracked only the test sources and
   never the Neko library, so a test object compiled against an older layout of
   a Neko derived type was silently kept and linked against the rebuilt
   library. This gave undefined behaviour at run time, e.g. a segfault in
-  `gs_free` after `gs_t` gained new components.
+  `gs_free` after `gs_t` gained new components. Each `tests/unit/*/Makefile`
+  now also regenerates itself from `Makefile.in` via `config.status`, so
+  *future* changes to these files propagate automatically. This fix itself
+  cannot bootstrap into an already-configured build tree, since these
+  Makefiles previously had no such self-regeneration rule at all — anyone
+  hitting this segfault on an existing build tree should run `make
+  refresh-unit-test-makefiles` (or reconfigure) after pulling this change.
 - Added configurable wall-model field samplers. Wall models can now sample at
   GLL nodes or physical wall-normal distances using global interpolation. The
   sampling values can also be supplied per wall node through new user hooks.

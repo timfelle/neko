@@ -16,6 +16,13 @@ NEKO_LIB := $(wildcard @top_builddir@/src/libneko.la)
 
 check: case_file_utils_test
 
+# Regenerate this Makefile from Makefile.in via config.status
+# whenever it changes, so an already-configured build tree picks up
+# fixes to this file (e.g. the NEKO_LIB dependency above) without
+# requiring a full reconfigure.
+Makefile: Makefile.in @top_builddir@/config.status
+	cd @top_builddir@ && $(SHELL) ./config.status tests/unit/case_file_utils/Makefile
+
 case_file_utils_test_TESTS := test_case_file_utils.pf
 case_file_utils_test_OTHER_LIBRARIES = -L@top_builddir@/src/.libs -lneko @LDFLAGS@ @LIBS@
 $(eval $(call make_pfunit_test,case_file_utils_test))

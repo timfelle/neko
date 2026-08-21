@@ -16,6 +16,13 @@ NEKO_LIB := $(wildcard @top_builddir@/src/libneko.la)
 
 check: time_scheme_test
 
+# Regenerate this Makefile from Makefile.in via config.status
+# whenever it changes, so an already-configured build tree picks up
+# fixes to this file (e.g. the NEKO_LIB dependency above) without
+# requiring a full reconfigure.
+Makefile: Makefile.in @top_builddir@/config.status
+	cd @top_builddir@ && $(SHELL) ./config.status tests/unit/time_scheme/Makefile
+
 time_scheme_test_TESTS := test_bdf.pf\
     test_ext.pf\
     test_ab.pf
