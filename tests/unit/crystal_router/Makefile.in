@@ -5,7 +5,13 @@ endif
 FFLAGS += $(PFUNIT_EXTRA_FFLAGS) @NEKO_PKG_FCFLAGS@ -I@top_builddir@/src
 FC = @FC@
 
-%.o : %.F90
+# The pFUnit rules below only track the .pf sources, so a test object
+# compiled against an older layout of a Neko derived type would be kept
+# and linked against the rebuilt library, which is undefined behaviour.
+# Depend on the library so the test objects follow any change to Neko.
+NEKO_LIB := $(wildcard @top_builddir@/src/libneko.la)
+
+%.o : %.F90 $(NEKO_LIB)
 	$(FC) -c $(FFLAGS) $<
 
 

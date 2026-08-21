@@ -2,6 +2,11 @@
 
 ## Develop
 
+- Fixed the unit tests' build rules, which tracked only the `.pf` sources and
+  never the Neko library, so a test object compiled against an older layout of
+  a Neko derived type was silently kept and linked against the rebuilt
+  library. This gave undefined behaviour at run time, e.g. a segfault in
+  `gs_free` after `gs_t` gained new components.
 - Added configurable wall-model field samplers. Wall models can now sample at
   GLL nodes or physical wall-normal distances using global interpolation. The
   sampling values can also be supplied per wall node through new user hooks.
