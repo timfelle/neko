@@ -166,11 +166,112 @@ EXTRA_DIST = \
 	patches/fujitsu_memleak.patch
 
 if ENABLE_FLINT
+# Score every Fortran source individually instead of handing the whole src/
+# tree to a single flint invocation. flint's parser allocates without bound on
+# some sources, so the whole-tree call is reliably killed by the OOM killer,
+# which in turn kills `make check`.
+#
+# This is only loosely comparable to .github/workflows/check_lint.yml: that
+# workflow's per-file loop runs over the *changed* files of a pull request,
+# not the whole tree, and hardcodes a skip list rather than a memory limit.
+# The cost of covering every file here is real -- roughly two minutes and one
+# line of output per source -- which is why nothing is gated on the result.
+#
+# Reporting only: like the plain `flint score` it replaces, this target never
+# fails the build on code quality, whatever the scores are. 174 of the 482
+# sources under src/ are below 10 today, and gating on that is a separate
+# decision from fixing the crash.
+#
+# Sources generated at configure time are skipped, by ignoring any file that
+# has a matching *.in template, so the set of files scored does not depend on
+# whether this is an in-tree or a VPATH build.
+#
+# Both knobs below are deliberately plain make variables rather than configure
+# substitutions: they are developer conveniences, overridable per invocation
+# with e.g. `make lint FLINT_SCORE_GOAL=9`, and nothing in the build depends
+# on their values.
+#
+# FLINT_SCORE_GOAL  Per-file score at or above which a file is considered
+#                   fine; anything below is listed as improvable at the end of
+#                   the run. Matches the bar check_lint.yml reports against.
+# FLINT_MEM_LIMIT   Per-file address-space limit, in KiB. flint cannot score a
+#                   handful of sources at all (it grows past 20 GiB and still
+#                   does not finish); the limit turns that from an OOM kill of
+#                   the whole build into a reported, non-fatal skip. Platforms
+#                   that do not enforce RLIMIT_AS warn once and carry on.
+FLINT_SCORE_GOAL = 10
+FLINT_MEM_LIMIT = 2097152
+
+# Sources flint cannot score at any memory limit -- it grows past 20 GiB on
+# these and still does not terminate. Skipped outright so the run does not
+# spend minutes reaching the limit; check_lint.yml skips the same two.
+FLINT_EXCLUDE = src/adt/stack.f90 src/adt/htable.f90
+
+.PHONY: lint
 lint:
-	$(FLINT) score -d 0 src/ -r flinter_rc.yml
+	@tmpdir=`mktemp -d 2> /dev/null || echo ./lint-tmp.$$$$`; \
+	mkdir -p "$$tmpdir" || exit 1; \
+	trap 'rm -rf "$$tmpdir"' EXIT HUP INT TERM; \
+	lim='$(FLINT_MEM_LIMIT)'; \
+	if ( ulimit -v $$lim ) 2> /dev/null; then :; else \
+	  printf '%s\n' "Warning: this platform will not honour a $$lim KiB"; \
+	  printf '%s\n' "address-space limit, so a pathological source can" \
+	    "still exhaust memory and abort the build."; \
+	  lim=unlimited; \
+	fi; \
+	find "$(srcdir)/src" \( -name '*.f90' -o -name '*.F90' \) \
+	  | sort > "$$tmpdir/files"; \
+	: > "$$tmpdir/improvable"; \
+	: > "$$tmpdir/skipped"; \
+	while IFS= read -r f; do \
+	  if test -f "$$f.in"; then continue; fi; \
+	  excluded=no; \
+	  for x in $(FLINT_EXCLUDE); do \
+	    case "$$f" in */$$x) excluded=yes;; esac; \
+	  done; \
+	  if test "$$excluded" = yes; then \
+	    printf '  - %s: skipped, known to exhaust memory\n' "$$f"; \
+	    printf '  - %s: on FLINT_EXCLUDE\n' "$$f" >> "$$tmpdir/skipped"; \
+	    continue; \
+	  fi; \
+	  out=`( ulimit -v $$lim 2> /dev/null; \
+	         $(FLINT) score -d 0 -r "$(srcdir)/flinter_rc.yml" "$$f" 2>&1 \
+	       )`; \
+	  status=$$?; \
+	  score=`printf '%s\n' "$$out" | sed -n 's/.*-->|\([^|]*\)|<--.*/\1/p'`; \
+	  if test -z "$$score"; then \
+	    reason=`printf '%s\n' "$$out" | tail -n 1`; \
+	    printf '  - %s: not scored, flint exited %s\n' "$$f" "$$status"; \
+	    printf '  - %s: exit %s, %s\n' "$$f" "$$status" "$$reason" \
+	      >> "$$tmpdir/skipped"; \
+	  else \
+	    printf '  - %s: %s\n' "$$f" "$$score"; \
+	    if awk "BEGIN { exit !($$score < $(FLINT_SCORE_GOAL)) }"; then \
+	      printf '  - %s: %s\n' "$$f" "$$score" >> "$$tmpdir/improvable"; \
+	    fi; \
+	  fi; \
+	done < "$$tmpdir/files"; \
+	if test -s "$$tmpdir/skipped"; then \
+	  printf '%s\n' \
+	    "Files flint could not score (see FLINT_EXCLUDE, FLINT_MEM_LIMIT):"; \
+	  cat "$$tmpdir/skipped"; \
+	fi; \
+	if test -s "$$tmpdir/improvable"; then \
+	  printf 'Files that can be improved (score below %s):\n' \
+	    '$(FLINT_SCORE_GOAL)'; \
+	  cat "$$tmpdir/improvable"; \
+	  printf 'Run "%s lint -r %s/flinter_rc.yml <file>" for the\n' \
+	    '$(FLINT)' '$(srcdir)'; \
+	  printf 'suggested improvements.\n'; \
+	fi; \
+	exit 0
 
 check-local: lint
 
+else
+.PHONY: lint
+lint:
+	@echo "flint support is disabled: nothing to lint."
 endif
 
 if ENABLE_PFUNIT
