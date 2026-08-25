@@ -48,12 +48,27 @@ module logger
   !> Length of the section header
   integer, public, parameter :: SEC_HEAD_SIZE = 30
 
+  !> Always logged
+  integer, public, parameter :: NEKO_LOG_QUIET = 0
+  !> Default log level
+  integer, public, parameter :: NEKO_LOG_INFO = 1
+  !> Verbose log level
+  integer, public, parameter :: NEKO_LOG_VERBOSE = 2
+  !> Deprecation log level
+  integer, public, parameter :: NEKO_LOG_DEPRECATION = 5
+  !> Debug log level
+  integer, public, parameter :: NEKO_LOG_DEBUG = 10
+
+  !> @note The components are default initialized to the same configuration
+  !! `init` produces when no environment variables are set, such that a log
+  !! which is used before it is initialized writes to standard output rather
+  !! than to an undefined unit.
   type, public :: log_t
-     integer, private :: indent_
-     integer, private :: section_id_
-     integer, private :: tab_size_
-     integer, private :: level_
-     integer, private :: unit_
+     integer, private :: indent_ = 0
+     integer, private :: section_id_ = 0
+     integer, private :: tab_size_ = 1
+     integer, private :: level_ = NEKO_LOG_INFO
+     integer, private :: unit_ = stdout
 
      character(len=LOG_SIZE), private :: section_header = ""
 
@@ -81,16 +96,6 @@ module logger
 
   !> Global log stream
   type(log_t), public :: neko_log
-  !> Always logged
-  integer, public, parameter :: NEKO_LOG_QUIET = 0
-  !> Default log level
-  integer, public, parameter :: NEKO_LOG_INFO = 1
-  !> Verbose log level
-  integer, public, parameter :: NEKO_LOG_VERBOSE = 2
-  !> Deprecation log level
-  integer, public, parameter :: NEKO_LOG_DEPRECATION = 5
-  !> Debug log level
-  integer, public, parameter :: NEKO_LOG_DEBUG = 10
 
 contains
 
