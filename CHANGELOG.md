@@ -2,6 +2,17 @@
 
 ## Develop
 
+- Added an optional `env_prefix` argument to `log_t%init`, defaulting to
+  `"NEKO"`. A `log_t` instance can now read its configuration from an
+  independent set of environment variables (`<PREFIX>_LOG_LEVEL`,
+  `<PREFIX>_LOG_FILE`, `<PREFIX>_LOG_TAB_SIZE`), so a second log stream can be
+  directed and quietened separately from `neko_log`. `log_t` components are
+  now default initialized to the same configuration `init` produces with no
+  environment variables set, and `free` leaves the log writing to standard
+  output rather than to an invalid unit, so an uninitialized or freed log no
+  longer aborts. Moved the list of already logged deprecated features from a
+  module variable into `log_t`, so it is tracked per instance rather than
+  shared between all of them.
 - Added configurable wall-model field samplers. Wall models can now sample at
   GLL nodes or physical wall-normal distances using global interpolation. The
   sampling values can also be supplied per wall node through new user hooks.

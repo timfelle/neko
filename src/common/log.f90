@@ -59,10 +59,11 @@ module logger
   !> Debug log level
   integer, public, parameter :: NEKO_LOG_DEBUG = 10
 
-  !> @note The components are default initialized to the same configuration
+  !> A log stream.
+  !! @note The components are default initialized to the same configuration
   !! `init` produces when no environment variables are set, such that a log
-  !! which is used before it is initialized writes to standard output rather
-  !! than to an undefined unit.
+  !! which is used before it is initialized, or after it is freed, writes to
+  !! standard output rather than to an undefined unit.
   type, public :: log_t
      integer, private :: indent_ = 0
      integer, private :: section_id_ = 0
@@ -138,6 +139,12 @@ contains
        this%level_ = NEKO_LOG_INFO
     end if
 
+    ! Close any file this log was previously pointed at, so that
+    ! re-initialization does not leak the unit.
+    if (this%unit_ .ne. stdout) then
+       close(this%unit_)
+    end if
+
     call get_environment_variable(trim(prefix) // "_LOG_FILE", &
          log_file, envvar_len)
     if (envvar_len .gt. 0) then
@@ -173,7 +180,9 @@ contains
 
     this%indent_ = 0
     this%level_ = NEKO_LOG_INFO
-    this%unit_ = -1
+    ! Leave the log writing to standard output rather than to an invalid
+    ! unit, such that logging to, or freeing, an already freed log is safe.
+    this%unit_ = stdout
 
     if (allocated(this%deprecated_list)) then
        deallocate(this%deprecated_list)

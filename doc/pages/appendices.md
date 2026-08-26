@@ -87,6 +87,13 @@ A number of logging levels are supported.
 - `NEKO_LOG_LEVEL=5`   : Deprecated features will be logged if used.
 - `NEKO_LOG_LEVEL=10`  : Debug mode.
 
+The `NEKO_` prefix of these three variables is the default of the optional
+`env_prefix` argument to `log_t%init`. An application built on top of Neko may
+declare its own `log_t` and initialise it with a different prefix, giving that
+log stream its own `<PREFIX>_LOG_FILE`, `<PREFIX>_LOG_TAB_SIZE` and
+`<PREFIX>_LOG_LEVEL`, so its output and verbosity are controlled separately
+from Neko's own `neko_log`.
+
 ### Gather-scatter communication backend details
 
 A number of gather-scatter backends are supported.
