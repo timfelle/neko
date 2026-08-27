@@ -69,16 +69,16 @@ contains
     integer(size_t) :: open_obj_count
     integer(hid_t) :: all_files_id
 
-    ! all_files_id = int(H5F_OBJ_ALL_F, kind = hid_t)
+    all_files_id = int(H5F_OBJ_ALL_F, kind = hid_t)
 
     ierr = 0
-    ! call h5fget_obj_count_f(all_files_id, H5F_OBJ_ALL_F, open_obj_count, ierr)
-    ! if (ierr .ne. 0) then
-    !    write(error_unit, '(A,I0)') 'HDF5 object count query failed, ierr=', ierr
-    ! else if (open_obj_count .ne. 0) then
-    !    write(error_unit, '(A,I0)') &
-    !         'HDF5 open object count before final close: ', open_obj_count
-    ! end if
+    call h5fget_obj_count_f(all_files_id, H5F_OBJ_ALL_F, open_obj_count, ierr)
+    if (ierr .ne. 0) then
+       write(error_unit, '(A,I0)') 'HDF5 object count query failed, ierr=', ierr
+    else if (open_obj_count .ne. 0) then
+       write(error_unit, '(A,I0)') &
+            'HDF5 open object count before final close: ', open_obj_count
+    end if
     call h5close_f(ierr)
     if (ierr .ne. 0) call neko_error('Failed to close HDF5')
 #endif
