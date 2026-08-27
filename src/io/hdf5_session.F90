@@ -32,9 +32,11 @@
 !
 !> HDF5 session management
 module hdf5_session
+  use, intrinsic :: iso_fortran_env, only : error_unit
   use utils, only : neko_error
 #ifdef HAVE_HDF5
-  use hdf5, only : h5open_f, h5close_f
+  use hdf5, only : h5open_f, h5close_f, h5fget_obj_count_f, H5F_OBJ_ALL_F, &
+       size_t, hid_t
 #endif
   implicit none
   private
@@ -64,7 +66,19 @@ contains
   subroutine hdf5_session_finalize
 #ifdef HAVE_HDF5
     integer :: ierr
+    integer(size_t) :: open_obj_count
+    integer(hid_t) :: all_files_id
 
+    ! all_files_id = int(H5F_OBJ_ALL_F, kind = hid_t)
+
+    ierr = 0
+    ! call h5fget_obj_count_f(all_files_id, H5F_OBJ_ALL_F, open_obj_count, ierr)
+    ! if (ierr .ne. 0) then
+    !    write(error_unit, '(A,I0)') 'HDF5 object count query failed, ierr=', ierr
+    ! else if (open_obj_count .ne. 0) then
+    !    write(error_unit, '(A,I0)') &
+    !         'HDF5 open object count before final close: ', open_obj_count
+    ! end if
     call h5close_f(ierr)
     if (ierr .ne. 0) call neko_error('Failed to close HDF5')
 #endif
