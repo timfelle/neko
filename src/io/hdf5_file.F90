@@ -46,6 +46,7 @@ module hdf5_file
   use vector, only : vector_t
   use matrix, only : matrix_t
   use datadist, only : linear_dist_t
+  use space, only : GLL
   use comm, only : pe_rank, pe_size, NEKO_COMM
   use mpi_f08, only : MPI_INFO_NULL, MPI_Allreduce, MPI_Allgather, &
        MPI_IN_PLACE, MPI_INTEGER, MPI_SUM, MPI_MAX, MPI_Comm_size, MPI_Exscan, &
@@ -407,6 +408,36 @@ contains
     call h5aread_f(attr_id, H5T_NATIVE_INTEGER, gdim, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
     call h5gclose_f(grp_id, ierr)
+
+    !
+    ! Record the polynomial order the checkpoint was written at, exactly as
+    ! chkp_file does. `fluid_scheme%restart` compares `chkp%previous_Xh%lx`
+    ! against the running case's `Xh%lx` to decide whether the restored
+    ! fields need the interpolation fix-up (scale by the multiplicity, then
+    ! gather-scatter back). Leaving `previous_Xh` uninitialised made that
+    ! comparison spuriously true even when the orders match, so every HDF5
+    ! restart ran a fix-up it did not need. That round trip is the identity
+    ! in exact arithmetic but perturbs every shared degree of freedom by
+    ! about one ulp, so an HDF5 restart was never bit-exact where the native
+    ! chkp format was.
+    !
+    select type (data)
+    type is (chkp_t)
+       ! Unlike chkp_file, this reader has no interpolation path: it reads
+       ! straight into fields sized by the running case's dofmap. Say so,
+       ! rather than silently reading the wrong number of values per element.
+       if (lx .ne. dof%Xh%lx) then
+          call neko_error('HDF5 checkpoint was written at a different ' // &
+               'polynomial order; restarting across orders is only ' // &
+               'supported by the chkp format')
+       end if
+
+       if (gdim .eq. 3) then
+          call data%previous_Xh%init(GLL, lx, lx, lx)
+       else
+          call data%previous_Xh%init(GLL, lx, lx)
+       end if
+    end select
 
 
     if (associated(tlag) .and. associated(dtlag)) then

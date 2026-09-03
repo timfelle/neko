@@ -39,6 +39,18 @@
 - Added configurable wall-model field samplers. Wall models can now sample at
   GLL nodes or physical wall-normal distances using global interpolation. The
   sampling values can also be supplied per wall node through new user hooks.
+- Fixed HDF5 checkpoint restarts not being bit-exact. `hdf5_file` read the
+  polynomial order from the file but never recorded it in
+  `chkp_t%previous_Xh`, which `fluid_scheme%restart` and `ale_manager`
+  compare against the running case to decide whether the restored fields need
+  the interpolation fix-up. Reading that uninitialised order made the
+  comparison spuriously true even when the orders matched, so every HDF5
+  restart scaled `u`, `v`, `w`, `p` and the velocity lags by the multiplicity
+  and gather-scattered them back — the identity in exact arithmetic, but about
+  one ulp per shared degree of freedom in practice. Restarting from an HDF5
+  checkpoint written at a different polynomial order now raises an error
+  rather than silently reading the wrong number of values per element; the
+  `chkp` format remains the one that interpolates across orders.
 - The CUDA and HIP auto-tuners for `ax_helm` and the SEM operators (`opgrad`,
   `dudxyz`, `cdtp`, `conv1`, `convect_scalar`, `lambda2`) now also sweep the
   thread block geometry, not just the kernel formulation: chunk size for the
