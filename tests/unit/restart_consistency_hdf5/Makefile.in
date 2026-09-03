@@ -5,9 +5,7 @@ endif
 FFLAGS += $(PFUNIT_EXTRA_FFLAGS) @NEKO_PKG_FCFLAGS@ -I@top_builddir@/src
 FC = @FC@
 
-# Rebuild against the library, not just against the test source. Without
-# this the suite is happily left linked to a stale libneko, which quietly
-# invalidates any comparison drawn from running it.
+# Depend on the library so the test objects follow any change to Neko.
 NEKO_LIB := $(wildcard @top_builddir@/src/libneko.la)
 
 %.o : %.F90 $(NEKO_LIB)
@@ -16,6 +14,12 @@ NEKO_LIB := $(wildcard @top_builddir@/src/libneko.la)
 
 check: restart_consistency_hdf5_suite
 
+# Regenerate this Makefile from Makefile.in via config.status
+# whenever it changes.
+SUBDIR := $(patsubst $(abspath @top_builddir@)/%,%,$(CURDIR))
+
+Makefile: Makefile.in @top_builddir@/config.status
+	cd @top_builddir@ && $(SHELL) ./config.status $(SUBDIR)/Makefile
 
 restart_consistency_hdf5_suite_TESTS := test_restart_consistency_hdf5.pf
 restart_consistency_hdf5_suite_OTHER_LIBRARIES = -L@top_builddir@/src/.libs -lneko @LDFLAGS@ @LIBS@
