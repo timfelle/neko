@@ -39,6 +39,20 @@
 - Added configurable wall-model field samplers. Wall models can now sample at
   GLL nodes or physical wall-normal distances using global interpolation. The
   sampling values can also be supplied per wall node through new user hooks.
+- Added `restart_consistency` and `restart_consistency_hdf5` unit tests,
+  which run a short simulation, checkpoint half way through, restart a fresh
+  case from that checkpoint and require every subsequent step to reproduce
+  the uninterrupted run bit-exactly. The two differ only in checkpoint
+  format, so the native one acts as a control: it stayed green while the
+  HDF5 one caught the `previous_Xh` fault below at `u/v/w/p RMSE = 2.7E-19 /
+  2.3E-19 / 2.1E-19 / 2.2E-16`. Their `Makefile.in` makes the test objects
+  depend on `libneko.la`, so a suite is never left linked against a stale
+  library.
+- Fixed two HDF5 identifier leaks in `hdf5_file`: the per-dataset dataspace
+  returned by `h5dget_space_f` overwrote the shared `filespace` and only the
+  last one was ever closed, and the file-access property list was overwritten
+  by the dataset-transfer one before being closed. Neither is the cause of
+  the `Failed to close HDF5` seen at teardown elsewhere, which is still open.
 - Fixed HDF5 checkpoint restarts not being bit-exact. `hdf5_file` read the
   polynomial order from the file but never recorded it in
   `chkp_t%previous_Xh`, which `fluid_scheme%restart` and `ale_manager`

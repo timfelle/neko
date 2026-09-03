@@ -178,7 +178,7 @@ contains
     real(kind=dp), pointer :: tlag(:)
     integer :: ierr, info, drank, i, j
     integer(hid_t) :: plist_id, file_id, dset_id, grp_id, attr_id
-    integer(hid_t) :: filespace, memspace
+    integer(hid_t) :: filespace, memspace, dspace_id, fapl_id
     integer(hid_t) :: H5T_NEKO_REAL
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
     integer :: suffix_pos
@@ -194,12 +194,16 @@ contains
 
     call hdf5_file_determine_real(H5T_NEKO_REAL)
 
-    call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, ierr)
+    ! The file-access and dataset-transfer property lists are distinct
+    ! objects; reusing one identifier for both would leak the first, and
+    ! HDF5 then refuses to close the library at the end of the session.
+    call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
     info = MPI_INFO_NULL%mpi_val
-    call h5pset_fapl_mpio_f(plist_id, NEKO_COMM%mpi_val, info, ierr)
+    call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, info, ierr)
 
     call h5fcreate_f(fname, H5F_ACC_TRUNC_F, &
-         file_id, ierr, access_prp = plist_id)
+         file_id, ierr, access_prp = fapl_id)
+    call h5pclose_f(fapl_id, ierr)
 
     call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, ierr)
     call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, ierr)
@@ -263,20 +267,22 @@ contains
 
        call h5dcreate_f(grp_id, 'tlag', H5T_NATIVE_DOUBLE, &
             filespace, dset_id, ierr)
-       call h5dget_space_f(dset_id, filespace, ierr)
-       call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, &
+       call h5dget_space_f(dset_id, dspace_id, ierr)
+       call h5sselect_hyperslab_f (dspace_id, H5S_SELECT_SET_F, &
             doffset, dcount, ierr)
        call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, tlag, &
             ddim, ierr, xfer_prp = plist_id)
+       call h5sclose_f(dspace_id, ierr)
        call h5dclose_f(dset_id, ierr)
 
        call h5dcreate_f(grp_id, 'dtlag', H5T_NATIVE_DOUBLE, &
             filespace, dset_id, ierr)
-       call h5dget_space_f(dset_id, filespace, ierr)
-       call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, &
+       call h5dget_space_f(dset_id, dspace_id, ierr)
+       call h5sselect_hyperslab_f (dspace_id, H5S_SELECT_SET_F, &
             doffset, dcount, ierr)
        call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, dtlag, &
             ddim, ierr, xfer_prp = plist_id)
+       call h5sclose_f(dspace_id, ierr)
        call h5dclose_f(dset_id, ierr)
 
        call h5sclose_f(filespace, ierr)
@@ -308,13 +314,14 @@ contains
           do i = 1, size(fp)
              call h5dcreate_f(grp_id, fp(i)%ptr%name, H5T_NEKO_REAL, &
                   filespace, dset_id, ierr)
-             call h5dget_space_f(dset_id, filespace, ierr)
-             call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, &
+             call h5dget_space_f(dset_id, dspace_id, ierr)
+             call h5sselect_hyperslab_f(dspace_id, H5S_SELECT_SET_F, &
                   doffset, dcount, ierr)
              call h5dwrite_f(dset_id, H5T_NEKO_REAL, &
                   fp(i)%ptr%x(1,1,1,1), &
-                  ddim, ierr, file_space_id = filespace, &
+                  ddim, ierr, file_space_id = dspace_id, &
                   mem_space_id = memspace, xfer_prp = plist_id)
+             call h5sclose_f(dspace_id, ierr)
              call h5dclose_f(dset_id, ierr)
           end do
           deallocate(fp)
@@ -325,13 +332,14 @@ contains
              do j = 1, fsp(i)%ptr%size()
                 call h5dcreate_f(grp_id, fsp(i)%ptr%lf(j)%name, &
                      H5T_NEKO_REAL, filespace, dset_id, ierr)
-                call h5dget_space_f(dset_id, filespace, ierr)
-                call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, &
+                call h5dget_space_f(dset_id, dspace_id, ierr)
+                call h5sselect_hyperslab_f(dspace_id, H5S_SELECT_SET_F, &
                      doffset, dcount, ierr)
                 call h5dwrite_f(dset_id, H5T_NEKO_REAL, &
                      fsp(i)%ptr%lf(j)%x(1,1,1,1), &
-                     ddim, ierr, file_space_id = filespace, &
+                     ddim, ierr, file_space_id = dspace_id, &
                      mem_space_id = memspace, xfer_prp = plist_id)
+                call h5sclose_f(dspace_id, ierr)
                 call h5dclose_f(dset_id, ierr)
              end do
           end do
@@ -354,7 +362,7 @@ contains
     class(hdf5_file_t) :: this
     class(*), target, intent(inout) :: data
     integer(hid_t) :: plist_id, file_id, dset_id, grp_id, attr_id
-    integer(hid_t) :: filespace, memspace
+    integer(hid_t) :: filespace, memspace, fapl_id
     integer(hid_t) :: H5T_NEKO_REAL
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
     integer :: i,j, ierr, info, glb_nelv, gdim, lx, drank
@@ -374,12 +382,15 @@ contains
     call hdf5_file_determine_data(data, msh, dof, fp, fsp, dtlag, tlag)
     call hdf5_file_determine_real(H5T_NEKO_REAL)
 
-    call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, ierr)
+    ! As in the write path, keep the file-access and dataset-transfer
+    ! property lists in separate identifiers so neither is leaked.
+    call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
     info = MPI_INFO_NULL%mpi_val
-    call h5pset_fapl_mpio_f(plist_id, NEKO_COMM%mpi_val, info, ierr)
+    call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, info, ierr)
 
     call h5fopen_f(fname, H5F_ACC_RDONLY_F, &
-         file_id, ierr, access_prp = plist_id)
+         file_id, ierr, access_prp = fapl_id)
+    call h5pclose_f(fapl_id, ierr)
 
     call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, ierr)
     call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, ierr)
