@@ -40,14 +40,17 @@
   GLL nodes or physical wall-normal distances using global interpolation. The
   sampling values can also be supplied per wall node through new user hooks.
 - Added `restart_consistency` and `restart_consistency_hdf5` unit tests,
-  which run a short simulation, checkpoint half way through, restart a fresh
-  case from that checkpoint and require every subsequent step to reproduce
-  the uninterrupted run bit-exactly. The two differ only in checkpoint
-  format, so the native one acts as a control: it stayed green while the
-  HDF5 one caught the `previous_Xh` fault below at `u/v/w/p RMSE = 2.7E-19 /
-  2.3E-19 / 2.1E-19 / 2.2E-16`. Their `Makefile.in` makes the test objects
-  depend on `libneko.la`, so a suite is never left linked against a stale
-  library.
+  which run a short Taylor-Green vortex, checkpoint half way through,
+  restart a fresh case from that checkpoint and require every subsequent
+  step to reproduce the uninterrupted run bit-exactly. The physics is
+  `examples/tgv/tgv_expression.case` coarsened to something a unit test can
+  afford; TGV is at full amplitude from the first step, so the comparison
+  cannot degenerate into checking that two fields are both still at rest.
+  The two tests differ only in checkpoint format, so the native one acts as
+  a control: it stayed green while the HDF5 one caught the `previous_Xh`
+  fault below at `u/v/w/p RMSE = 1.5E-17 / 2.3E-17 / 1.1E-18 / 7.7E-17` --
+  a pressure error below machine epsilon, which is why the comparison is
+  against exactly zero rather than against `NEKO_EPS`.
 - Fixed two HDF5 identifier leaks in `hdf5_file`: the per-dataset dataspace
   returned by `h5dget_space_f` overwrote the shared `filespace` and only the
   last one was ever closed, and the file-access property list was overwritten
