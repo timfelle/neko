@@ -76,6 +76,7 @@ module matrix_math
        device_masked_gather_copy_0, device_masked_scatter_copy_0, &
        device_glsubnorm, device_invcol3
   use, intrinsic :: iso_c_binding, only : c_ptr
+  use vector_math
   implicit none
   private
 
@@ -94,38 +95,18 @@ contains
   subroutine matrix_rzero(a, n)
     type(matrix_t), intent(inout) :: a
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
+    call vector_rzero(a, n)
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_rzero(a%x_d, size)
-    else
-       call rzero(a%x, size)
-    end if
   end subroutine matrix_rzero
 
   !> Set all elements to one
   subroutine matrix_rone(a, n)
     type(matrix_t), intent(inout) :: a
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
+    call vector_rone(a, n)
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_rone(a%x_d, size)
-    else
-       call rone(a%x, size)
-    end if
   end subroutine matrix_rone
 
   !> Copy a matrix \f$ a = b \f$
@@ -133,19 +114,8 @@ contains
     type(matrix_t), intent(inout) :: a
     type(matrix_t), intent(in) :: b
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(a%x_d, b%x_d, size)
-    else
-       call copy(a%x, b%x, size)
-    end if
+    call vector_copy(a, b, n)
   end subroutine matrix_copy
 
   !> Multiplication by constant c \f$ a = c \cdot a \f$
@@ -153,19 +123,9 @@ contains
     type(matrix_t), intent(inout) :: a
     real(kind=rp), intent(in) :: c
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
+    call vector_cmult(a, c, n)
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cmult(a%x_d, c, size)
-    else
-       call cmult(a%x, c, size)
-    end if
   end subroutine matrix_cmult
 
   !> Add a scalar to matrix \f$ a_i = a_i + s \f$
@@ -173,19 +133,9 @@ contains
     type(matrix_t), intent(inout) :: a
     real(kind=rp), intent(in) :: s
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
+    call vector_cadd(a, s, n)
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cadd(a%x_d, s, size)
-    else
-       call cadd(a%x, s, size)
-    end if
   end subroutine matrix_cadd
 
   !> Set all elements to a constant c \f$ a = c \f$
@@ -195,36 +145,16 @@ contains
     integer, intent(in), optional :: n
     integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
+    call vector_cfill(a, c, n)
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cfill(a%x_d, c, size)
-    else
-       call cfill(a%x, c, size)
-    end if
   end subroutine matrix_cfill
 
   !> Invert elements of a matrix \f$ a_i = 1 / a_i \f$
   subroutine matrix_invcol1(a, n)
     type(matrix_t), intent(inout) :: a
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_invcol1(a%x_d, size)
-    else
-       call invcol1(a%x, size)
-    end if
+    call vector_invcol1(a, n)
 
   end subroutine matrix_invcol1
 
@@ -234,19 +164,8 @@ contains
     type(matrix_t), intent(in) :: b
     type(matrix_t), intent(in) :: c
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_invcol3(a%x_d, b%x_d, c%x_d, size)
-    else
-       call invcol3(a%x, b%x, c%x, size)
-    end if
+    call vector_invcol3(a, b, c, n)
 
   end subroutine matrix_invcol3
 
@@ -255,19 +174,8 @@ contains
     type(matrix_t), intent(inout) :: a
     type(matrix_t), intent(in) :: b
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_add2(a%x_d, b%x_d, size)
-    else
-       call add2(a%x, b%x, size)
-    end if
+    call vector_add2(a, b, n)
 
   end subroutine matrix_add2
 
@@ -276,19 +184,8 @@ contains
     type(matrix_t), intent(inout) :: a
     type(matrix_t), intent(in) :: b, c
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_add3(a%x_d, b%x_d, c%x_d, size)
-    else
-       call add3(a%x, b%x, c%x, size)
-    end if
+    call vector_add3(a, b, c, n)
 
   end subroutine matrix_add3
 
@@ -297,19 +194,8 @@ contains
     type(matrix_t), intent(inout) :: a
     type(matrix_t), intent(in) :: b, c, d
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_add4(a%x_d, b%x_d, c%x_d, d%x_d, size)
-    else
-       call add4(a%x, b%x, c%x, d%x, size)
-    end if
+    call vector_add4(a, b, c, d, n)
 
   end subroutine matrix_add4
 
@@ -318,19 +204,8 @@ contains
     type(matrix_t), intent(inout) :: a
     type(matrix_t), intent(in) :: b
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_sub2(a%x_d, b%x_d, size)
-    else
-       call sub2(a%x, b%x, size)
-    end if
+    call vector_sub2(a, b, n)
 
   end subroutine matrix_sub2
 
@@ -340,19 +215,8 @@ contains
     type(matrix_t), intent(in) :: b
     type(matrix_t), intent(in) :: c
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_sub3(a%x_d, b%x_d, c%x_d, size)
-    else
-       call sub3(a%x, b%x, c%x, size)
-    end if
+    call vector_sub3(a, b, c, n)
 
   end subroutine matrix_sub3
 
@@ -364,19 +228,8 @@ contains
     type(matrix_t), intent(in) :: b
     real(kind=rp), intent(in) :: c1
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_add2s1(a%x_d, b%x_d, c1, size)
-    else
-       call add2s1(a%x, b%x, c1, size)
-    end if
+    call vector_add2s1(a, b, c1, n)
 
   end subroutine matrix_add2s1
 
@@ -387,19 +240,8 @@ contains
     type(matrix_t), intent(in) :: b
     real(kind=rp), intent(in) :: c1
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_add2s2(a%x_d, b%x_d, c1, size)
-    else
-       call add2s2(a%x, b%x, c1, size)
-    end if
+    call vector_add2s2(a, b, c1, n)
 
   end subroutine matrix_add2s2
 
@@ -409,19 +251,8 @@ contains
     type(matrix_t), intent(in) :: b
     real(kind=rp), intent(in) :: c1
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_addsqr2s2(a%x_d, b%x_d, c1, size)
-    else
-       call addsqr2s2(a%x, b%x, c1, size)
-    end if
+    call vector_addsqr2s2(a, b, c1, n)
 
   end subroutine matrix_addsqr2s2
 
@@ -431,19 +262,8 @@ contains
     type(matrix_t), intent(in) :: b
     real(kind=rp), intent(in) :: c
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cmult2(a%x_d, b%x_d, c, size)
-    else
-       call cmult2(a%x, b%x, c, size)
-    end if
+    call vector_cmult2(a, b, c, n)
 
   end subroutine matrix_cmult2
 
@@ -452,19 +272,8 @@ contains
     type(matrix_t), intent(inout) :: a
     type(matrix_t), intent(in) :: b
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_invcol2(a%x_d, b%x_d, size)
-    else
-       call invcol2(a%x, b%x, size)
-    end if
+    call vector_invcol2(a, b, n)
 
   end subroutine matrix_invcol2
 
@@ -474,19 +283,8 @@ contains
     type(matrix_t), intent(inout) :: a
     type(matrix_t), intent(in) :: b
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_col2(a%x_d, b%x_d, size)
-    else
-       call col2(a%x, b%x, size)
-    end if
+    call vector_col2(a, b, n)
 
   end subroutine matrix_col2
 
@@ -496,19 +294,8 @@ contains
     type(matrix_t), intent(in) :: b
     type(matrix_t), intent(in) :: c
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_col3(a%x_d, b%x_d, c%x_d, size)
-    else
-       call col3(a%x, b%x, c%x, size)
-    end if
+    call vector_col3(a, b, c, n)
 
   end subroutine matrix_col3
 
@@ -518,19 +305,8 @@ contains
     type(matrix_t), intent(in) :: b
     type(matrix_t), intent(in) :: c
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_subcol3(a%x_d, b%x_d, c%x_d, size)
-    else
-       call subcol3(a%x, b%x, c%x, size)
-    end if
+    call vector_subcol3(a, b, c, n)
 
   end subroutine matrix_subcol3
 
@@ -541,19 +317,8 @@ contains
     type(matrix_t), intent(in) :: c
     real(kind=rp), intent(in) :: c1, c2
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_add3s2(a%x_d, b%x_d, c%x_d, c1, c2, size)
-    else
-       call add3s2(a%x, b%x, c%x, c1, c2, size)
-    end if
+    call vector_add3s2(a, b, c, c1, c2, n)
 
   end subroutine matrix_add3s2
 
@@ -563,19 +328,8 @@ contains
     type(matrix_t), intent(in) :: b
     type(matrix_t), intent(in) :: c
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_addcol3(a%x_d, b%x_d, c%x_d, size)
-    else
-       call addcol3(a%x, b%x, c%x, size)
-    end if
+    call vector_addcol3(a, b, c, n)
 
   end subroutine matrix_addcol3
 
@@ -586,19 +340,8 @@ contains
     type(matrix_t), intent(in) :: c
     type(matrix_t), intent(in) :: d
     integer, intent(in), optional :: n
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_addcol4(a%x_d, b%x_d, c%x_d, d%x_d, size)
-    else
-       call addcol4(a%x, b%x, c%x, d%x, size)
-    end if
+    call vector_addcol4(a, b, c, d, n)
 
   end subroutine matrix_addcol4
 
@@ -607,19 +350,8 @@ contains
     integer, intent(in), optional :: n
     type(matrix_t), intent(in) :: a
     real(kind=rp) :: sum
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       sum = device_glsum(a%x_d, size)
-    else
-       sum = glsum(a%x, size)
-    end if
+    sum = vector_glsum(a, n)
 
   end function matrix_glsum
 
@@ -628,19 +360,8 @@ contains
     integer, intent(in), optional :: n
     type(matrix_t), intent(in) :: a
     real(kind=rp) :: val
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       val = device_glmax(a%x_d, size)
-    else
-       val = glmax(a%x, size)
-    end if
+    val = vector_glmax(a, n)
 
   end function matrix_glmax
 
@@ -649,19 +370,8 @@ contains
     integer, intent(in), optional :: n
     type(matrix_t), intent(in) :: a
     real(kind=rp) :: val
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       val = device_glmin(a%x_d, size)
-    else
-       val = glmin(a%x, size)
-    end if
+    val = vector_glmin(a, n)
 
   end function matrix_glmin
 
@@ -670,19 +380,8 @@ contains
     integer, intent(in), optional :: n
     type(matrix_t), intent(in) :: a, b
     real(kind=rp) :: ip
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       ip = device_glsc2(a%x_d, b%x_d, size)
-    else
-       ip = glsc2(a%x, b%x, size)
-    end if
+    ip = vector_glsc2(a, b, n)
 
   end function matrix_glsc2
 
@@ -691,19 +390,8 @@ contains
     integer, intent(in), optional :: n
     type(matrix_t), intent(in) :: a, b, c
     real(kind=rp) :: ip
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       ip = device_glsc3(a%x_d, b%x_d, c%x_d, size)
-    else
-       ip = glsc3(a%x, b%x, c%x, size)
-    end if
+    ip = vector_glsc3(a, b, c, n)
 
   end function matrix_glsc3
 
@@ -713,19 +401,8 @@ contains
     integer, intent(in), optional :: n
     type(matrix_t), intent(in) :: a, b
     real(kind=rp) :: norm
-    integer :: size
 
-    if (present(n)) then
-       size = n
-    else
-       size = a%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       norm = device_glsubnorm(a%x_d, b%x_d, size)
-    else
-       norm = glsubnorm(a%x, b%x, size)
-    end if
+    norm = vector_glsubnorm(a, b, n)
 
   end function matrix_glsubnorm
 

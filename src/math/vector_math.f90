@@ -58,9 +58,9 @@
 ! not be used for advertising or product endorsement purposes.
 !
 module vector_math
+  use array, only : array_t
   use neko_config, only : NEKO_BCKND_DEVICE
   use num_types, only : rp
-  use vector, only : vector_t
   use mask, only : mask_t
   use device, only : device_get_ptr
   use utils, only : neko_error
@@ -90,8 +90,8 @@ module vector_math
   public :: vector_rzero, vector_rone, vector_copy, vector_cmult, &
        vector_cadd, vector_cfill, vector_invcol1, vector_invcol3, &
        vector_vdot3, vector_cadd2, vector_absval, &
-       vector_add2, vector_sub2, vector_sub3, vector_add2s1, &
-       vector_add2s2, vector_addsqr2s2, vector_cmult2, &
+       vector_add2, vector_sub2, vector_sub3, vector_add4, &
+       vector_add2s1, vector_add2s2, vector_addsqr2s2, vector_cmult2, &
        vector_invcol2, vector_col2, vector_col3, vector_subcol3, &
        vector_add3s2, vector_addcol3, vector_addcol4, vector_glsum, &
        vector_glmax, vector_glmin, vector_glsc2, vector_glsc3, vector_add3, &
@@ -104,8 +104,8 @@ contains
 
   !> Zero a real vector
   subroutine vector_rzero(a, n)
+    class(array_t), intent(inout) :: a
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
     integer :: size
 
     if (present(n)) then
@@ -117,14 +117,14 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_rzero(a%x_d, size)
     else
-       call rzero(a%x, size)
+       call rzero(a%data, size)
     end if
   end subroutine vector_rzero
 
   !> Set all elements to one
   subroutine vector_rone(a, n)
+    class(array_t), intent(inout) :: a
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
     integer :: size
 
     if (present(n)) then
@@ -136,15 +136,15 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_rone(a%x_d, size)
     else
-       call rone(a%x, size)
+       call rone(a%data, size)
     end if
   end subroutine vector_rone
 
   !> Copy a vector \f$ a = b \f$
   subroutine vector_copy(a, b, n)
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
     integer, intent(in), optional :: n
-    type(vector_t), intent(in) :: b
-    type(vector_t), intent(inout) :: a
     integer :: size
 
     if (present(n)) then
@@ -156,15 +156,15 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(a%x_d, b%x_d, size)
     else
-       call copy(a%x, b%x, size)
+       call copy(a%data, b%data, size)
     end if
   end subroutine vector_copy
 
   !> Multiplication by constant c \f$ a = c \cdot a \f$
   subroutine vector_cmult(a, c, n)
-    integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
+    class(array_t), intent(inout) :: a
     real(kind=rp), intent(in) :: c
+    integer, intent(in), optional :: n
     integer :: size
 
     if (present(n)) then
@@ -176,15 +176,15 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_cmult(a%x_d, c, size)
     else
-       call cmult(a%x, c, size)
+       call cmult(a%data, c, size)
     end if
   end subroutine vector_cmult
 
   !> Add a scalar to vector \f$ a = \sum a_i + s \f$
   subroutine vector_cadd(a, s, n)
-    integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
+    class(array_t), intent(inout) :: a
     real(kind=rp), intent(in) :: s
+    integer, intent(in), optional :: n
     integer :: size
 
     if (present(n)) then
@@ -196,16 +196,16 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_cadd(a%x_d, s, size)
     else
-       call cadd(a%x, s, size)
+       call cadd(a%data, s, size)
     end if
   end subroutine vector_cadd
 
   !> Add a scalar to vector \f$ a_i =  b_i + s \f$
   subroutine vector_cadd2(a, b, s, n)
-    integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
     real(kind=rp), intent(in) :: s
+    integer, intent(in), optional :: n
     integer :: size
 
     if (present(n)) then
@@ -217,16 +217,16 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_cadd2(a%x_d, b%x_d, s, size)
     else
-       call cadd2(a%x, b%x, s, size)
+       call cadd2(a%data, b%data, s, size)
     end if
   end subroutine vector_cadd2
 
 
   !> Set all elements to a constant c \f$ a = c \f$
   subroutine vector_cfill(a, c, n)
-    integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
+    class(array_t), intent(inout) :: a
     real(kind=rp), intent(in) :: c
+    integer, intent(in), optional :: n
     integer :: size
 
     if (present(n)) then
@@ -238,14 +238,14 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_cfill(a%x_d, c, size)
     else
-       call cfill(a%x, c, size)
+       call cfill(a%data, c, size)
     end if
   end subroutine vector_cfill
 
   !> Invert a vector \f$ a = 1 / a \f$
   subroutine vector_invcol1(a, n)
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
+    class(array_t), intent(inout) :: a
     integer :: size
 
     if (present(n)) then
@@ -257,17 +257,17 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_invcol1(a%x_d, size)
     else
-       call invcol1(a%x, size)
+       call invcol1(a%data, size)
     end if
 
   end subroutine vector_invcol1
 
   !> Invert a vector \f$ a = b / c \f$
   subroutine vector_invcol3(a, b, c, n)
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
+    class(array_t), intent(in) :: c
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b
-    type(vector_t), intent(in) :: c
     integer :: size
 
     if (present(n)) then
@@ -279,7 +279,7 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_invcol3(a%x_d, b%x_d, c%x_d, size)
     else
-       call invcol3(a%x, b%x, c%x, size)
+       call invcol3(a%data, b%data, c%data, size)
     end if
 
   end subroutine vector_invcol3
@@ -287,10 +287,10 @@ contains
   !> Compute a dot product \f$ dot = u \cdot v \f$ (3-d version)
   !! assuming vector components \f$ u = (u_1, u_2, u_3) \f$ etc.
   subroutine vector_vdot3(dot, u1, u2, u3, v1, v2, v3, n)
+    class(array_t), intent(in) :: u1, u2, u3
+    class(array_t), intent(in) :: v1, v2, v3
+    class(array_t), intent(inout) :: dot
     integer, intent(in), optional :: n
-    type(vector_t), intent(in) :: u1, u2, u3
-    type(vector_t), intent(in) :: v1, v2, v3
-    type(vector_t), intent(inout) :: dot
     integer :: size
 
     if (present(n)) then
@@ -305,9 +305,9 @@ contains
             v1%x_d, v2%x_d, v3%x_d, &
             size)
     else
-       call vdot3(dot%x, &
-            u1%x, u2%x, u3%x, &
-            v1%x, v2%x, v3%x, &
+       call vdot3(dot%data, &
+            u1%data, u2%data, u3%data, &
+            v1%data, v2%data, v3%data, &
             size)
     end if
 
@@ -315,9 +315,9 @@ contains
 
   !> Vector addition \f$ a = a + b \f$
   subroutine vector_add2(a, b, n)
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b
     integer :: size
 
     if (present(n)) then
@@ -329,16 +329,16 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_add2(a%x_d, b%x_d, size)
     else
-       call add2(a%x, b%x, size)
+       call add2(a%data, b%data, size)
     end if
 
   end subroutine vector_add2
 
   !> Vector addition \f$ a = b + c \f$
   subroutine vector_add3(a, b, c, n)
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b, c
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b, c
     integer :: size
 
     if (present(n)) then
@@ -350,16 +350,16 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_add3(a%x_d, b%x_d, c%x_d, size)
     else
-       call add3(a%x, b%x, c%x, size)
+       call add3(a%data, b%data, c%data, size)
     end if
 
   end subroutine vector_add3
 
   !> Vector addition \f$ a = b + c + d \f$
   subroutine vector_add4(a, b, c, d, n)
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b, c, d
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b, c, d
     integer :: size
 
     if (present(n)) then
@@ -371,16 +371,16 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_add4(a%x_d, b%x_d, c%x_d, d%x_d, size)
     else
-       call add4(a%x, b%x, c%x, d%x, size)
+       call add4(a%data, b%data, c%data, d%data, size)
     end if
 
   end subroutine vector_add4
 
   !> Vector substraction \f$ a = a - b \f$
   subroutine vector_sub2(a, b, n)
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(inout) :: b
     integer :: size
 
     if (present(n)) then
@@ -392,17 +392,17 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_sub2(a%x_d, b%x_d, size)
     else
-       call sub2(a%x, b%x, size)
+       call sub2(a%data, b%data, size)
     end if
 
   end subroutine vector_sub2
 
   !> Vector subtraction \f$ a = b - c \f$
   subroutine vector_sub3(a, b, c, n)
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
+    class(array_t), intent(in) :: c
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b
-    type(vector_t), intent(in) :: c
     integer :: size
 
     if (present(n)) then
@@ -414,7 +414,7 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_sub3(a%x_d, b%x_d, c%x_d, size)
     else
-       call sub3(a%x, b%x, c%x, size)
+       call sub3(a%data, b%data, c%data, size)
     end if
 
   end subroutine vector_sub3
@@ -423,10 +423,10 @@ contains
   !> Vector addition with scalar multiplication \f$ a = c_1 a + b \f$
   !! (multiplication on first argument)
   subroutine vector_add2s1(a, b, c1, n)
-    integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(inout) :: b
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
     real(kind=rp), intent(in) :: c1
+    integer, intent(in), optional :: n
     integer :: size
 
     if (present(n)) then
@@ -438,7 +438,7 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_add2s1(a%x_d, b%x_d, c1, size)
     else
-       call add2s1(a%x, b%x, c1, size)
+       call add2s1(a%data, b%data, c1, size)
     end if
 
   end subroutine vector_add2s1
@@ -446,10 +446,10 @@ contains
   !> Vector addition with scalar multiplication  \f$ a = a + c_1 b \f$
   !! (multiplication on second argument)
   subroutine vector_add2s2(a, b, c1, n)
-    integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
     real(kind=rp), intent(in) :: c1
+    integer, intent(in), optional :: n
     integer :: size
 
     if (present(n)) then
@@ -461,17 +461,17 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_add2s2(a%x_d, b%x_d, c1, size)
     else
-       call add2s2(a%x, b%x, c1, size)
+       call add2s2(a%data, b%data, c1, size)
     end if
 
   end subroutine vector_add2s2
 
   !> Returns \f$ a = a + c1 * (b * b )\f$
   subroutine vector_addsqr2s2(a, b, c1, n)
-    integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
     real(kind=rp), intent(in) :: c1
+    integer, intent(in), optional :: n
     integer :: size
 
     if (present(n)) then
@@ -483,17 +483,17 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_addsqr2s2(a%x_d, b%x_d, c1, size)
     else
-       call addsqr2s2(a%x, b%x, c1, size)
+       call addsqr2s2(a%data, b%data, c1, size)
     end if
 
   end subroutine vector_addsqr2s2
 
   !> Multiplication by constant c \f$ a = c \cdot b \f$
   subroutine vector_cmult2(a, b, c, n)
-    integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
     real(kind=rp), intent(in) :: c
+    integer, intent(in), optional :: n
     integer :: size
 
     if (present(n)) then
@@ -505,16 +505,16 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_cmult2(a%x_d, b%x_d, c, size)
     else
-       call cmult2(a%x, b%x, c, size)
+       call cmult2(a%data, b%data, c, size)
     end if
 
   end subroutine vector_cmult2
 
   !> Vector division \f$ a = a / b \f$
   subroutine vector_invcol2(a, b, n)
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b
     integer :: size
 
     if (present(n)) then
@@ -526,7 +526,7 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_invcol2(a%x_d, b%x_d, size)
     else
-       call invcol2(a%x, b%x, size)
+       call invcol2(a%data, b%data, size)
     end if
 
   end subroutine vector_invcol2
@@ -534,9 +534,9 @@ contains
 
   !> Vector multiplication \f$ a = a \cdot b \f$
   subroutine vector_col2(a, b, n)
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b
     integer :: size
 
     if (present(n)) then
@@ -548,17 +548,17 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_col2(a%x_d, b%x_d, size)
     else
-       call col2(a%x, b%x, size)
+       call col2(a%data, b%data, size)
     end if
 
   end subroutine vector_col2
 
   !> Vector multiplication with 3 vectors \f$ a =  b \cdot c \f$
   subroutine vector_col3(a, b, c, n)
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
+    class(array_t), intent(in) :: c
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b
-    type(vector_t), intent(in) :: c
     integer :: size
 
     if (present(n)) then
@@ -570,17 +570,17 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_col3(a%x_d, b%x_d, c%x_d, size)
     else
-       call col3(a%x, b%x, c%x, size)
+       call col3(a%data, b%data, c%data, size)
     end if
 
   end subroutine vector_col3
 
   !> Returns \f$ a = a - b*c \f$
   subroutine vector_subcol3(a, b, c, n)
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
+    class(array_t), intent(in) :: c
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b
-    type(vector_t), intent(in) :: c
     integer :: size
 
     if (present(n)) then
@@ -592,18 +592,18 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_subcol3(a%x_d, b%x_d, c%x_d, size)
     else
-       call subcol3(a%x, b%x, c%x, size)
+       call subcol3(a%data, b%data, c%data, size)
     end if
 
   end subroutine vector_subcol3
 
   !> Returns \f$ a = c1 * b + c2 * c \f$
   subroutine vector_add3s2(a, b, c, c1, c2, n)
-    integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b
-    type(vector_t), intent(in) :: c
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
+    class(array_t), intent(in) :: c
     real(kind=rp), intent(in) :: c1, c2
+    integer, intent(in), optional :: n
     integer :: size
 
     if (present(n)) then
@@ -615,17 +615,17 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_add3s2(a%x_d, b%x_d, c%x_d, c1, c2, size)
     else
-       call add3s2(a%x, b%x, c%x, c1, c2, size)
+       call add3s2(a%data, b%data, c%data, c1, c2, size)
     end if
 
   end subroutine vector_add3s2
 
   !> Returns \f$ a = a + b*c \f$
   subroutine vector_addcol3(a, b, c, n)
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
+    class(array_t), intent(in) :: c
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b
-    type(vector_t), intent(in) :: c
     integer :: size
 
     if (present(n)) then
@@ -637,18 +637,18 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_addcol3(a%x_d, b%x_d, c%x_d, size)
     else
-       call addcol3(a%x, b%x, c%x, size)
+       call addcol3(a%data, b%data, c%data, size)
     end if
 
   end subroutine vector_addcol3
 
   !> Returns \f$ a = a + b*c*d \f$
   subroutine vector_addcol4(a, b, c, d, n)
+    class(array_t), intent(inout) :: a
+    class(array_t), intent(in) :: b
+    class(array_t), intent(in) :: c
+    class(array_t), intent(in) :: d
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
-    type(vector_t), intent(in) :: b
-    type(vector_t), intent(in) :: c
-    type(vector_t), intent(in) :: d
     integer :: size
 
     if (present(n)) then
@@ -660,14 +660,14 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_addcol4(a%x_d, b%x_d, c%x_d, d%x_d, size)
     else
-       call addcol4(a%x, b%x, c%x, d%x, size)
+       call addcol4(a%data, b%data, c%data, d%data, size)
     end if
 
   end subroutine vector_addcol4
 
   function vector_glsum(a, n) result(sum)
+    class(array_t), intent(in) :: a
     integer, intent(in), optional :: n
-    type(vector_t), intent(in) :: a
     real(kind=rp) :: sum
     integer :: size
 
@@ -680,15 +680,15 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        sum = device_glsum(a%x_d, size)
     else
-       sum = glsum(a%x, size)
+       sum = glsum(a%data, size)
     end if
 
   end function vector_glsum
 
   !> Global maximum of all elements in a vector \f$ max = \max_i a_i \f$
   function vector_glmax(a, n) result(val)
+    class(array_t), intent(in) :: a
     integer, intent(in), optional :: n
-    type(vector_t), intent(in) :: a
     real(kind=rp) :: val
     integer :: size
 
@@ -701,15 +701,15 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        val = device_glmax(a%x_d, size)
     else
-       val = glmax(a%x, size)
+       val = glmax(a%data, size)
     end if
 
   end function vector_glmax
 
   !> Global minimum of all elements in a vector \f$ min = \min_i a_i \f$
   function vector_glmin(a, n) result(val)
+    class(array_t), intent(in) :: a
     integer, intent(in), optional :: n
-    type(vector_t), intent(in) :: a
     real(kind=rp) :: val
     integer :: size
 
@@ -722,14 +722,14 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        val = device_glmin(a%x_d, size)
     else
-       val = glmin(a%x, size)
+       val = glmin(a%data, size)
     end if
 
   end function vector_glmin
 
   function vector_glsc2(a, b, n) result(norm)
+    class(array_t), intent(in) :: a, b
     integer, intent(in), optional :: n
-    type(vector_t), intent(in) :: a, b
     real(kind=rp) :: norm
     integer :: size
 
@@ -742,14 +742,14 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        norm = device_glsc2(a%x_d, b%x_d, size)
     else
-       norm = glsc2(a%x, b%x, size)
+       norm = glsc2(a%data, b%data, size)
     end if
 
   end function vector_glsc2
 
   function vector_glsc3(a, b, c, n) result(norm)
+    class(array_t), intent(in) :: a, b, c
     integer, intent(in), optional :: n
-    type(vector_t), intent(in) :: a, b, c
     real(kind=rp) :: norm
     integer :: size
 
@@ -762,15 +762,15 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        norm = device_glsc3(a%x_d, b%x_d, c%x_d, size)
     else
-       norm = glsc3(a%x, b%x, c%x, size)
+       norm = glsc3(a%data, b%data, c%data, size)
     end if
 
   end function vector_glsc3
 
   !> Compute the pointwise absolute value of a vector \f$ a = |a| \f$
   subroutine vector_absval(a, n)
+    class(array_t), intent(inout) :: a
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
     integer :: size
 
     if (present(n)) then
@@ -782,14 +782,14 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_absval(a%x_d, size)
     else
-       call absval(a%x, size)
+       call absval(a%data, size)
     end if
 
   end subroutine vector_absval
 
   function vector_glsubnorm(a, b, n) result(norm)
+    class(array_t), intent(in) :: a, b
     integer, intent(in), optional :: n
-    type(vector_t), intent(in) :: a, b
     real(kind=rp) :: norm
     integer :: size
 
@@ -802,7 +802,7 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        norm = device_glsubnorm(a%x_d, b%x_d, size)
     else
-       norm = glsubnorm(a%x, b%x, size)
+       norm = glsubnorm(a%data, b%data, size)
     end if
 
   end function vector_glsubnorm
@@ -817,7 +817,7 @@ contains
   !! @param n_mask Size of the mask array `mask` and `a`.
   subroutine vector_masked_gather_copy_0(a, b, mask, n, n_mask)
     integer, intent(in) :: n, n_mask
-    type(vector_t), intent(inout) :: a
+    class(array_t), intent(inout) :: a
     real(kind=rp), dimension(n), intent(in) :: b
     integer, dimension(0:n_mask) :: mask
     type(c_ptr) :: mask_d, b_d
@@ -829,7 +829,7 @@ contains
        b_d = device_get_ptr(b)
        call device_masked_gather_copy_0(a%x_d, b_d, mask_d, n, n_mask)
     else
-       call masked_gather_copy_0(a%x, b, mask, n, n_mask)
+       call masked_gather_copy_0(a%data, b, mask, n, n_mask)
     end if
 
   end subroutine vector_masked_gather_copy_0
@@ -846,7 +846,7 @@ contains
   subroutine vector_face_masked_gather_copy_0(a, b, mask, facet, lx, ly, lz, &
        n_mask)
     integer, intent(in) :: lx, ly, lz, n_mask
-    type(vector_t), intent(inout) :: a
+    class(array_t), intent(inout) :: a
     real(kind=rp), dimension(:, :, :, :), intent(in) :: b
     integer, dimension(0:n_mask), intent(in) :: mask
     integer, dimension(0:n_mask), intent(in) :: facet
@@ -859,7 +859,7 @@ contains
        call device_face_masked_gather_copy_0(a%x_d, b_d, mask_d, facet_d, &
             size(b, 1), size(b, 2), lx, ly, lz, n_mask)
     else
-       call face_masked_gather_copy_0(a%x, b, mask, facet, lx, ly, lz, n_mask)
+       call face_masked_gather_copy_0(a%data, b, mask, facet, lx, ly, lz, n_mask)
     end if
 
   end subroutine vector_face_masked_gather_copy_0
@@ -871,7 +871,7 @@ contains
   !! @param mask mask_t containing mask array and device pointer if needed.
   !! @param n Size of the vector `b`.
   subroutine vector_masked_gather_copy(a, b, mask, n)
-    type(vector_t), intent(inout) :: a
+    class(array_t), intent(inout) :: a
     real(kind=rp), dimension(:), intent(in) :: b
     type(mask_t), intent(in) :: mask
     integer, intent(in) :: n
@@ -885,7 +885,7 @@ contains
        call device_masked_gather_copy_aligned(a%x_d, b_d, mask_d, n, &
             mask%size())
     else
-       call masked_gather_copy(a%x, b, mask%get(), n, mask%size())
+       call masked_gather_copy(a%data, b, mask%get(), n, mask%size())
     end if
 
   end subroutine vector_masked_gather_copy
@@ -901,7 +901,7 @@ contains
   subroutine vector_masked_scatter_copy_0(a, b, mask, n, n_mask)
     integer, intent(in) :: n, n_mask
     real(kind=rp), dimension(n), intent(inout) :: a
-    type(vector_t), intent(in) :: b
+    class(array_t), intent(in) :: b
     integer, dimension(0:n_mask) :: mask
     type(c_ptr) :: mask_d, a_d
 
@@ -912,7 +912,7 @@ contains
        mask_d = device_get_ptr(mask)
        call device_masked_scatter_copy_0(a_d, b%x_d, mask_d, n, n_mask)
     else
-       call masked_scatter_copy_0(a, b%x, mask, n, n_mask)
+       call masked_scatter_copy_0(a, b%data, mask, n, n_mask)
     end if
 
   end subroutine vector_masked_scatter_copy_0
@@ -925,7 +925,7 @@ contains
   !! @param n Size of the array `a`.
   subroutine vector_masked_scatter_copy(a, b, mask, n)
     real(kind=rp), dimension(:), intent(inout) :: a
-    type(vector_t), intent(in) :: b
+    class(array_t), intent(in) :: b
     type(mask_t), intent(in) :: mask
     integer, intent(in) :: n
     type(c_ptr) :: mask_d, a_d
@@ -938,7 +938,7 @@ contains
        call device_masked_scatter_copy_aligned(a_d, b%x_d, mask_d, n, &
             mask%size())
     else
-       call masked_scatter_copy(a, b%x, mask%get(), n, mask%size())
+       call masked_scatter_copy(a, b%data, mask%get(), n, mask%size())
     end if
 
   end subroutine vector_masked_scatter_copy
@@ -946,7 +946,7 @@ contains
   !> Wrap vector elements into the range [min_value, max_value)
   subroutine vector_cwrap(a, min_value, max_value, n)
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
+    class(array_t), intent(inout) :: a
     real(kind=rp), intent(in) :: min_value, max_value
     integer :: size
 
@@ -961,7 +961,7 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_cwrap(a%x_d, min_value, max_value, size)
     else
-       call cwrap(a%x, min_value, max_value, size)
+       call cwrap(a%data, min_value, max_value, size)
     end if
 
   end subroutine vector_cwrap
@@ -969,7 +969,7 @@ contains
   !> Sqrt a vector \f$ a = sqrt(a) \f$
   subroutine vector_sqrt_inplace(a, n)
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: a
+    class(array_t), intent(inout) :: a
     integer :: size
 
     if (present(n)) then
@@ -981,7 +981,7 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_sqrt_inplace(a%x_d, size)
     else
-       call sqrt_inplace(a%x, size)
+       call sqrt_inplace(a%data, size)
     end if
 
   end subroutine vector_sqrt_inplace
@@ -989,8 +989,8 @@ contains
   !> Take the power of a vector \f$ a^p \f$
   subroutine vector_power(ap, a, p, n)
     integer, intent(in), optional :: n
-    type(vector_t), intent(inout) :: ap
-    type(vector_t), intent(in) :: a
+    class(array_t), intent(inout) :: ap
+    class(array_t), intent(in) :: a
     real(kind=rp), intent(in) :: p
     integer :: size
 
@@ -1003,7 +1003,7 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_power(ap%x_d, a%x_d, p, size)
     else
-       call power(ap%x, a%x, p, size)
+       call power(ap%data, a%data, p, size)
     end if
 
   end subroutine vector_power

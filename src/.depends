@@ -145,11 +145,11 @@ math/schwarz.lo : math/schwarz.f90 bc/scalar_bc_projector.lo config/neko_config.
 common/particles.lo : common/particles.f90 device/device.lo common/utils.lo data_types/vector.lo config/num_types.lo 
 math/vector_series.lo : math/vector_series.f90 data_types/vector.lo 
 math/vector_list.lo : math/vector_list.f90 comm/comm.lo common/utils.lo config/num_types.lo data_types/vector.lo 
-math/vector_math.lo : math/vector_math.f90 math/bcknd/device/device_math.lo math/math.lo common/utils.lo device/device.lo common/mask.lo data_types/vector.lo config/num_types.lo config/neko_config.lo 
+math/vector_math.lo : math/vector_math.f90 math/bcknd/device/device_math.lo math/math.lo common/utils.lo device/device.lo common/mask.lo config/num_types.lo config/neko_config.lo data_types/array.lo 
 registries/registry.lo : registries/registry.f90 common/log.lo common/utils.lo sem/dofmap.lo registries/registry_entry.lo data_types/matrix.lo data_types/vector.lo field/field.lo config/num_types.lo 
 registries/registry_entry.lo : registries/registry_entry.f90 common/utils.lo sem/dofmap.lo field/field.lo data_types/matrix.lo data_types/vector.lo data_types/device_array.lo data_types/host_array.lo config/num_types.lo 
 registries/scratch_registry.lo : registries/scratch_registry.f90 common/utils.lo sem/dofmap.lo math/matrix_math.lo math/vector_math.lo math/field_math.lo math/bcknd/device/device_math.lo math/math.lo data_types/matrix.lo data_types/vector.lo field/field.lo data_types/device_array.lo data_types/host_array.lo registries/registry_entry.lo 
-math/matrix_math.lo : math/matrix_math.f90 math/bcknd/device/device_math.lo math/math.lo data_types/matrix.lo config/num_types.lo config/neko_config.lo 
+math/matrix_math.lo : math/matrix_math.f90 math/vector_math.lo math/bcknd/device/device_math.lo math/math.lo data_types/matrix.lo config/num_types.lo config/neko_config.lo 
 math/signed_distance.lo : math/signed_distance.f90 adt/stack.lo math/math.lo common/utils.lo config/neko_config.lo device/device.lo mesh/aabb_tree.lo mesh/search_tree/aabb.lo mesh/tri_mesh.lo mesh/tri.lo field/field.lo config/num_types.lo 
 multigrid/tree_amg.lo : multigrid/tree_amg.f90 config/neko_config.lo device/device.lo gs/gather_scatter.lo bc/scalar_bc_projector.lo math/ax.lo sem/space.lo mesh/mesh.lo sem/coef.lo math/bcknd/device/device_math.lo math/math.lo common/utils.lo config/num_types.lo 
 multigrid/tree_amg_utils.lo : multigrid/tree_amg_utils.f90 gs/gather_scatter.lo multigrid/tree_amg.lo config/num_types.lo 
