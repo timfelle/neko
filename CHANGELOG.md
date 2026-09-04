@@ -39,18 +39,27 @@
 - Added configurable wall-model field samplers. Wall models can now sample at
   GLL nodes or physical wall-normal distances using global interpolation. The
   sampling values can also be supplied per wall node through new user hooks.
-- Added `restart_consistency` and `restart_consistency_hdf5` unit tests,
-  which run a short Taylor-Green vortex, checkpoint half way through,
-  restart a fresh case from that checkpoint and require every subsequent
-  step to reproduce the uninterrupted run bit-exactly. The physics is
-  `examples/tgv/tgv_expression.case` coarsened to something a unit test can
-  afford; TGV is at full amplitude from the first step, so the comparison
-  cannot degenerate into checking that two fields are both still at rest.
-  The two tests differ only in checkpoint format, so the native one acts as
-  a control: it stayed green while the HDF5 one caught the `previous_Xh`
-  fault below at `u/v/w/p RMSE = 1.5E-17 / 2.3E-17 / 1.1E-18 / 7.7E-17` --
-  a pressure error below machine epsilon, which is why the comparison is
-  against exactly zero rather than against `NEKO_EPS`.
+- Added `restart_consistency` and `restart_consistency_hdf5` unit tests.
+  Each runs a Taylor-Green vortex at the resolution and solver setup of
+  `examples/tgv/tgv_expression.case` -- 8x8x8 elements at order 7 with
+  dealiasing, CG/Jacobi for velocity and GMRES/hsmg for pressure --
+  checkpoints half way through, restarts a fresh case from that checkpoint
+  and requires every subsequent step to reproduce the uninterrupted run
+  bit-exactly. TGV is at full amplitude from the first step, so the
+  comparison cannot degenerate into checking that two fields are both
+  still at rest. The two differ only in checkpoint format, so the native
+  one acts as a control: a failure in one and not the other points at the
+  reader rather than at the restart machinery, which is how the
+  `previous_Xh` fault below was localised. The comparison is against
+  exactly zero rather than `NEKO_EPS` because that fault's signature moves
+  by orders of magnitude with the base and the case, and on one of them
+  sat below machine epsilon.
+  The single deviation from the example is `projection_space_size`, pinned
+  to 0: the Krylov projection space is a running history of previous
+  solutions and is not part of any checkpoint, so with the example's 20 a
+  restart diverges at step 7 by `u/v/w/p RMSE = 6.1E-07 / 6.1E-07 /
+  3.4E-07 / 4.9E-05` -- identical in both checkpoint formats, and at
+  exactly the step `projection_hold_steps` first consults it.
 - HDF5 checkpoints can now be restarted from at a different polynomial
   order, and across meshes via `case.restart_mesh_file`, matching what the
   `chkp` format has always supported. `hdf5_file` read the order, element
