@@ -60,6 +60,13 @@
   restart diverges at step 7 by `u/v/w/p RMSE = 6.1E-07 / 6.1E-07 /
   3.4E-07 / 4.9E-05` -- identical in both checkpoint formats, and at
   exactly the step `projection_hold_steps` first consults it.
+- `test_scalar_restart` now runs over both checkpoint formats. The
+  reference data it compares against is physics rather than format, so the
+  same references apply to `chkp` and `hdf5` alike: whichever format loses
+  or garbles state stops matching, and the two are pinned to each other as
+  well as to the references. This is also the first coverage HDF5 restart
+  has had on the device backends, where the unit tests' bit-exact
+  comparison cannot apply.
 - Fixed `Failed to close HDF5` aborting any run that writes HDF5 output.
   `hdf5_session` exists to hold the library open for the run, on the
   premise that the file backends' paired `h5open_f`/`h5close_f` would
