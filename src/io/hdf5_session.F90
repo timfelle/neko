@@ -39,7 +39,11 @@ module hdf5_session
   implicit none
   private
 
-  public :: hdf5_session_init, hdf5_session_finalize
+  public :: hdf5_session_init, hdf5_session_finalize, hdf5_session_is_active
+
+  !> Whether a session currently holds the library open. The file backends
+  !! consult this so they do not close the library out from under it.
+  logical, save :: session_active = .false.
 
 contains
 
@@ -54,6 +58,7 @@ contains
 
     call h5open_f(ierr)
     if (ierr .ne. 0) call neko_error('Failed to initialize HDF5')
+    session_active = .true.
 #endif
   end subroutine hdf5_session_init
 
@@ -65,9 +70,21 @@ contains
 #ifdef HAVE_HDF5
     integer :: ierr
 
+    session_active = .false.
     call h5close_f(ierr)
     if (ierr .ne. 0) call neko_error('Failed to close HDF5')
 #endif
   end subroutine hdf5_session_finalize
+
+  !> Whether a session is holding the HDF5 library open.
+  !! @note `h5close_f` terminates the library rather than decrementing a
+  !! user-level reference count, so a file backend that closes after every
+  !! read or write tears down the very session that is supposed to outlive
+  !! it. The backends therefore skip their own close while this is true,
+  !! and the session performs the single matching close.
+  function hdf5_session_is_active() result(active)
+    logical :: active
+    active = session_active
+  end function hdf5_session_is_active
 
 end module hdf5_session

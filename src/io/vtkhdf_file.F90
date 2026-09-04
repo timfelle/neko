@@ -49,6 +49,10 @@ module vtkhdf_file
        MPI_IN_PLACE, MPI_INTEGER, MPI_SUM, MPI_MAX, MPI_Comm_size, MPI_Exscan, &
        MPI_Barrier, MPI_Bcast, MPI_LOGICAL
   use vtk, only : vtk_ordering
+  ! Outside the guard below: this module compiles with or without HDF5,
+  ! and makedepf90 does not preprocess, so an import hidden behind #ifdef
+  ! would be missing from src/.depends.
+  use hdf5_session, only : hdf5_session_is_active
 #ifdef HAVE_HDF5
   use hdf5, only : &
        hid_t, hsize_t, size_t, &
@@ -314,7 +318,9 @@ contains
     end block
     call h5fflush_f(file_id, H5F_SCOPE_GLOBAL_F, ierr)
     call h5fclose_f(file_id, ierr)
-    call h5close_f(ierr)
+    ! Leave the library open when a session owns it; see
+    ! hdf5_session_is_active for why closing here is wrong.
+    if (.not. hdf5_session_is_active()) call h5close_f(ierr)
 
     call fields%free()
 
@@ -1555,7 +1561,9 @@ contains
     call h5gclose_f(vtkhdf_grp, ierr)
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(plist_id, ierr)
-    call h5close_f(ierr)
+    ! Leave the library open when a session owns it; see
+    ! hdf5_session_is_active for why closing here is wrong.
+    if (.not. hdf5_session_is_active()) call h5close_f(ierr)
 
     call fields%free()
 

@@ -54,6 +54,10 @@ module hdf5_file
   use mpi_f08, only : MPI_INFO_NULL, MPI_Allreduce, MPI_Allgather, &
        MPI_IN_PLACE, MPI_INTEGER, MPI_SUM, MPI_MAX, MPI_Comm_size, MPI_Exscan, &
        MPI_Barrier, MPI_INTEGER8, MPI_Scan
+  ! Outside the guard: this module compiles with or without HDF5, and
+  ! makedepf90 does not preprocess, so an import hidden behind #ifdef
+  ! would be missing from src/.depends.
+  use hdf5_session, only : hdf5_session_is_active
 #ifdef HAVE_HDF5
   use hdf5
 #endif
@@ -358,7 +362,9 @@ contains
 
     call h5pclose_f(plist_id, ierr)
     call h5fclose_f(file_id, ierr)
-    call h5close_f(ierr)
+    ! Leave the library open when a session owns it; see
+    ! hdf5_session_is_active for why closing here is wrong.
+    if (.not. hdf5_session_is_active()) call h5close_f(ierr)
 
   end subroutine hdf5_file_write
 
@@ -602,7 +608,9 @@ contains
 
     call h5pclose_f(plist_id, ierr)
     call h5fclose_f(file_id, ierr)
-    call h5close_f(ierr)
+    ! Leave the library open when a session owns it; see
+    ! hdf5_session_is_active for why closing here is wrong.
+    if (.not. hdf5_session_is_active()) call h5close_f(ierr)
 
   end subroutine hdf5_file_read
 
@@ -930,7 +938,9 @@ contains
     this%plist_id = -1_hid_t
     call h5fclose_f(this%file_id, ierr)
     this%file_id = -1_hid_t
-    call h5close_f(ierr)
+    ! Leave the library open when a session owns it; see
+    ! hdf5_session_is_active for why closing here is wrong.
+    if (.not. hdf5_session_is_active()) call h5close_f(ierr)
 
     call neko_log%message("Closed HDF5 file: " // trim(this%get_fname()), &
          lvl = NEKO_LOG_DEBUG)

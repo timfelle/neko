@@ -60,6 +60,18 @@
   restart diverges at step 7 by `u/v/w/p RMSE = 6.1E-07 / 6.1E-07 /
   3.4E-07 / 4.9E-05` -- identical in both checkpoint formats, and at
   exactly the step `projection_hold_steps` first consults it.
+- Fixed `Failed to close HDF5` aborting any run that writes HDF5 output.
+  `hdf5_session` exists to hold the library open for the run, on the
+  premise that the file backends' paired `h5open_f`/`h5close_f` would
+  never drop its reference count to zero. `H5close` does not decrement a
+  user-level count, it terminates the library -- so the first checkpoint
+  or vtkhdf write tore down the session, and `neko_finalize`'s close then
+  failed and stopped the program with a non-zero exit. The session now
+  records that it owns the library and the five backend close sites, three
+  in `hdf5_file` and two in `vtkhdf_file`, skip their own close while it
+  does. Standalone use with no session is unchanged. Beyond the noisy
+  exit, a backend closing the library while another HDF5 file is still
+  open would lose data, so this is not only a teardown problem.
 - HDF5 checkpoints can now be restarted from at a different polynomial
   order, and across meshes via `case.restart_mesh_file`, matching what the
   `chkp` format has always supported. `hdf5_file` read the order, element
