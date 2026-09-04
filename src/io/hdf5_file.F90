@@ -47,6 +47,9 @@ module hdf5_file
   use matrix, only : matrix_t
   use datadist, only : linear_dist_t
   use space, only : GLL
+  use interpolation, only : interpolator_t
+  use global_interpolation, only : global_interpolation_t
+  use math, only : rzero
   use comm, only : pe_rank, pe_size, NEKO_COMM
   use mpi_f08, only : MPI_INFO_NULL, MPI_Allreduce, MPI_Allgather, &
        MPI_IN_PLACE, MPI_INTEGER, MPI_SUM, MPI_MAX, MPI_Comm_size, MPI_Exscan, &
@@ -299,8 +302,10 @@ contains
             lcpl_id = h5p_default_f, gcpl_id = h5p_default_f, &
             gapl_id = h5p_default_f)
 
+       ! `lxyz` rather than `lx**3`: they agree in 3D, but a 2D case has
+       ! `lz = 1`, and the reader derives its offsets the same way.
        dcount(1) = int(dof%size(), 8)
-       doffset(1) = int(msh%offset_el, 8) * int((dof%Xh%lx**3),8)
+       doffset(1) = int(msh%offset_el, 8) * int(dof%Xh%lxyz, 8)
        ddim = int(dof%size(), 8)
        drank = 1
        call MPI_Allreduce(MPI_IN_PLACE, ddim(1), 1, &
@@ -366,6 +371,21 @@ contains
     integer(hid_t) :: H5T_NEKO_REAL
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
     integer :: i,j, ierr, info, glb_nelv, gdim, lx, drank
+    ! Not LOG_SIZE: that is 79 characters, which these messages overflow,
+    ! and an overflowing internal write is a runtime error rather than a
+    ! truncation -- the guard below would abort with `End of record`
+    ! instead of saying what was actually wrong.
+    character(len=256) :: err_msg
+    ! Interpolation state, mirroring chkp_file's. `src_*` describe the
+    ! discretisation the checkpoint was written on, which is only the
+    ! running case's when no interpolation is called for.
+    type(interpolator_t) :: space_interp
+    type(global_interpolation_t) :: global_interp
+    type(dofmap_t) :: src_dof
+    type(mesh_t), pointer :: src_msh
+    real(kind=rp), allocatable :: read_buf(:)
+    logical :: mesh2mesh, interp_space
+    integer :: nel_src, lxyz_src, n_src
     type(mesh_t), pointer :: msh
     type(dofmap_t), pointer :: dof
     type(field_ptr_t), allocatable :: fp(:)
@@ -421,34 +441,80 @@ contains
     call h5gclose_f(grp_id, ierr)
 
     !
-    ! Record the polynomial order the checkpoint was written at, exactly as
-    ! chkp_file does. `fluid_scheme%restart` compares `chkp%previous_Xh%lx`
-    ! against the running case's `Xh%lx` to decide whether the restored
-    ! fields need the interpolation fix-up (scale by the multiplicity, then
-    ! gather-scatter back). Leaving `previous_Xh` uninitialised made that
-    ! comparison spuriously true even when the orders match, so every HDF5
-    ! restart ran a fix-up it did not need. That round trip is the identity
-    ! in exact arithmetic but perturbs every shared degree of freedom by
-    ! about one ulp, so an HDF5 restart was never bit-exact where the native
-    ! chkp format was.
+    ! Work out what discretisation the checkpoint was written on, and set
+    ! up interpolation into the running case's if it differs. This mirrors
+    ! chkp_file: the header carries the polynomial order, element count and
+    ! dimension precisely so a restart can adapt to them rather than assume
+    ! they match.
     !
+    ! Defaults describe "same discretisation, read straight in", which is
+    ! also what the non-checkpoint data types want.
+    !
+    mesh2mesh = .false.
+    interp_space = .false.
+    lxyz_src = 0
+    nullify(src_msh)
+
     select type (data)
     type is (chkp_t)
-       ! Unlike chkp_file, this reader has no interpolation path: it reads
-       ! straight into fields sized by the running case's dofmap. Say so,
-       ! rather than silently reading the wrong number of values per element.
-       if (lx .ne. dof%Xh%lx) then
-          call neko_error('HDF5 checkpoint was written at a different ' // &
-               'polynomial order; restarting across orders is only ' // &
-               'supported by the chkp format')
+       ! A mesh supplied through `case.restart_mesh_file` means the
+       ! checkpoint belongs to a different mesh, and its own mesh is the
+       ! one the file's layout is expressed in.
+       if (allocated(data%previous_mesh%elements)) then
+          src_msh => data%previous_mesh
+          mesh2mesh = .true.
+       else
+          src_msh => msh
        end if
 
+       if (gdim .ne. src_msh%gdim) then
+          write(err_msg, '(A,I0,A,I0,A)') &
+               'HDF5 checkpoint is for a ', gdim, &
+               'D mesh but this case is ', src_msh%gdim, 'D'
+          call neko_error(trim(err_msg))
+       end if
+
+       if (glb_nelv .ne. src_msh%glb_nelv) then
+          write(err_msg, '(A,I0,A,I0,A)') &
+               'HDF5 checkpoint has ', glb_nelv, &
+               ' elements but this case has ', src_msh%glb_nelv, &
+               '; supply case.restart_mesh_file to interpolate from ' // &
+               'another mesh'
+          call neko_error(trim(err_msg))
+       end if
+
+       ! Record the order the checkpoint was written at. Beyond driving the
+       ! interpolation below, `fluid_scheme%restart` and `ale_manager`
+       ! compare `previous_Xh%lx` against the running case to decide
+       ! whether the restored fields need their continuity fix-up; leaving
+       ! it uninitialised made that comparison spuriously true even when
+       ! the orders matched, so every HDF5 restart ran a fix-up it did not
+       ! need -- the identity in exact arithmetic, but about one ulp on
+       ! every shared degree of freedom in practice.
        if (gdim .eq. 3) then
           call data%previous_Xh%init(GLL, lx, lx, lx)
        else
           call data%previous_Xh%init(GLL, lx, lx)
        end if
+       lxyz_src = data%previous_Xh%lxyz
+
+       if (mesh2mesh) then
+          call src_dof%init(src_msh, data%previous_Xh)
+          call global_interp%init(src_dof, NEKO_COMM, &
+               tol = data%mesh2mesh_tol)
+          call global_interp%find_points(dof%x, dof%y, dof%z, dof%size())
+       else if (data%previous_Xh%lx .ne. dof%Xh%lx) then
+          call space_interp%init(dof%Xh, data%previous_Xh)
+          interp_space = .true.
+       end if
     end select
+
+    ! Sizes of the data as it sits in the file, which is the running case's
+    ! layout unless one of the branches above said otherwise.
+    if (.not. associated(src_msh)) src_msh => msh
+    if (lxyz_src .eq. 0) lxyz_src = dof%Xh%lxyz
+    nel_src = src_msh%nelv
+    n_src = lxyz_src * nel_src
 
 
     if (associated(tlag) .and. associated(dtlag)) then
@@ -487,53 +553,51 @@ contains
     if (allocated(fp) .or. allocated(fsp)) then
        call h5gopen_f(file_id, 'Fields', grp_id, ierr, gapl_id = h5p_default_f)
 
-       dcount(1) = int(dof%size(), 8)
-       doffset(1) = int(msh%offset_el, 8) * int((dof%Xh%lx**3),8)
-       ddim = int(dof%size(), 8)
+       ! Hyperslabs are sized and offset by the checkpoint's own layout,
+       ! not the running case's, so that a file written at a different
+       ! polynomial order or on a different mesh is still read whole.
+       ! `lxyz` rather than `lx**3`: they agree in 3D, but a 2D case has
+       ! `lz = 1` and `lx**3` would read three-dimensionally past its data.
        drank = 1
-
-       dcount(1) = int(dof%size(), 8)
-       doffset(1) = int(msh%offset_el, 8) * int((dof%Xh%lx**3),8)
-       ddim = int(dof%size(), 8)
-       drank = 1
-       call MPI_Allreduce(MPI_IN_PLACE, ddim(1), 1, &
-            MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       dcount(1) = int(n_src, 8)
+       doffset(1) = int(src_msh%offset_el, 8) * int(lxyz_src, 8)
+       ddim(1) = int(lxyz_src, 8) * int(src_msh%glb_nelv, 8)
 
        call h5screate_simple_f(drank, dcount, memspace, ierr)
 
+       allocate(read_buf(n_src))
+
        if (allocated(fp)) then
           do i = 1, size(fp)
-             call h5dopen_f(grp_id, fp(i)%ptr%name, dset_id, ierr)
-             call h5dget_space_f(dset_id, filespace, ierr)
-             call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, &
-                  doffset, dcount, ierr)
-             call h5dread_f(dset_id, H5T_NEKO_REAL, &
-                  fp(i)%ptr%x(1,1,1,1), &
-                  ddim, ierr, file_space_id = filespace, &
-                  mem_space_id = memspace, xfer_prp = plist_id)
-             call h5dclose_f(dset_id, ierr)
-             call h5sclose_f(filespace, ierr)
+             call hdf5_read_field(grp_id, fp(i)%ptr%name, read_buf, &
+                  fp(i)%ptr%x, H5T_NEKO_REAL, ddim, dcount, doffset, &
+                  memspace, plist_id, nel_src, mesh2mesh, interp_space, &
+                  space_interp, global_interp, dof)
           end do
        end if
 
        if (allocated(fsp)) then
           do i = 1, size(fsp)
              do j = 1, fsp(i)%ptr%size()
-                call h5dopen_f(grp_id, fsp(i)%ptr%lf(j)%name, dset_id, ierr)
-                call h5dget_space_f(dset_id, filespace, ierr)
-                call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, &
-                     doffset, dcount, ierr)
-                call h5dread_f(dset_id, H5T_NEKO_REAL, &
-                     fsp(i)%ptr%lf(j)%x(1,1,1,1), &
-                     ddim, ierr, file_space_id = filespace, &
-                     mem_space_id = memspace, xfer_prp = plist_id)
-                call h5dclose_f(dset_id, ierr)
-                call h5sclose_f(filespace, ierr)
+                call hdf5_read_field(grp_id, fsp(i)%ptr%lf(j)%name, &
+                     read_buf, fsp(i)%ptr%lf(j)%x, H5T_NEKO_REAL, ddim, &
+                     dcount, doffset, memspace, plist_id, nel_src, &
+                     mesh2mesh, interp_space, space_interp, global_interp, &
+                     dof)
              end do
           end do
        end if
+
+       deallocate(read_buf)
        call h5sclose_f(memspace, ierr)
        call h5gclose_f(grp_id, ierr)
+    end if
+
+    if (mesh2mesh) then
+       call global_interp%free()
+       call src_dof%free()
+    else if (interp_space) then
+       call space_interp%free()
     end if
 
     call h5pclose_f(plist_id, ierr)
@@ -718,6 +782,69 @@ contains
     end select
 
   end subroutine hdf5_file_determine_data
+
+  !> Read one field from the open `Fields` group and place it into its
+  !! destination, interpolating when the checkpoint was written on a
+  !! different discretisation. Mirrors `chkp_file`'s `read_field`.
+  !! @param grp_id The open `Fields` group.
+  !! @param name Dataset name, which is the field's own name.
+  !! @param read_buf Scratch sized to the checkpoint's local degrees of
+  !! freedom; the raw data lands here before any interpolation.
+  !! @param dst The field data to fill.
+  !! @param h5_real HDF5 type matching the working precision.
+  !! @param ddim Global size of the dataset.
+  !! @param dcount This rank's share of it.
+  !! @param doffset Where this rank's share starts.
+  !! @param memspace Dataspace describing `read_buf`.
+  !! @param plist_id Dataset transfer property list.
+  !! @param nel Elements in the checkpoint's mesh, locally.
+  !! @param mesh2mesh Whether to interpolate between two meshes.
+  !! @param interp_space Whether to interpolate between polynomial orders.
+  !! @param space_interp Interpolator between orders, when used.
+  !! @param global_interp Interpolator between meshes, when used.
+  !! @param dof The running case's dofmap.
+  subroutine hdf5_read_field(grp_id, name, read_buf, dst, h5_real, ddim, &
+       dcount, doffset, memspace, plist_id, nel, mesh2mesh, interp_space, &
+       space_interp, global_interp, dof)
+    integer(hid_t), intent(in) :: grp_id
+    character(len=*), intent(in) :: name
+    real(kind=rp), intent(inout) :: read_buf(:)
+    real(kind=rp), intent(inout) :: dst(:,:,:,:)
+    integer(hid_t), intent(in) :: h5_real
+    integer(hsize_t), intent(in) :: ddim(1), dcount(1), doffset(1)
+    integer(hid_t), intent(in) :: memspace, plist_id
+    integer, intent(in) :: nel
+    logical, intent(in) :: mesh2mesh, interp_space
+    type(interpolator_t), intent(inout) :: space_interp
+    type(global_interpolation_t), intent(inout) :: global_interp
+    type(dofmap_t), intent(in) :: dof
+
+    integer(hid_t) :: dset_id, filespace
+    integer :: ierr, k
+    logical, parameter :: interp_on_host = .true.
+
+    call h5dopen_f(grp_id, trim(name), dset_id, ierr)
+    call h5dget_space_f(dset_id, filespace, ierr)
+    call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, &
+         doffset, dcount, ierr)
+    call h5dread_f(dset_id, h5_real, read_buf, ddim, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, &
+         xfer_prp = plist_id)
+    call h5dclose_f(dset_id, ierr)
+    call h5sclose_f(filespace, ierr)
+
+    if (mesh2mesh) then
+       call rzero(dst, dof%size())
+       call global_interp%evaluate(dst, read_buf, interp_on_host)
+    else if (interp_space) then
+       call space_interp%map_host(dst, read_buf, nel, dof%Xh)
+    else
+       do k = 1, size(read_buf)
+          dst(k, 1, 1, 1) = read_buf(k)
+       end do
+    end if
+
+  end subroutine hdf5_read_field
 
   !> Determine hdf5 real type corresponding to NEKO_REAL
   !! @note This must be called after h5open_f, otherwise

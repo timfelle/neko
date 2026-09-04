@@ -51,6 +51,24 @@
   fault below at `u/v/w/p RMSE = 1.5E-17 / 2.3E-17 / 1.1E-18 / 7.7E-17` --
   a pressure error below machine epsilon, which is why the comparison is
   against exactly zero rather than against `NEKO_EPS`.
+- HDF5 checkpoints can now be restarted from at a different polynomial
+  order, and across meshes via `case.restart_mesh_file`, matching what the
+  `chkp` format has always supported. `hdf5_file` read the order, element
+  count and dimension from the file header and then discarded them, reading
+  the fields at offsets derived from the *running* case's dofmap -- so a
+  checkpoint written on a different discretisation was not rejected, it was
+  quietly read wrong. Hyperslabs are now sized by the checkpoint's own
+  layout and the data interpolated into the running case, driving the same
+  `interpolator_t` and `global_interpolation_t` that `chkp_file` uses.
+  Verified against `chkp_file` as the reference implementation: restarting
+  at order 3 from an order-5 checkpoint, and onto a 5x5x5 mesh from a 4x4x4
+  one, both reproduce the `chkp` result exactly. A checkpoint that genuinely
+  cannot be used (dimension mismatch, or an element count with no
+  `restart_mesh_file` to interpolate from) now errors naming both sides
+  rather than reading past its data.
+- Fixed HDF5 checkpoint hyperslabs being sized with `lx**3` rather than
+  `lxyz`, on both read and write. The two agree in 3D, but a 2D case has
+  `lz = 1`, so HDF5 checkpoints of 2D cases addressed the wrong extent.
 - Fixed two HDF5 identifier leaks in `hdf5_file`: the per-dataset dataspace
   returned by `h5dget_space_f` overwrote the shared `filespace` and only the
   last one was ever closed, and the file-access property list was overwritten
