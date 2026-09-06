@@ -30,6 +30,22 @@
 ! different rank counts and make glsc3's reduced value rank-count-dependent
 ! for reasons having nothing to do with the code under test. Coordinates are
 ! decomposition-independent, so the global reduction is too.
+!
+! Machine-readable output: alongside the human-readable lines, rank 0 emits
+! three kinds of key=value record, parsed by the ReFrame checks in
+! tests/reframe/checks.py. Keep them stable -- changing a key or its spelling
+! breaks the regression checks silently, since a regex that matches nothing
+! just yields an empty sample rather than an error.
+!
+!   GLSC3 lx=<lx> value=<reduced glsc3>
+!   BENCH op=<op> path=<path> lx=<lx> n=<n> min=<s> mean=<s> sd=<s> mdofs=<r>
+!   RATIO op=<op> path=<path> lx=<lx> value=<r> value_mean=<r>
+!
+! RATIO is the wrapper's cost relative to the direct math path at the same
+! size: value is built from the per-iteration minima, value_mean from the
+! means. Only the per-size facts are emitted here; aggregating them across the
+! lx sweep is left to the checks, so the aggregation can change without
+! touching Fortran.
 
 program mathbench
   use neko
@@ -100,11 +116,11 @@ program mathbench
   if (pe_rank .eq. 0) then
      write(*, *) ''
      write(*, '(A)') '# mathbench: math vs field_math/vector_math/matrix_math'
-     write(*, '(A,A)')    '# mesh      : ', trim(fname)
-     write(*, '(A,I0)')   '# glb_nelv  : ', msh%glb_nelv
-     write(*, '(A,I0)')   '# pe_size   : ', pe_size
-     write(*, '(A,I0)')   '# niter     : ', niter
-     write(*, '(A,I0)')   '# bcknd_dev : ', NEKO_BCKND_DEVICE
+     write(*, '(A,A)') '# mesh      : ', trim(fname)
+     write(*, '(A,I0)') '# glb_nelv  : ', msh%glb_nelv
+     write(*, '(A,I0)') '# pe_size   : ', pe_size
+     write(*, '(A,I0)') '# niter     : ', niter
+     write(*, '(A,I0)') '# bcknd_dev : ', NEKO_BCKND_DEVICE
      write(*, *) ''
   end if
 
@@ -349,6 +365,11 @@ contains
        write(*, '(A,I3,A,I10,A,e24.16)') &
             '# verify OK  lx = ', lx, '  n = ', n, &
             '  glsc3 = ', s_math
+       ! The reduced value is fixed by the mesh and the coordinate-based
+       ! fill, so it must come back identical at every rank count. The
+       ! ReFrame checks pin it, which is what turns that invariant into a
+       ! gate -- a single run cannot check it against itself.
+       write(*, '(A,I0,A,e24.16)') 'GLSC3 lx=', lx, ' value=', s_math
     end if
 
   end subroutine verify_ops
@@ -385,9 +406,10 @@ contains
 
   end subroutine check_scalar
 
-  !> Report per-call timings and the Mdofs/s/pe workrate. The workrate matches
-  !! the formula ReFrame already uses for Neko (tests/reframe),
-  !! 1e-3 * dofs * iters / time / pes, so numbers are comparable.
+  !> Report per-call timings and the Mdofs/s/pe workrate. The workrate is
+  !! ReFrame's dofs * iters / time / pes (tests/reframe), scaled so that the
+  !! Mdofs label is literally true -- see the comment on the scale factor
+  !! below, which is the one place this deliberately diverges from it.
   !!
   !! Both mean and minimum are reported. The minimum is the more useful
   !! statistic here: scheduler preemption, page faults and frequency changes
@@ -397,11 +419,18 @@ contains
   !! are kept alongside it so that a noisy run is recognisable as noisy rather
   !! than silently reported as a clean result. Mdofs/s is computed from the
   !! minimum for the same reason.
-  subroutine report(op, path, lx, n, n_glb, t)
+  !!
+  !! @param tmin_max Reduced minimum, returned so the caller can form the
+  !! wrapper/direct ratio once all four paths have been timed.
+  !! @param tmean_max Reduced mean, returned for the same reason. It backs
+  !! the ungated value_mean, kept so that the choice of min over mean stays
+  !! auditable from the perflog rather than needing a rerun to revisit.
+  subroutine report(op, path, lx, n, n_glb, t, tmin_max, tmean_max)
     character(len=*), intent(in) :: op, path
     integer, intent(in) :: lx, n, n_glb
     real(kind=dp), intent(in) :: t(niter)
-    real(kind=dp) :: mean, stddev, tmin, tmin_max
+    real(kind=dp), intent(out) :: tmin_max, tmean_max
+    real(kind=dp) :: mean, stddev, tmin
     real(kind=rp) :: mdofs
     integer :: i, ierr
 
@@ -418,8 +447,17 @@ contains
     ! rank 0's own wall time.
     call MPI_Allreduce(tmin, tmin_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
          NEKO_COMM, ierr)
+    call MPI_Allreduce(mean, tmean_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
+         NEKO_COMM, ierr)
 
-    mdofs = 1.0e-3_rp * real(n_glb, rp) &
+    ! Deliberately 1e-6, not the 1e-3 that tests/reframe/checks.py's workrate
+    ! uses. That factor makes the printed number 1000x the Mdofs/s it is
+    ! labelled as, so a reader comparing against a hardware bandwidth figure
+    ! is off by three orders of magnitude. Here the label is made true
+    ! instead of the discrepancy propagated into a new tracked metric; the
+    ! existing workrate is left alone (log-only, no reference anywhere) and
+    ! filed as a bug rather than silently rescaled under its own history.
+    mdofs = 1.0e-6_rp * real(n_glb, rp) &
          / real(tmin_max, rp) / real(pe_size, rp)
 
     if (pe_rank .eq. 0) then
@@ -428,13 +466,46 @@ contains
             '  lx = ', lx, '  n = ', n, &
             '  min = ', tmin, '  mean = ', mean, '  stddev = ', stddev, &
             '  Mdofs/s/pe = ', mdofs
+       write(*, '(A,A,A,A,A,I0,A,I0,4(A,e17.10))') &
+            'BENCH op=', trim(op), ' path=', trim(path), &
+            ' lx=', lx, ' n=', n, &
+            ' min=', tmin_max, ' mean=', tmean_max, ' sd=', stddev, &
+            ' mdofs=', real(mdofs, dp)
     end if
 
   end subroutine report
 
+  !> Emit each wrapper's cost relative to the direct math path at one size.
+  !!
+  !! Only per-size ratios are emitted; the mean and spread across the lx
+  !! sweep -- which is what the regression checks actually gate on -- are
+  !! formed in tests/reframe/checks.py, so the aggregation can be changed
+  !! without touching this driver.
+  !!
+  !! @param tmin_path Reduced per-path minima, path 1 being direct math.
+  !! @param tmean_path Reduced per-path means, in the same order.
+  subroutine report_ratios(op, lx, tmin_path, tmean_path)
+    character(len=*), intent(in) :: op
+    integer, intent(in) :: lx
+    real(kind=dp), intent(in) :: tmin_path(npaths), tmean_path(npaths)
+    integer :: ip
+
+    if (pe_rank .ne. 0) return
+
+    do ip = 2, npaths
+       write(*, '(A,A,A,A,A,I0,2(A,e17.10))') &
+            'RATIO op=', trim(op), ' path=', trim(path_names(ip)), &
+            ' lx=', lx, &
+            ' value=', tmin_path(ip) / tmin_path(1), &
+            ' value_mean=', tmean_path(ip) / tmean_path(1)
+    end do
+
+  end subroutine report_ratios
+
   subroutine bench_add2(n, n_glb, lx)
     integer, intent(in) :: n, n_glb, lx
     real(kind=dp) :: t(niter)
+    real(kind=dp) :: tmin_path(npaths), tmean_path(npaths)
     integer :: i, ierr
 
     ! --- math -------------------------------------------------------------
@@ -459,7 +530,8 @@ contains
        call device_sync()
        t(i) = MPI_Wtime() - t(i)
     end do
-    call report('add2 ', 'math       ', lx, n, n_glb, t)
+    call report('add2 ', 'math       ', lx, n, n_glb, t, &
+         tmin_path(1), tmean_path(1))
 
     ! --- field_math -------------------------------------------------------
     do i = 1, nwarmup
@@ -475,7 +547,8 @@ contains
        call device_sync()
        t(i) = MPI_Wtime() - t(i)
     end do
-    call report('add2 ', 'field_math ', lx, n, n_glb, t)
+    call report('add2 ', 'field_math ', lx, n, n_glb, t, &
+         tmin_path(2), tmean_path(2))
 
     ! --- vector_math ------------------------------------------------------
     do i = 1, nwarmup
@@ -491,7 +564,8 @@ contains
        call device_sync()
        t(i) = MPI_Wtime() - t(i)
     end do
-    call report('add2 ', 'vector_math', lx, n, n_glb, t)
+    call report('add2 ', 'vector_math', lx, n, n_glb, t, &
+         tmin_path(3), tmean_path(3))
 
     ! --- matrix_math ------------------------------------------------------
     do i = 1, nwarmup
@@ -507,13 +581,17 @@ contains
        call device_sync()
        t(i) = MPI_Wtime() - t(i)
     end do
-    call report('add2 ', 'matrix_math', lx, n, n_glb, t)
+    call report('add2 ', 'matrix_math', lx, n, n_glb, t, &
+         tmin_path(4), tmean_path(4))
+
+    call report_ratios('add2', lx, tmin_path, tmean_path)
 
   end subroutine bench_add2
 
   subroutine bench_col2(n, n_glb, lx)
     integer, intent(in) :: n, n_glb, lx
     real(kind=dp) :: t(niter)
+    real(kind=dp) :: tmin_path(npaths), tmean_path(npaths)
     integer :: i, ierr
 
     ! --- math -------------------------------------------------------------
@@ -538,7 +616,8 @@ contains
        call device_sync()
        t(i) = MPI_Wtime() - t(i)
     end do
-    call report('col2 ', 'math       ', lx, n, n_glb, t)
+    call report('col2 ', 'math       ', lx, n, n_glb, t, &
+         tmin_path(1), tmean_path(1))
 
     ! --- field_math -------------------------------------------------------
     do i = 1, nwarmup
@@ -554,7 +633,8 @@ contains
        call device_sync()
        t(i) = MPI_Wtime() - t(i)
     end do
-    call report('col2 ', 'field_math ', lx, n, n_glb, t)
+    call report('col2 ', 'field_math ', lx, n, n_glb, t, &
+         tmin_path(2), tmean_path(2))
 
     ! --- vector_math ------------------------------------------------------
     do i = 1, nwarmup
@@ -570,7 +650,8 @@ contains
        call device_sync()
        t(i) = MPI_Wtime() - t(i)
     end do
-    call report('col2 ', 'vector_math', lx, n, n_glb, t)
+    call report('col2 ', 'vector_math', lx, n, n_glb, t, &
+         tmin_path(3), tmean_path(3))
 
     ! --- matrix_math ------------------------------------------------------
     do i = 1, nwarmup
@@ -586,7 +667,10 @@ contains
        call device_sync()
        t(i) = MPI_Wtime() - t(i)
     end do
-    call report('col2 ', 'matrix_math', lx, n, n_glb, t)
+    call report('col2 ', 'matrix_math', lx, n, n_glb, t, &
+         tmin_path(4), tmean_path(4))
+
+    call report_ratios('col2', lx, tmin_path, tmean_path)
 
   end subroutine bench_col2
 
@@ -595,6 +679,7 @@ contains
   subroutine bench_glsc3(n, n_glb, lx)
     integer, intent(in) :: n, n_glb, lx
     real(kind=dp) :: t(niter)
+    real(kind=dp) :: tmin_path(npaths), tmean_path(npaths)
     real(kind=rp) :: s
     integer :: i, ierr
 
@@ -616,7 +701,8 @@ contains
        end if
        t(i) = MPI_Wtime() - t(i)
     end do
-    call report('glsc3', 'math       ', lx, n, n_glb, t)
+    call report('glsc3', 'math       ', lx, n, n_glb, t, &
+         tmin_path(1), tmean_path(1))
 
     ! --- field_math -------------------------------------------------------
     do i = 1, nwarmup
@@ -628,7 +714,8 @@ contains
        s = field_glsc3(fa, fb, fc, n)
        t(i) = MPI_Wtime() - t(i)
     end do
-    call report('glsc3', 'field_math ', lx, n, n_glb, t)
+    call report('glsc3', 'field_math ', lx, n, n_glb, t, &
+         tmin_path(2), tmean_path(2))
 
     ! --- vector_math ------------------------------------------------------
     do i = 1, nwarmup
@@ -640,7 +727,8 @@ contains
        s = vector_glsc3(va, vb, vc, n)
        t(i) = MPI_Wtime() - t(i)
     end do
-    call report('glsc3', 'vector_math', lx, n, n_glb, t)
+    call report('glsc3', 'vector_math', lx, n, n_glb, t, &
+         tmin_path(3), tmean_path(3))
 
     ! --- matrix_math ------------------------------------------------------
     do i = 1, nwarmup
@@ -652,7 +740,10 @@ contains
        s = matrix_glsc3(ma, mb, mc, n)
        t(i) = MPI_Wtime() - t(i)
     end do
-    call report('glsc3', 'matrix_math', lx, n, n_glb, t)
+    call report('glsc3', 'matrix_math', lx, n, n_glb, t, &
+         tmin_path(4), tmean_path(4))
+
+    call report_ratios('glsc3', lx, tmin_path, tmean_path)
 
   end subroutine bench_glsc3
 

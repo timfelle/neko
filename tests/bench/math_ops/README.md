@@ -78,8 +78,36 @@ iteration slower, so the fastest observed call is the cleanest estimate of the
 true cost, and it is the only statistic that makes a nanosecond-scale dispatch
 difference visible at all. `mean`/`stddev` are printed alongside so that a
 noisy run is recognisable as noisy rather than silently reported as clean.
-`Mdofs/s/pe` uses the ReFrame workrate formula already used for Neko
-(`tests/reframe/checks.py`): `1e-3 * dofs / time / pes`.
+`Mdofs/s/pe` is `1e-6 * dofs / time / pes`. That is ReFrame's `workrate`
+formula (`tests/reframe/checks.py`) with a corrected scale factor: `workrate`
+uses `1e-3`, which makes the number it prints 1000x the `Mdofs/s` it is
+labelled as. The label is made true here rather than the discrepancy carried
+into a new tracked metric, so **these numbers are not directly comparable to a
+`workrate` figure** -- divide by 1000 first.
+
+## Machine-readable output
+
+Rank 0 also emits `key=value` records, which the ReFrame checks parse. Keep
+them stable: a regex that matches nothing yields an empty sample rather than
+an error, so a format change breaks the regression gates silently.
+
+```
+GLSC3 lx=<lx> value=<reduced glsc3>
+BENCH op=<op> path=<path> lx=<lx> n=<n> min=<s> mean=<s> sd=<s> mdofs=<r>
+RATIO op=<op> path=<path> lx=<lx> value=<r> value_mean=<r>
+```
+
+`RATIO` is the wrapper's cost relative to the direct `math` path at the same
+size, `value` from the per-iteration minima and `value_mean` from the means.
+Only per-size facts are emitted; the aggregation across the `lx` sweep lives
+in `tests/reframe/checks.py` so it can change without touching Fortran.
+
+## Regression tracking
+
+`MathOpsVerify` and `MathOpsPerf` in `tests/reframe/checks.py` run this
+benchmark on every PR and gate on it. See `tests/reframe/README.md` for what
+is gated, and for how to regenerate the pinned `glsc3` values and the
+overhead thresholds.
 
 Timing uses `-np 1` by default. For the in-place ops the operand is restored
 from a reference between iterations, and that restore sits **outside** the
