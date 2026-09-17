@@ -259,7 +259,7 @@ contains
   subroutine second_cg_part(rtr, r, mult, w, alpha, n)
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: r(n), rtr
-    real(kind=rp), intent(in) ::mult(n), w(n), alpha
+    real(kind=rp), intent(in) :: mult(n), w(n), alpha
     real(kind=xp) :: tmp
     integer :: i, ierr
 
