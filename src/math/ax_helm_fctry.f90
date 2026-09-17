@@ -46,7 +46,7 @@ submodule (ax_product) ax_helm_fctry
   use ax_helm_svv_one_sided_full_device, only : &
        ax_helm_svv_one_sided_full_device_t
   use spectral_vanishing_viscosity, only : svv_t
-  use utils, only : neko_error, neko_type_error, neko_type_registration_error
+  use utils, only : neko_type_error, neko_type_registration_error
   implicit none
 
   ! List of all possible types created by the allocator routine

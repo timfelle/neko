@@ -37,18 +37,20 @@ module ax_helm
   use space, only : space_t
   use mesh, only : mesh_t
   use math, only : addcol4
+  use , intrinsic :: iso_c_binding, only : c_ptr
   implicit none
   private
 
   !> Matrix-vector product for a Helmholtz problem.
   type, public, abstract, extends(ax_t) :: ax_helm_t
    contains
-     !! Compute the product for 3 compenents of a vector field.
+     !! Compute the product for 3 components of a vector field.
      procedure, pass(this) :: compute_vector => ax_helm_compute_vector
+     procedure, pass(this) :: compute_vector_device => ax_helm_compute_vector_device
   end type ax_helm_t
 
 contains
-  !! Compute the product for 3 compenents of a vector field.
+  !! Compute the product for 3 components of a vector field.
   !! @details applies `compute` to one component at a time.
   !! @param au Result for the first component of the vector.
   !! @param av Result for the first component of the vector.
@@ -75,5 +77,33 @@ contains
     call this%compute(av, v, coef, msh, Xh)
     call this%compute(aw, w, coef, msh, Xh)
   end subroutine ax_helm_compute_vector
+
+  !! Compute the product for 3 components of a vector field.
+  !! @details applies `compute` to one component at a time.
+  !! @param au Result for the first component of the vector.
+  !! @param av Result for the first component of the vector.
+  !! @param aw Result for the first component of the vector.
+  !! @param u The first component of the vector.
+  !! @param v The second component of the vector.
+  !! @param w The third component of the vector.
+  !! @param coef Coefficients.
+  !! @param msh Mesh.
+  !! @param Xh Function space \f$ X_h \f$.
+  subroutine ax_helm_compute_vector_device(this, au_d, av_d, aw_d, u_d, v_d, w_d, coef, msh, Xh)
+    class(ax_helm_t), intent(in) :: this
+    type(space_t), intent(in) :: Xh
+    type(mesh_t), intent(in) :: msh
+    type(coef_t), intent(in) :: coef
+    type(c_ptr), intent(inout) :: au_d
+    type(c_ptr), intent(inout) :: av_d
+    type(c_ptr), intent(inout) :: aw_d
+    type(c_ptr), intent(in) :: u_d
+    type(c_ptr), intent(in) :: v_d
+    type(c_ptr), intent(in) :: w_d
+
+    call this%compute_device(au_d, u_d, coef, msh, Xh)
+    call this%compute_device(av_d, v_d, coef, msh, Xh)
+    call this%compute_device(aw_d, w_d, coef, msh, Xh)
+  end subroutine ax_helm_compute_vector_device
 
 end module ax_helm

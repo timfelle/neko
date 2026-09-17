@@ -47,6 +47,8 @@ module ax_helm_full_device
    contains
      procedure, pass(this) :: compute_vector => &
           ax_helm_full_device_compute_vector
+     procedure, pass(this) :: compute_vector_device => &
+          ax_helm_full_device_compute_vector_device
   end type ax_helm_full_device_t
 
 #ifdef HAVE_HIP
@@ -257,5 +259,66 @@ contains
     end if
 
   end subroutine ax_helm_full_device_compute_vector
+
+  subroutine ax_helm_full_device_compute_vector_device(this, au_d, av_d, aw_d, &
+       u_d, v_d, w_d, coef, msh, Xh)
+    class(ax_helm_full_device_t), intent(in) :: this
+    type(space_t), intent(in) :: Xh
+    type(mesh_t), intent(in) :: msh
+    type(coef_t), intent(in) :: coef
+    type(c_ptr), intent(inout) :: au_d
+    type(c_ptr), intent(inout) :: av_d
+    type(c_ptr), intent(inout) :: aw_d
+    type(c_ptr), intent(in) :: u_d
+    type(c_ptr), intent(in) :: v_d
+    type(c_ptr), intent(in) :: w_d
+
+#ifdef HAVE_HIP
+    call hip_ax_helm_stress_vector(au_d, av_d, aw_d, u_d, v_d, w_d, &
+         Xh%dx_d, Xh%dy_d, Xh%dz_d, Xh%dxt_d, Xh%dyt_d, Xh%dzt_d, coef%h1_d, &
+         coef%drdx_d, coef%drdy_d, coef%drdz_d, &
+         coef%dsdx_d, coef%dsdy_d, coef%dsdz_d, &
+         coef%dtdx_d, coef%dtdy_d, coef%dtdz_d, &
+         coef%jacinv_d, Xh%w3_d, msh%nelv, Xh%lx)
+#elif HAVE_CUDA
+    call cuda_ax_helm_stress_vector(au_d, av_d, aw_d, u_d, v_d, w_d, &
+         Xh%dx_d, Xh%dy_d, Xh%dz_d, Xh%dxt_d, Xh%dyt_d, Xh%dzt_d, coef%h1_d, &
+         coef%drdx_d, coef%drdy_d, coef%drdz_d, &
+         coef%dsdx_d, coef%dsdy_d, coef%dsdz_d, &
+         coef%dtdx_d, coef%dtdy_d, coef%dtdz_d, &
+         coef%jacinv_d, Xh%w3_d, msh%nelv, Xh%lx)
+#elif HAVE_OPENCL
+    call opencl_ax_helm_stress_vector(au_d, av_d, aw_d, u_d, v_d, w_d, &
+         Xh%dx_d, Xh%dy_d, Xh%dz_d, Xh%dxt_d, Xh%dyt_d, Xh%dzt_d, coef%h1_d, &
+         coef%drdx_d, coef%drdy_d, coef%drdz_d, &
+         coef%dsdx_d, coef%dsdy_d, coef%dsdz_d, &
+         coef%dtdx_d, coef%dtdy_d, coef%dtdz_d, &
+         coef%jacinv_d, Xh%w3_d, msh%nelv, Xh%lx)
+#elif HAVE_METAL
+    call metal_ax_helm_stress_vector(au_d, av_d, aw_d, u_d, v_d, w_d, &
+         Xh%dx_d, Xh%dy_d, Xh%dz_d, Xh%dxt_d, Xh%dyt_d, Xh%dzt_d, coef%h1_d, &
+         coef%drdx_d, coef%drdy_d, coef%drdz_d, &
+         coef%dsdx_d, coef%dsdy_d, coef%dsdz_d, &
+         coef%dtdx_d, coef%dtdy_d, coef%dtdz_d, &
+         coef%jacinv_d, Xh%w3_d, msh%nelv, Xh%lx)
+#endif
+
+    if (coef%ifh2) then
+#ifdef HAVE_HIP
+       call hip_ax_helm_stress_vector_part2(au_d, av_d, aw_d, u_d, v_d, w_d, &
+            coef%h2_d, coef%B_d, coef%dof%size())
+#elif HAVE_CUDA
+       call cuda_ax_helm_stress_vector_part2(au_d, av_d, aw_d, u_d, v_d, w_d, &
+            coef%h2_d, coef%B_d, coef%dof%size())
+#elif HAVE_OPENCL
+       call opencl_ax_helm_stress_vector_part2(au_d, av_d, aw_d, u_d, v_d, &
+            w_d, coef%h2_d, coef%B_d, coef%dof%size())
+#elif HAVE_METAL
+       call metal_ax_helm_stress_vector_part2(au_d, av_d, aw_d, u_d, v_d, &
+            w_d, coef%h2_d, coef%B_d, coef%dof%size())
+#endif
+    end if
+
+  end subroutine ax_helm_full_device_compute_vector_device
 
 end module ax_helm_full_device

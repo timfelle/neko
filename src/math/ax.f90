@@ -36,6 +36,8 @@ module ax_product
   use coefs, only : coef_t
   use space, only : space_t
   use mesh, only : mesh_t
+  use utils, only : neko_error
+  use, intrinsic :: iso_c_binding, only : c_ptr
   implicit none
   private
 
@@ -44,6 +46,8 @@ module ax_product
    contains
      procedure(ax_compute), pass(this), deferred :: compute
      procedure(ax_compute_vector), pass(this), deferred :: compute_vector
+     procedure, pass(this) :: compute_device => ax_compute_device
+     procedure, pass(this) :: compute_vector_device => ax_compute_vector_device
      procedure, pass(this) :: free => ax_free
   end type ax_t
 
@@ -161,4 +165,32 @@ contains
     class(ax_t), intent(inout) :: this
   end subroutine ax_free
 
+  !> Default implementation of the device compute method.
+  !! This default implementation just throws an error.
+  subroutine ax_compute_device(this, w_d, u_d, coef, msh, Xh)
+    class(ax_t), intent(in) :: this
+    type(space_t), intent(in) :: Xh
+    type(mesh_t), intent(in) :: msh
+    type(coef_t), intent(in) :: coef
+    type(c_ptr), intent(inout) :: w_d
+    type(c_ptr), intent(in) :: u_d
+    call neko_error("compute_device not implemented for this ax_t type")
+  end subroutine ax_compute_device
+
+  !> Default implementation of the device compute method.
+  !! This default implementation just throws an error.
+  subroutine ax_compute_vector_device(this, au_d, av_d, aw_d, u_d, v_d, w_d, &
+       coef, msh, Xh)
+    class(ax_t), intent(in) :: this
+    type(space_t), intent(in) :: Xh
+    type(mesh_t), intent(in) :: msh
+    type(coef_t), intent(in) :: coef
+    type(c_ptr), intent(inout) :: au_d
+    type(c_ptr), intent(inout) :: av_d
+    type(c_ptr), intent(inout) :: aw_d
+    type(c_ptr), intent(in) :: u_d
+    type(c_ptr), intent(in) :: v_d
+    type(c_ptr), intent(in) :: w_d
+    call neko_error("compute_vector_device not implemented for this ax_t type")
+  end subroutine ax_compute_vector_device
 end module ax_product
