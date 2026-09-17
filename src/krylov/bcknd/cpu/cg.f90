@@ -57,17 +57,14 @@ module cg
   !!
   !! Workspace pointers are associated with host arrays from the scratch
   !! registry only for the duration of a solve.
+  !!
+  !! Notable objects:
+  !! - w(:):     Operator action \f$w = A p\f$.
+  !! - r(:):     Residual \f$r = f - A x\f$.
+  !! - p(:,:):   Rolling space of search directions \f$p\f$.
+  !! - z(:):     Preconditioned residual \f$z = M^{-1} r\f$.
+  !! - alpha(:): Step lengths associated with the stored search directions.
   type, public, extends(ksp_t) :: cg_t
-     !> Operator action \f$w = A p\f$.
-     real(kind=rp), pointer :: w(:) => null()
-     !> Residual \f$r = f - A x\f$.
-     real(kind=rp), pointer :: r(:) => null()
-     !> Rolling space of search directions \f$p\f$.
-     real(kind=rp), pointer :: p(:,:) => null()
-     !> Preconditioned residual \f$z = M^{-1} r\f$.
-     real(kind=rp), pointer :: z(:) => null()
-     !> Step lengths associated with the stored search directions.
-     real(kind=rp), pointer :: alpha(:) => null()
    contains
      !> Initialise a CPU PCG solver.
      procedure, pass(this) :: init => cg_init
@@ -121,13 +118,6 @@ contains
     class(cg_t), intent(inout) :: this
 
     call this%ksp_free()
-
-    nullify(this%w)
-    nullify(this%r)
-    nullify(this%p)
-    nullify(this%z)
-    nullify(this%alpha)
-
     nullify(this%M)
 
   end subroutine cg_free
@@ -148,7 +138,8 @@ contains
     integer :: iter, max_iter, i, j, k, p_cur, p_prev, ierr
     real(kind=rp) :: rnorm, rtr, rtz2, rtz1, x_plus(NEKO_BLK_SIZE)
     real(kind=rp) :: beta, pap, norm_fac, tmp
-    type(host_array_t), pointer :: w_tmp, r_tmp, p_tmp, z_tmp, alpha_tmp
+    real(kind=rp), pointer, dimension(:) :: w, r, z, alpha
+    type(matrix_t), pointer :: p
     integer :: temp_indices(5)
 
     if (present(niter)) then
@@ -158,111 +149,107 @@ contains
     end if
     norm_fac = 1.0_rp / sqrt(coef%volume)
 
-    call neko_scratch_registry%request(this%w, temp_indices(1), n, .false.)
-    call neko_scratch_registry%request(this%r, temp_indices(2), n, .false.)
-    call neko_scratch_registry%request(this%z, temp_indices(4), n, .false.)
-    call neko_scratch_registry%request(this%alpha, temp_indices(5), CG_P_SPACE, .false.)
-    call neko_scratch_registry%request(p_tmp, temp_indices(3), &
-         n * CG_P_SPACE, .false.)
+    call neko_scratch_registry%request(w, temp_indices(1), n, .false.)
+    call neko_scratch_registry%request(r, temp_indices(2), n, .false.)
+    call neko_scratch_registry%request(z, temp_indices(4), n, .false.)
+    call neko_scratch_registry%request(alpha, temp_indices(5), CG_P_SPACE, &
+         .false.)
+    call neko_scratch_registry%request(p, temp_indices(3), n, CG_P_SPACE, &
+         .false.)
 
-    this%p(1:n, 1:CG_P_SPACE) => p_tmp%x
+    rtz1 = 1.0_rp
+    rtr = 0.0_rp
+    !$omp parallel do reduction(+:rtr)
+    do i = 1, n
+       x%x(i,1,1,1) = 0.0_rp
+       p%x(i, CG_P_SPACE) = 0.0_rp
+       r(i) = f(i)
+       rtr = rtr + (r(i) * coef%mult(i,1,1,1) * r(i))
+    end do
+    !$omp end parallel do
 
-    associate(w => this%w%x, r => this%r%x, p => this%p%x, &
-         z => this%z%x, alpha => this%alpha%x)
+    call MPI_Allreduce(MPI_IN_PLACE, rtr, 1, &
+         MPI_REAL_PRECISION, MPI_SUM, NEKO_COMM, ierr)
 
-      rtz1 = 1.0_rp
-      rtr = 0.0_rp
-      !$omp parallel do reduction(+:rtr)
-      do i = 1, n
-         x%x(i,1,1,1) = 0.0_rp
-         p(i, CG_P_SPACE) = 0.0_rp
-         r(i) = f(i)
-         rtr = rtr + (r(i) * coef%mult(i,1,1,1) * r(i))
-      end do
-      !$omp end parallel do
+    rnorm = sqrt(rtr) * norm_fac
+    ksp_results%res_start = rnorm
+    ksp_results%res_final = rnorm
+    ksp_results%iter = 0
+    if (abscmp(rnorm, 0.0_rp)) then
+       ksp_results%converged = .true.
+       nullify(w, r, p, z, alpha)
+       call neko_scratch_registry%relinquish(temp_indices)
+       return
+    end if
 
-      call MPI_Allreduce(MPI_IN_PLACE, rtr, 1, &
-           MPI_REAL_PRECISION, MPI_SUM, NEKO_COMM, ierr)
+    p_prev = CG_P_SPACE
+    p_cur = 1
+    call this%monitor_start('CG')
+    do iter = 1, max_iter
+       call this%M%solve(z, r, n)
+       rtz2 = rtz1
+       rtz1 = glsc3(r, coef%mult, z, n)
 
-      rnorm = sqrt(rtr) * norm_fac
-      ksp_results%res_start = rnorm
-      ksp_results%res_final = rnorm
-      ksp_results%iter = 0
-      if (abscmp(rnorm, 0.0_rp)) then
-         ksp_results%converged = .true.
-         nullify(this%w, this%r, this%p, this%z, this%alpha)
-         call neko_scratch_registry%relinquish_host_array(temp_indices)
-         return
-      end if
+       beta = rtz1 / rtz2
+       if (iter .eq. 1) beta = 0.0_rp
+       !$omp parallel do
+       do i = 1, n
+          p%x(i, p_cur) = z(i) + beta * p%x(i, p_prev)
+       end do
+       !$omp end parallel do
 
-      p_prev = CG_P_SPACE
-      p_cur = 1
-      call this%monitor_start('CG')
-      do iter = 1, max_iter
-         call this%M%solve(z, r, n)
-         rtz2 = rtz1
-         rtz1 = glsc3(r, coef%mult, z, n)
+       call Ax%compute(w, p%x(1, p_cur), coef, x%msh, x%Xh)
+       call gs_h%op(w, n, GS_OP_ADD)
+       call bc_projector%apply(w, n)
 
-         beta = rtz1 / rtz2
-         if (iter .eq. 1) beta = 0.0_rp
-         !$omp parallel do
-         do i = 1, n
-            p(i, p_cur) = z(i) + beta * p(i, p_prev)
-         end do
-         !$omp end parallel do
+       pap = glsc3(w, coef%mult, p%x(1, p_cur), n)
 
-         call Ax%compute(w, p(1, p_cur), coef, x%msh, x%Xh)
-         call gs_h%op(w, n, GS_OP_ADD)
-         call bc_projector%apply(w, n)
+       alpha(p_cur) = rtz1 / pap
+       call second_cg_part(rtr, r, coef%mult, w, alpha(p_cur), n)
+       rnorm = sqrt(rtr) * norm_fac
+       call this%monitor_iter(iter, rnorm)
 
-         pap = glsc3(w, coef%mult, p(1, p_cur), n)
+       if ((p_cur .eq. CG_P_SPACE) .or. &
+            (rnorm .lt. this%abs_tol) .or. iter .eq. max_iter) then
+          !$omp parallel do private(j, k, x_plus, tmp)
+          do i = 0, n-1, NEKO_BLK_SIZE
+             if (i + NEKO_BLK_SIZE .le. n) then
+                !$omp simd
+                do k = 1, NEKO_BLK_SIZE
+                   x_plus(k) = 0.0_rp
+                end do
+                do j = 1, p_cur
+                   !$omp simd
+                   do k = 1, NEKO_BLK_SIZE
+                      x_plus(k) = x_plus(k) + alpha(j) * p%x(i+k,j)
+                   end do
+                end do
+                !$omp simd
+                do k = 1, NEKO_BLK_SIZE
+                   x%x(i+k,1,1,1) = x%x(i+k,1,1,1) + x_plus(k)
+                end do
+             else
+                do k = 1, n - i
+                   tmp = 0.0_rp
+                   do j = 1, p_cur
+                      tmp = tmp + alpha(j) * p%x(i+k,j)
+                   end do
+                   x%x(i+k,1,1,1) = x%x(i+k,1,1,1) + tmp
+                end do
+             end if
+          end do
+          !$omp end parallel do
+          p_prev = p_cur
+          p_cur = 1
+          if (rnorm .lt. this%abs_tol) exit
+       else
+          p_prev = p_cur
+          p_cur = p_cur + 1
+       end if
+    end do
 
-         alpha(p_cur) = rtz1 / pap
-         call second_cg_part(rtr, r, coef%mult, w, alpha(p_cur), n)
-         rnorm = sqrt(rtr) * norm_fac
-         call this%monitor_iter(iter, rnorm)
-
-         if ((p_cur .eq. CG_P_SPACE) .or. &
-              (rnorm .lt. this%abs_tol) .or. iter .eq. max_iter) then
-            !$omp parallel do private(j, k, x_plus, tmp)
-            do i = 0, n-1, NEKO_BLK_SIZE
-               if (i + NEKO_BLK_SIZE .le. n) then
-                  !$omp simd
-                  do k = 1, NEKO_BLK_SIZE
-                     x_plus(k) = 0.0_rp
-                  end do
-                  do j = 1, p_cur
-                     !$omp simd
-                     do k = 1, NEKO_BLK_SIZE
-                        x_plus(k) = x_plus(k) + alpha(j) * p(i+k,j)
-                     end do
-                  end do
-                  !$omp simd
-                  do k = 1, NEKO_BLK_SIZE
-                     x%x(i+k,1,1,1) = x%x(i+k,1,1,1) + x_plus(k)
-                  end do
-               else
-                  do k = 1, n - i
-                     tmp = 0.0_rp
-                     do j = 1, p_cur
-                        tmp = tmp + alpha(j) * p(i+k,j)
-                     end do
-                     x%x(i+k,1,1,1) = x%x(i+k,1,1,1) + tmp
-                  end do
-               end if
-            end do
-            !$omp end parallel do
-            p_prev = p_cur
-            p_cur = 1
-            if (rnorm .lt. this%abs_tol) exit
-         else
-            p_prev = p_cur
-            p_cur = p_cur + 1
-         end if
-      end do
-    end associate
-    nullify(this%w, this%r, this%p, this%z, this%alpha)
-    call neko_scratch_registry%relinquish_host_array(temp_indices)
+    nullify(w, r, p, z, alpha)
+    call neko_scratch_registry%relinquish(temp_indices)
     call this%monitor_stop()
     ksp_results%res_final = rnorm
     ksp_results%iter = iter
@@ -272,8 +259,8 @@ contains
   subroutine second_cg_part(rtr, r, mult, w, alpha, n)
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: r(n), rtr
-    real(kind=xp) :: tmp
     real(kind=rp), intent(in) ::mult(n), w(n), alpha
+    real(kind=xp) :: tmp
     integer :: i, ierr
 
     tmp = 0.0_xp
