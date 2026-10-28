@@ -11,6 +11,9 @@
 
 ## Develop
 
+- Fixed cases with several scalars aborting with "Profile region renamed"
+  when `runtime_statistics` is enabled. The profiling regions of each scalar
+  are now allocated by name instead of sharing fixed region ids.
 - Fix bugs in running average of the dynamic Smgorinsky SGS model.
 - Remove the averaging of the LES filter width on element interfaces.
 - Fixed Mij computation in dynamic Smagorinsky SGS model 
