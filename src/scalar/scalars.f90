@@ -201,7 +201,7 @@ contains
     end do
 
     if (.not. all_frozen) then
-       call ksp_results(i)%print_header()
+       call ksp_results(1)%print_header()
     end if
 
     do i = 1, size(this%scalar_fields)

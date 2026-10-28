@@ -11,6 +11,9 @@
 
 ## Develop
 
+- Fixed the scalar step printing its solver header through an element one
+  past the end of the per-scalar Krylov results, which aborts bounds-checked
+  builds whenever a scalar is not frozen.
 - Fix bugs in running average of the dynamic Smgorinsky SGS model.
 - Remove the averaging of the LES filter width on element interfaces.
 - Fixed Mij computation in dynamic Smagorinsky SGS model 
