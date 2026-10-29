@@ -308,6 +308,7 @@ contains
     logical, intent(in) :: append_out
     real(kind=dp), intent(in) :: start_time
     character(len=LOG_SIZE) :: log_buf
+    character(len=:), allocatable :: zone_list
     character(len=80) :: suffix
     integer :: i, col, ierr, offset, n_geom
     logical :: ale_enabled
@@ -469,8 +470,10 @@ contains
     ! Log
     call neko_log%section("Boundary data writer")
     call neko_log%message("Name: " // trim(this%name))
-    write(log_buf, '(A,*(I0,:,", "))') "Zone indices: ", this%zone_indices
-    call neko_log%message(log_buf)
+    ! I0 needs at most 11 characters for a default integer, plus ", ".
+    allocate(character(len=13 * size(this%zone_indices) + 1) :: zone_list)
+    write(zone_list, '(*(I0,:,", "))') this%zone_indices
+    call neko_log%message("Zone indices: " // trim(zone_list))
     write(log_buf, '(A,I0)') "Global number of masked points: ", this%n_global
     call neko_log%message(log_buf)
     call neko_log%message("Output file: " // trim(output_filename))

@@ -175,6 +175,7 @@ contains
     character(len=*), intent(in), optional :: output_filename
     character(len=:), allocatable :: csv_header
     character(len=LOG_SIZE) :: log_buf
+    character(len=:), allocatable :: zone_list
     integer :: i
     integer :: n_pts, glb_n_pts, ierr
 
@@ -260,8 +261,10 @@ contains
        write(log_buf, '(A,A)') "  ", trim(this%operations(i))
        call neko_log%message(log_buf)
     end do
-    write(log_buf, '(A,*(I0,:,", "))') "Zone indices: ", this%zone_indices
-    call neko_log%message(log_buf)
+    ! I0 needs at most 11 characters for a default integer, plus ", ".
+    allocate(character(len=13 * size(this%zone_indices) + 1) :: zone_list)
+    write(zone_list, '(*(I0,:,", "))') this%zone_indices
+    call neko_log%message("Zone indices: " // trim(zone_list))
     write(log_buf, '(A,I0)') "Marked boundary quadrature points: ", glb_n_pts
     call neko_log%message(log_buf)
     call neko_log%end_section()

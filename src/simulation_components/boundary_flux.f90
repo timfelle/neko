@@ -166,6 +166,7 @@ contains
     logical, intent(in) :: log
     character(len=*), intent(in), optional :: output_filename
     character(len=LOG_SIZE) :: log_buf
+    character(len=:), allocatable :: zone_list
     integer :: i
     integer :: n_pts
 
@@ -226,8 +227,10 @@ contains
     call neko_log%message("Name: " // trim(this%name))
     call neko_log%message("Fields: " // trim(this%field_names(1)) // ", " // &
          trim(this%field_names(2)) // ", " // trim(this%field_names(3)))
-    write(log_buf, '(A,*(I0,:,", "))') "Zone indices: ", this%zone_indices
-    call neko_log%message(log_buf)
+    ! I0 needs at most 11 characters for a default integer, plus ", ".
+    allocate(character(len=13 * size(this%zone_indices) + 1) :: zone_list)
+    write(zone_list, '(*(I0,:,", "))') this%zone_indices
+    call neko_log%message("Zone indices: " // trim(zone_list))
     write(log_buf, '(A,I0)') "Marked boundary quadrature points: ", &
          this%bc%facet_node_msk(0)
     call neko_log%message(log_buf)

@@ -11,10 +11,12 @@
 
 ## Develop
 
-- Fixed a crash ("End of record") when a log or error message contains a
-  case-file string that does not fit on one log line, e.g. a fluid or scalar
-  `name` of 67 characters or more, a long file name or path, or a long
-  simulation component, field or zone name.
+- Fixed a crash ("End of record") when a log, warning or error message does
+  not fit on one log line, e.g. with a fluid or scalar `name` too long to fit
+  on one log line, a long file name or path, a long simulation component,
+  field or zone name, a long list of zone indices, or the gravity
+  misalignment warning of the MOST and Richardson wall models. Field names in
+  the registry are still limited to 80 characters.
 - Fix bugs in running average of the dynamic Smgorinsky SGS model.
 - Remove the averaging of the LES filter width on element interfaces.
 - Fixed Mij computation in dynamic Smagorinsky SGS model 

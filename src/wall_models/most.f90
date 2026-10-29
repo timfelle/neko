@@ -342,10 +342,10 @@ contains
     end do
     max_ang = max_ang * 180.0_rp / (4.0_rp * atan(1.0_rp))
     if (max_ang > 8.0_rp) then
-       write(log_buf, '(A, F6.2, A)') &
-            "MOST WM: Significant gravity-normal misalignment (max ", &
-            max_ang, " deg). Stability corrections will use projected gravity."
-       call neko_warning(trim(log_buf))
+       write(log_buf, '(F6.2)') max_ang
+       call neko_warning("MOST WM: Significant gravity-normal " // &
+            "misalignment (max " // trim(log_buf) // " deg). Stability " // &
+            "corrections will use projected gravity.")
     end if
 
     call most_validate_sampling_height(this)

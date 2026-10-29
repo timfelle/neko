@@ -850,12 +850,11 @@ contains
        call neko_log%message(log_buf)
     end if
     if (this%periodic_bc%rotational_periodic_enabled) then
-       write(log_buf, '(A,3(ES13.5,A),ES13.5)') &
-            "Rotational periodic sector: theta_min = ", &
+       write(log_buf, '(A,2(ES13.5,A),ES13.5)') "theta_min = ", &
             this%periodic_bc%rotational_theta_min, ", theta_max = ", &
             this%periodic_bc%rotational_theta_max, ", theta_len = ", &
-            this%periodic_bc%rotational_theta_len, ""
-       call neko_log%message(log_buf)
+            this%periodic_bc%rotational_theta_len
+       call neko_log%message("Rotational periodic sector: " // trim(log_buf))
     end if
     if (this%elastic_wall_enabled) then
        write(log_buf, '(A,I0)') "Elastic wall zones configured: ", &

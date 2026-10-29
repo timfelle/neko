@@ -345,6 +345,7 @@ contains
     type(coef_t), intent(inout), target :: coef
     character(len=NEKO_VARNAME_LEN), allocatable :: fields(:)
     character(len=LOG_SIZE) :: log_buf
+    character(len=:), allocatable :: zone_list, field_list
     integer :: i, glb_n_pts
     logical :: ale_enabled
 
@@ -408,21 +409,23 @@ contains
 
     call neko_log%section("Wall shear stress")
     call neko_log%message("Name: " // trim(this%name))
-    write(log_buf, '(A,*(I0,:,", "))') "Zone indices: ", this%zone_indices
-    call neko_log%message(log_buf)
+    ! I0 needs at most 11 characters for a default integer, plus ", ".
+    allocate(character(len=13 * size(this%zone_indices) + 1) :: zone_list)
+    write(zone_list, '(*(I0,:,", "))') this%zone_indices
+    call neko_log%message("Zone indices: " // trim(zone_list))
     write(log_buf, '(A,I0)') "Global number of masked points: ", glb_n_pts
     call neko_log%message(log_buf)
     call neko_log%message("Viscosity field: " // trim(viscosity_field))
-    log_buf = "Registered fields: "
-    if (this%want_x) log_buf = trim(log_buf) // " " // &
+    field_list = "Registered fields:"
+    if (this%want_x) field_list = field_list // " " // &
          trim(computed_field) // "_x"
-    if (this%want_y) log_buf = trim(log_buf) // " " // &
+    if (this%want_y) field_list = field_list // " " // &
          trim(computed_field) // "_y"
-    if (this%want_z) log_buf = trim(log_buf) // " " // &
+    if (this%want_z) field_list = field_list // " " // &
          trim(computed_field) // "_z"
-    if (this%want_mag) log_buf = trim(log_buf) // " " // &
+    if (this%want_mag) field_list = field_list // " " // &
          trim(computed_field) // "_mag"
-    call neko_log%message(log_buf)
+    call neko_log%message(field_list)
     write(log_buf, '(A,L1)') "Moving mesh: ", this%mesh_has_changed
     call neko_log%message(log_buf)
     call neko_log%end_section()
@@ -467,7 +470,7 @@ contains
     integer :: field_indices(6)
     integer :: vector_indices(15)
     integer :: n_pts
-    character(len=LOG_SIZE) :: log_buf
+    character(len=:), allocatable :: zone_list
 
     n_pts = this%bdata%n_local
 
@@ -576,9 +579,12 @@ contains
 
     call neko_scratch_registry%relinquish_field(field_indices)
 
-    write(log_buf, '(A,E15.7,A,*(I0,:,", "))') "' computed at t = ", &
+    ! The literals and E15.7 take 42 characters, and I0 needs at most 11
+    ! characters for a default integer, plus ", ".
+    allocate(character(len=42 + 13 * size(this%zone_indices)) :: zone_list)
+    write(zone_list, '(A,E15.7,A,*(I0,:,", "))') "' computed at t = ", &
          time%t, ", zones: ", this%zone_indices
-    call neko_log%message("WSS: '" // trim(this%name) // trim(log_buf))
+    call neko_log%message("WSS: '" // trim(this%name) // trim(zone_list))
 
   end subroutine wall_shear_stress_compute
 
