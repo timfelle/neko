@@ -142,6 +142,37 @@ contains
     call registry%free()
   end subroutine test_registry_add_field
 
+  !> Printing the contents must not fail for a field name longer than a
+  !! log line (but within the 80 characters a registry entry name holds).
+  @test
+  subroutine test_registry_print_long_name(this)
+    class(test_field_reg), intent(inout) :: this
+    type(space_t) :: Xh
+    type(mesh_t) :: msh
+    type(dofmap_t) :: dm
+    integer, parameter :: lx = 2
+    type(registry_t) :: registry
+    character(len=75) :: long_name
+
+    long_name = repeat('n', len(long_name))
+
+    call test_registry_gen_msh(msh)
+
+    call Xh%init(GLL, lx, lx, lx)
+    call dm%init(msh, Xh)
+
+    call registry%init()
+    call registry%add_field(dm, long_name)
+    call registry%print_contents()
+
+    @assertTrue(registry%field_exists(long_name))
+
+    call registry%free()
+    call dm%free()
+    call Xh%free()
+    call msh%free()
+  end subroutine test_registry_print_long_name
+
   @test
   subroutine test_registry_add_alias(this)
     class(test_field_reg), intent(inout) :: this

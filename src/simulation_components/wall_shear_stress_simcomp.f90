@@ -407,14 +407,12 @@ contains
     glb_n_pts = this%bdata%n_global
 
     call neko_log%section("Wall shear stress")
-    write(log_buf, '(A,A)') "Name: ", trim(this%name)
-    call neko_log%message(log_buf)
+    call neko_log%message("Name: " // trim(this%name))
     write(log_buf, '(A,*(I0,:,", "))') "Zone indices: ", this%zone_indices
     call neko_log%message(log_buf)
     write(log_buf, '(A,I0)') "Global number of masked points: ", glb_n_pts
     call neko_log%message(log_buf)
-    write(log_buf, '(A,A)') "Viscosity field: ", trim(viscosity_field)
-    call neko_log%message(log_buf)
+    call neko_log%message("Viscosity field: " // trim(viscosity_field))
     log_buf = "Registered fields: "
     if (this%want_x) log_buf = trim(log_buf) // " " // &
          trim(computed_field) // "_x"
@@ -578,10 +576,9 @@ contains
 
     call neko_scratch_registry%relinquish_field(field_indices)
 
-    write(log_buf, '(A,A,A,E15.7,A,*(I0,:,", "))') &
-         "WSS: '", trim(this%name), "' computed at t = ", &
+    write(log_buf, '(A,E15.7,A,*(I0,:,", "))') "' computed at t = ", &
          time%t, ", zones: ", this%zone_indices
-    call neko_log%message(log_buf)
+    call neko_log%message("WSS: '" // trim(this%name) // trim(log_buf))
 
   end subroutine wall_shear_stress_compute
 

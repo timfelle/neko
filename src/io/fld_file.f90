@@ -1401,8 +1401,8 @@ contains
 
              write(log_buf,*) 'Reading meta file for fld series'
              call neko_log%message(log_buf)
-             write(log_buf,*) 'Name: ', trim(data%fld_series_fname)
-             call neko_log%message(log_buf)
+             call neko_log%message(' Name: ' // &
+                  trim(data%fld_series_fname))
              write(log_buf,*) 'Start counter: ', data%meta_start_counter
              call neko_log%message(log_buf)
              write(log_buf,*) 'Nsamples: ', data%meta_nsamples

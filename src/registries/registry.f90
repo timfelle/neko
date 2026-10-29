@@ -955,14 +955,14 @@ contains
   !> Print the contents of the registry to standard output.
   subroutine registry_print(this)
     class(registry_t), intent(in) :: this
-    character(len=LOG_SIZE), allocatable :: buffer
+    character(len=LOG_SIZE) :: buffer
     integer :: i
 
     call neko_log%section("Field Registry Contents")
     do i = 1, this%n_entries()
-       write(buffer, '(A,I4,A,A)') "- [", i, "] ", &
-            this%entries(i)%get_type(), ": ", this%entries(i)%get_name()
-       call neko_log%message(trim(buffer))
+       write(buffer, '(A,I4,A)') "- [", i, "]"
+       call neko_log%message(trim(buffer) // " " // &
+            this%entries(i)%get_type() // ": " // this%entries(i)%get_name())
     end do
 
     call neko_log%end_section()
@@ -1023,9 +1023,9 @@ contains
     do i = 1, this%n_entries()
        if (this%entries(i)%get_type() .eq. entity_type) then
           found = .true.
-          write(buffer, '(A,I4,A,A)') "    [", i, "] ", &
-               trim(this%entries(i)%get_name())
-          call neko_log%message(trim(buffer))
+          write(buffer, '(A,I4,A)') "    [", i, "]"
+          call neko_log%message(trim(buffer) // " " // &
+               trim(this%entries(i)%get_name()))
        end if
     end do
     if (.not. found) then

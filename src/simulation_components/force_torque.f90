@@ -362,15 +362,14 @@ contains
     avg_r(3) = glsum(this%r3%x, n_pts)/glb_n_pts
     ! Print some information
     call neko_log%section('Force/torque calculation')
-    write(log_buf, '(A,I4,A,A)') 'Zone ', zone_id, '  ', trim(zone_name)
-    call neko_log%message(log_buf)
+    write(log_buf, '(A,I4)') 'Zone ', zone_id
+    call neko_log%message(trim(log_buf) // '  ' // trim(zone_name))
 
     write(log_buf, '(A,I6, I6)') 'Global number of GLL points in zone: ', &
          glb_n_pts
     call neko_log%message(log_buf)
 
-    write(log_buf, '(A,A)') 'Center Type: ', trim(ctype_str)
-    call neko_log%message(log_buf)
+    call neko_log%message('Center Type: ' // trim(ctype_str))
 
     if (trim(ctype_str) == 'pivot' .or. &
          trim(ctype_str) == 'body_attached') then
@@ -735,11 +734,10 @@ contains
 
              if (.not. body_found) then
                 call neko_log%message(' ')
-                write(log_buf, '(A,I0,A)') 'Warning: Zone ', zone_id, &
-                     ' requested "' // trim(center_type) // &
-                     '" center, but is not registered as an ALE body.'
-
-                call neko_log%message(log_buf)
+                write(log_buf, '(A,I0)') 'Warning: Zone ', zone_id
+                call neko_log%message(trim(log_buf) // ' requested "' // &
+                     trim(center_type) // &
+                     '" center, but is not registered as an ALE body.')
 
                 call neko_log%message('Reverting to FIXED center ' // &
                      'using JSON coordinates.')
@@ -756,10 +754,9 @@ contains
 
        call neko_log%message(' ')
 
-       write(log_buf, '(A,I0,A)') "Warning: Zone ", zone_id, &
-            " requested '" // trim(center_type) // "' center, " // &
-            "but ALE is not active."
-       call neko_log%message(log_buf)
+       write(log_buf, '(A,I0)') "Warning: Zone ", zone_id
+       call neko_log%message(trim(log_buf) // " requested '" // &
+            trim(center_type) // "' center, but ALE is not active.")
 
        call neko_log%message("pivot and body_attached work " // &
             "only for ALE simulations.")

@@ -840,8 +840,7 @@ contains
     if (.not. this%log) return
 
     call neko_log%section("Lagrangian particle tracking")
-    write(log_buf, '(A,A)') "Name: ", trim(this%name)
-    call neko_log%message(log_buf)
+    call neko_log%message("Name: " // trim(this%name))
     write(log_buf, '(A,I0)') "Global seeded particles: ", &
          this%particles%n_global
     call neko_log%message(log_buf)

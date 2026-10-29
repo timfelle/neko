@@ -523,7 +523,6 @@ contains
     integer :: facet_size, facet, el
     integer :: i, j, k, l, msk_c
     integer :: lx, ly, lz, n
-    character(len=LOG_SIZE) :: log_buf
     lx = this%Xh%lx
     ly = this%Xh%ly
     lz = this%Xh%lz
@@ -669,8 +668,7 @@ contains
 ! gives plenty of empty info lines during AMR restart
 !       this%name = ""
     else
-       write(log_buf, '(A,A)') 'BC assigned name :   ', trim(this%name)
-       call neko_log%message(log_buf)
+       call neko_log%message('BC assigned name :   ' // trim(this%name))
     end if
 
 ! causes trouble for AMR restart

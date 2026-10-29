@@ -389,8 +389,7 @@ contains
 
     write(log_buf, '(A, A)') 'Type       : ', trim(scheme)
     call neko_log%message(log_buf)
-    write(log_buf, '(A, A)') 'Name       : ', trim(this%name)
-    call neko_log%message(log_buf)
+    call neko_log%message('Name       : ' // trim(this%name))
     call neko_log%message('Ksp scalar : ('// trim(solver_type) // &
          ', ' // trim(solver_precon) // ')')
     write(log_buf, '(A,ES13.6)') ' `-abs tol :', solver_abstol

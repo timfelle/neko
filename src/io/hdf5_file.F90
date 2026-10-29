@@ -1322,9 +1322,10 @@ contains
     ! Set the active group to the root of the file
     call this%set_active_group()
 
-    write (log_buf, *) "Opened HDF5 file: ", trim(fname), " with counter: ", &
-         counter
-    call neko_log%message(log_buf, lvl = NEKO_LOG_DEBUG)
+    write (log_buf, '(I12)') counter
+    call neko_log%message(" Opened HDF5 file: " // trim(fname) // &
+         " with counter: " // trim(log_buf), &
+         lvl = NEKO_LOG_DEBUG)
 
   end subroutine hdf5_file_open
 

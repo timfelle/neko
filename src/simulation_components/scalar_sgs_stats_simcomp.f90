@@ -178,14 +178,11 @@ contains
     character(len=5) :: prefix
 
     call neko_log%section('Scalar SGS stats')
-    write(log_buf, '(A,A)') 'Scalar field: ', trim(sname)
-    call neko_log%message(log_buf)
-    write(log_buf, '(A,A)') 'Eddy diffusivity field: ', trim(alphat_field)
-    call neko_log%message(log_buf)
+    call neko_log%message('Scalar field: ' // trim(sname))
+    call neko_log%message('Eddy diffusivity field: ' // trim(alphat_field))
     write(log_buf, '(A,E15.7)') 'Start time: ', start_time
     call neko_log%message(log_buf)
-    write(log_buf, '(A,A)') 'Averaging in direction: ', trim(hom_dir)
-    call neko_log%message(log_buf)
+    call neko_log%message('Averaging in direction: ' // trim(hom_dir))
 
     call this%stats%init(coef, sname, alphat_field)
 
@@ -237,16 +234,13 @@ contains
     character(len=5) :: prefix
 
     call neko_log%section('scalar stats')
-    write(log_buf, '(A,A)') 'Scalar field: ', trim(sname)
-    call neko_log%message(log_buf)
-    write(log_buf, '(A,A)') 'Eddy viscosity field: ', trim(nut_field)
-    call neko_log%message(log_buf)
+    call neko_log%message('Scalar field: ' // trim(sname))
+    call neko_log%message('Eddy viscosity field: ' // trim(nut_field))
     write(log_buf, '(A,E15.7)') 'Turbulent Prandtl number: ', pr_turb
     call neko_log%message(log_buf)
     write(log_buf, '(A,E15.7)') 'Start time: ', start_time
     call neko_log%message(log_buf)
-    write(log_buf, '(A,A)') 'Averaging in direction: ', trim(hom_dir)
-    call neko_log%message(log_buf)
+    call neko_log%message('Averaging in direction: ' // trim(hom_dir))
 
 
     call this%stats%init(coef, sname, nut_field, pr_turb)

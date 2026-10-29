@@ -87,8 +87,7 @@ contains
     call neko_log%section('LES model')
     write(log_buf, '(A)') 'Model : Wale'
     call neko_log%message(log_buf)
-    write(log_buf, '(A, A)') 'Delta evaluation : ', delta_type
-    call neko_log%message(log_buf)
+    call neko_log%message('Delta evaluation : ' // delta_type)
     write(log_buf, '(A, E15.7)') 'c_w : ', c_w
     call neko_log%message(log_buf)
     write(log_buf, '(A, L1)') 'extrapolation : ', if_ext

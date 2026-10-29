@@ -560,8 +560,7 @@ contains
     call neko_log%section('Fluid')
     write(log_buf, '(A, A)') 'Type       : ', trim(scheme)
     call neko_log%message(log_buf)
-    write(log_buf, '(A, A)') 'Name       : ', trim(this%name)
-    call neko_log%message(log_buf)
+    call neko_log%message('Name       : ' // trim(this%name))
 
     ! Polynomial order
     if (lx .lt. 10) then

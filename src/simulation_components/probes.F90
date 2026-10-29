@@ -697,9 +697,9 @@ contains
     write(log_buf, '(A,I6)') "Number of fields: ", this%n_fields
     call neko_log%message(log_buf)
     do i = 1, this%n_fields
-       write(log_buf, '(A,I6,A,A)') &
-            "Field: ", i, " ", trim(this%which_fields(i))
-       call neko_log%message(log_buf, lvl = NEKO_LOG_DEBUG)
+       write(log_buf, '(A,I6)') "Field: ", i
+       call neko_log%message(trim(log_buf) // " " // &
+            trim(this%which_fields(i)), lvl = NEKO_LOG_DEBUG)
     end do
     call neko_log%end_section()
     call neko_log%newline()

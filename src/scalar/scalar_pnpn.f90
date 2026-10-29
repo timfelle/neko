@@ -673,10 +673,8 @@ contains
        ! Check that there are no labeled zones, i.e. all are periodic.
        do i = 1, size(this%msh%labeled_zones)
           if (this%msh%labeled_zones(i)%size .gt. 0) then
-             write(error_msg, '(A, A)') &
-                  "No boundary_conditions entry in the case file for scalar ", &
-                  this%s%name
-             call neko_error(error_msg)
+             call neko_error("No boundary_conditions entry in the case " // &
+                  "file for scalar " // trim(this%s%name))
              error stop
           end if
        end do

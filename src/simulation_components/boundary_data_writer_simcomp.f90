@@ -468,18 +468,15 @@ contains
 
     ! Log
     call neko_log%section("Boundary data writer")
-    write(log_buf, '(A,A)') "Name: ", trim(this%name)
-    call neko_log%message(log_buf)
+    call neko_log%message("Name: " // trim(this%name))
     write(log_buf, '(A,*(I0,:,", "))') "Zone indices: ", this%zone_indices
     call neko_log%message(log_buf)
     write(log_buf, '(A,I0)') "Global number of masked points: ", this%n_global
     call neko_log%message(log_buf)
-    write(log_buf, '(A,A)') "Output file: ", trim(output_filename)
-    call neko_log%message(log_buf)
+    call neko_log%message("Output file: " // trim(output_filename))
     call neko_log%message("Columns:")
     do i = 1, this%n_cols
-       write(log_buf, '(A,A)') "  ", trim(this%col_names(i))
-       call neko_log%message(log_buf)
+       call neko_log%message("  " // trim(this%col_names(i)))
     end do
     write(log_buf, '(A,L1)') "Moving mesh: ", this%mesh_has_changed
     call neko_log%message(log_buf)

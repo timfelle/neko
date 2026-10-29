@@ -200,9 +200,9 @@ contains
           call this%add_file(object_settings)
 
        case default
-          write(error_msg, '(A,I0,A,A)') 'Brinkman object: ', i, &
-               ' unknown type: ', trim(object_type)
-          call neko_error(trim(error_msg))
+          write(error_msg, '(A,I0)') 'Brinkman object: ', i
+          call neko_error(trim(error_msg) // ' unknown type: ' // &
+               trim(object_type))
        end select
 
     end do

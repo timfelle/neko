@@ -122,11 +122,9 @@ contains
       call neko_log%section('LES model')
       write(log_buf, '(A)') 'Model : Dynamic Smagorinsky'
       call neko_log%message(log_buf)
-      write(log_buf, '(A, A)') 'Delta evaluation : ', delta_type
-      call neko_log%message(log_buf)
-      write(log_buf, '(A, A)') 'Test filter type : ', &
-           this%test_filter%filter_type
-      call neko_log%message(log_buf)
+      call neko_log%message('Delta evaluation : ' // delta_type)
+      call neko_log%message('Test filter type : ' // &
+           this%test_filter%filter_type)
       write(log_buf, '(A, L1)') 'extrapolation : ', if_ext
       call neko_log%message(log_buf)
       call neko_log%end_section()

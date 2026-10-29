@@ -155,10 +155,8 @@ contains
     call neko_log%section('Fluid stats')
     write(log_buf, '(A,E15.7)') 'Start time: ', start_time
     call neko_log%message(log_buf)
-    write(log_buf, '(A,A)') 'Nut field name: ', trim(nut_field)
-    call neko_log%message(log_buf)
-    write(log_buf, '(A,A)') 'Averaging in direction: ', trim(hom_dir)
-    call neko_log%message(log_buf)
+    call neko_log%message('Nut field name: ' // trim(nut_field))
+    call neko_log%message('Averaging in direction: ' // trim(hom_dir))
 
 
     call this%stats%init(coef, u, v, w, nut_field)

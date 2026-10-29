@@ -204,10 +204,8 @@ contains
     call neko_log%section('Wall model')
     write(log_buf, '(A, A)') 'Model : Richardson'
     call neko_log%message(log_buf)
-    write(log_buf, '(A, A)') 'scalar_name : ', trim(this%scalar_name)
-    call neko_log%message(log_buf)
-    write(log_buf, '(A, A)') 'bc_type : ', trim(this%bc_type)
-    call neko_log%message(log_buf)
+    call neko_log%message('scalar_name : ' // trim(this%scalar_name))
+    call neko_log%message('bc_type : ' // trim(this%bc_type))
     write(log_buf, '(A, E15.7)') 'bc_value : ', this%bc_value
     call neko_log%message(log_buf)
     write(log_buf, '(A, E15.7)') 'kappa : ', this%kappa

@@ -223,12 +223,9 @@ contains
     end if
 
     call neko_log%section("Boundary flux")
-    write(log_buf, '(A,A)') "Name: ", trim(this%name)
-    call neko_log%message(log_buf)
-    write(log_buf, '(A,A,", ",A,", ",A)') "Fields: ", &
-         trim(this%field_names(1)), trim(this%field_names(2)), &
-         trim(this%field_names(3))
-    call neko_log%message(log_buf)
+    call neko_log%message("Name: " // trim(this%name))
+    call neko_log%message("Fields: " // trim(this%field_names(1)) // ", " // &
+         trim(this%field_names(2)) // ", " // trim(this%field_names(3)))
     write(log_buf, '(A,*(I0,:,", "))') "Zone indices: ", this%zone_indices
     call neko_log%message(log_buf)
     write(log_buf, '(A,I0)') "Marked boundary quadrature points: ", &

@@ -168,14 +168,11 @@ contains
 
     this%name = name
     call neko_log%section('Scalar stats')
-    write(log_buf, '(A,A)') 'Scalar field: ', trim(s%name)
-    call neko_log%message(log_buf)
+    call neko_log%message('Scalar field: ' // trim(s%name))
     write(log_buf, '(A,E15.7)') 'Start time: ', start_time
     call neko_log%message(log_buf)
-    write(log_buf, '(A,A)') 'Set of statistics: ', trim(stat_set)
-    call neko_log%message(log_buf)
-    write(log_buf, '(A,A)') 'Averaging in direction: ', trim(hom_dir)
-    call neko_log%message(log_buf)
+    call neko_log%message('Set of statistics: ' // trim(stat_set))
+    call neko_log%message('Averaging in direction: ' // trim(hom_dir))
 
 
     call this%stats%init(coef, s, u, v, w, p, stat_set, name)

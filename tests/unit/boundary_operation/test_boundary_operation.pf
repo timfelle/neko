@@ -181,6 +181,59 @@ contains
     call msh%free()
   end subroutine test_init
 
+  !> Verify that the constructor accepts a name and a field name longer than
+  !! a log line (the field name within the 80 characters a registry entry
+  !! name holds).
+  @test(npes=[1])
+  subroutine test_init_long_names(this)
+    class(test_boundary_operation_case), intent(inout) :: this
+    type(mesh_t) :: msh
+    type(space_t) :: Xh
+    type(dofmap_t) :: dof
+    type(gs_t) :: gs
+    type(boundary_operation_t) :: simcomp
+    type(case_t), target :: test_case
+    integer :: zone_indices(1)
+    character(len=16) :: operations(1)
+    character(len=100) :: name
+    character(len=75) :: field_name
+
+    name = repeat('b', len(name))
+    field_name = repeat('f', len(field_name))
+
+    allocate(fluid_pnpn_t :: test_case%fluid)
+    select type(fluid => test_case%fluid)
+    type is (fluid_pnpn_t)
+       call build_single_hex_fixture(msh, Xh, dof, gs, fluid%c_Xh)
+    end select
+    call label_adjacent_faces(msh)
+
+    call neko_registry%init()
+    call neko_registry%add_field(dof, field_name)
+    call test_case%time%init(0.0_dp, 1.0_dp, 0.1_dp)
+
+    zone_indices = [1]
+    operations = [character(len=16) :: "integral"]
+    call simcomp%init_from_components(name, test_case, 7, &
+         "tsteps", 1.0_dp, "tsteps", 1.0_dp, "tsteps", 1.0_dp, &
+         zone_indices, field_name, operations, .false.)
+
+    @assertEqual(name, simcomp%name)
+    @assertEqual(field_name, simcomp%field_name)
+
+    call simcomp%free()
+    select type(fluid => test_case%fluid)
+    type is (fluid_pnpn_t)
+       call fluid%c_Xh%free()
+    end select
+    deallocate(test_case%fluid)
+    call neko_registry%free()
+    call gs%free()
+    call dof%free()
+    call Xh%free()
+    call msh%free()
+  end subroutine test_init_long_names
+
   ! This builds the entire simcomp to test compute, without using a
   ! constructor.
   subroutine init_boundary_operation_for_compute_test(simcomp, fld, coef)

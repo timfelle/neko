@@ -164,10 +164,8 @@ contains
     call neko_log%section('Fluid stats')
     write(log_buf, '(A,E15.7)') 'Start time: ', start_time
     call neko_log%message(log_buf)
-    write(log_buf, '(A,A)') 'Set of statistics: ', trim(stat_set)
-    call neko_log%message(log_buf)
-    write(log_buf, '(A,A)') 'Averaging in direction: ', trim(hom_dir)
-    call neko_log%message(log_buf)
+    call neko_log%message('Set of statistics: ' // trim(stat_set))
+    call neko_log%message('Averaging in direction: ' // trim(hom_dir))
 
     call this%stats%init(coef, u, v, w, p, stat_set, name)
 

@@ -359,7 +359,6 @@ contains
   subroutine output_controller_set_counter(this, time)
     class(output_controller_t), intent(inout) :: this
     type(time_state_t), intent(in) :: time
-    character(len=LOG_SIZE) :: log_buf
     character(len=1024) :: output_fname
     integer :: i, nexecutions
     logical :: file_exists
@@ -387,8 +386,7 @@ contains
           inquire(file = trim(output_fname), exist = file_exists)
        end if
        if (file_exists) then
-          write(log_buf, '(A,A)') 'Overwriting from: ', trim(output_fname)
-          call neko_log%warning(log_buf)
+          call neko_log%warning('Overwriting from: ' // trim(output_fname))
        end if
     end do
 

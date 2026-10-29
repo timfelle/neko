@@ -253,10 +253,8 @@ contains
     end if
 
     call neko_log%section("Boundary operation")
-    write(log_buf, '(A,A)') "Name: ", trim(this%name)
-    call neko_log%message(log_buf)
-    write(log_buf, '(A,A)') "Field: ", trim(this%field_name)
-    call neko_log%message(log_buf)
+    call neko_log%message("Name: " // trim(this%name))
+    call neko_log%message("Field: " // trim(this%field_name))
     call neko_log%message("Operations:")
     do i = 1, size(this%operations)
        write(log_buf, '(A,A)') "  ", trim(this%operations(i))

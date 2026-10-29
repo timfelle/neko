@@ -218,7 +218,6 @@ contains
     character(len=*), intent(in) :: field_name
     real(kind=rp), intent(in), optional :: tol, pad, relaxation
     logical, intent(in), optional :: log
-    character(len=256) :: log_buf
 
     call this%init_base(coef)
     this%bc_type = BC_DIRICHLET
@@ -250,9 +249,8 @@ contains
     end if
 
     this%field_name = field_name
-    write (log_buf, '(A,A)') "Coupling overset interface for: ", &
-         trim(this%field_name)
-    call neko_log%message(log_buf)
+    call neko_log%message("Coupling overset interface for: " // &
+         trim(this%field_name))
 
     call this%bc_s%init_from_components(coef, this%field_name)
     call this%field_list%init(1)
