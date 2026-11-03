@@ -14,12 +14,6 @@
 
 ## Develop
 
-- Fixed a crash ("End of record") when a log, warning or error message does
-  not fit on one log line, e.g. with a fluid or scalar `name` too long to fit
-  on one log line, a long file name or path, a long simulation component,
-  field or zone name, a long list of zone indices, or the gravity
-  misalignment warning of the MOST and Richardson wall models. Field names in
-  the registry are still limited to 80 characters.
 - Reduced statistics memory usage by storing work/gradients in the scratch
   registry and folding product computations into the update routines.
 - Fixed an out-of-bounds read in the gather-scatter setup. The loop grouping
