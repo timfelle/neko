@@ -14,9 +14,6 @@
 
 ## Develop
 
-- Fixed the scalar step printing its solver header through an element one
-  past the end of the per-scalar Krylov results, which aborts bounds-checked
-  builds whenever a scalar is not frozen.
 - Reduced statistics memory usage by storing work/gradients in the scratch
   registry and folding product computations into the update routines.
 - Fixed an out-of-bounds read in the gather-scatter setup. The loop grouping
