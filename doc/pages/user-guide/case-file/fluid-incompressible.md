@@ -988,8 +988,8 @@ Additional keywords are available to modify the Brinkman force term.
 
 | Name                               | Description                                                                                   | Admissible values                 | Default value |
 | ---------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------- | ------------- |
-| `brinkman.limits`                  | Brinkman factor at free-flow (\f$ \kappa_0 \f$) and solid domain (\f$ \kappa_1 \f$).          | Vector of 2 reals.                | -             |
-| `brinkman.penalty`                 | Penalty parameter \f$ q \f$ when estimating Brinkman factor.                                  | Real                              | \f$ 1.0 \f$   |
+| `limits`                           | Brinkman factor at free-flow (\f$ \kappa_0 \f$) and solid domain (\f$ \kappa_1 \f$).          | Vector of 2 reals.                | -             |
+| `penalty`                          | Penalty parameter \f$ q \f$ when estimating Brinkman factor.                                  | Real                              | \f$ 1.0 \f$   |
 | `objects`                          | Array of JSON objects, defining the objects to be immersed.                                   | Each object must specify a `type` | -             |
 | `distance_transform.type`          | How to map from distance field to indicator field.                                            | `step`, `smooth_step`             | -             |
 | `distance_transform.value`         | Values used to define the distance transform, such as cut-off distance for the step function. | Real                              | -             |
@@ -1008,6 +1008,8 @@ the boundary mesh is computed using a step function with a cut-off distance of
 "source_terms": [
    {
       "type": "brinkman",
+      "limits": [0.0, 100.0],
+      "penalty": 1.0,
       "objects": [
          {
             "type": "boundary_mesh",
@@ -1021,16 +1023,9 @@ the boundary mesh is computed using a step function with a cut-off distance of
          },
          {
             "type": "point_zone",
-            "name": "cylinder_zone",
-            "filter": {
-               "type": "none"
-            }
+            "name": "cylinder_zone"
          }
-      ],
-      "brinkman": {
-         "limits": [0.0, 100.0],
-         "penalty": 1.0
-      }
+      ]
    }
 ]
 ~~~~~~~~~~~~~~~
