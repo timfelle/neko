@@ -20,7 +20,92 @@ subroutine test_krylov_free
   integer :: i
 
   ! UPDATE once redesign is done
-  
+
 end subroutine test_krylov_free
+
+!> A solve whose residual meets the tolerance on its last allowed iteration
+!! has converged: max_iter caps the iterations, it is not the verdict.
+@test
+subroutine test_krylov_converged_on_last_iteration
+  use pfunit
+  use num_types, only : rp
+  use cg, only : cg_t
+  implicit none
+  type(cg_t), target :: ksp
+  integer, parameter :: max_iter = 5
+  real(kind=rp), parameter :: tol = 1.0e-8_rp
+
+  call ksp%init(1, max_iter, abs_tol = tol)
+
+  @assertTrue(ksp%is_converged(max_iter, 0.5_rp * tol))
+
+  call ksp%free()
+
+end subroutine test_krylov_converged_on_last_iteration
+
+!> A solve can stop past max_iter, as a communication-avoiding solver does
+!! when it takes several iterations per step, or when a solve is given more
+!! iterations than max_iter. Its residual still decides the verdict.
+@test
+subroutine test_krylov_converged_past_max_iter
+  use pfunit
+  use num_types, only : rp
+  use cg, only : cg_t
+  implicit none
+  type(cg_t), target :: ksp
+  integer, parameter :: max_iter = 5
+  real(kind=rp), parameter :: tol = 1.0e-8_rp
+
+  call ksp%init(1, max_iter, abs_tol = tol)
+
+  @assertTrue(ksp%is_converged(max_iter + 3, 0.5_rp * tol))
+
+  call ksp%free()
+
+end subroutine test_krylov_converged_past_max_iter
+
+!> A solve whose residual meets the tolerance before the last allowed
+!! iteration has converged, as it did before the iteration count was
+!! dropped from the verdict.
+@test
+subroutine test_krylov_converged_before_last_iteration
+  use pfunit
+  use num_types, only : rp
+  use cg, only : cg_t
+  implicit none
+  type(cg_t), target :: ksp
+  integer, parameter :: max_iter = 5
+  real(kind=rp), parameter :: tol = 1.0e-8_rp
+
+  call ksp%init(1, max_iter, abs_tol = tol)
+
+  @assertTrue(ksp%is_converged(1, 0.5_rp * tol))
+  @assertTrue(ksp%is_converged(max_iter - 1, tol))
+
+  call ksp%free()
+
+end subroutine test_krylov_converged_before_last_iteration
+
+!> A solve whose residual is above the tolerance has not converged, whether
+!! it stopped before, on, or after its last allowed iteration.
+@test
+subroutine test_krylov_not_converged_above_tolerance
+  use pfunit
+  use num_types, only : rp
+  use cg, only : cg_t
+  implicit none
+  type(cg_t), target :: ksp
+  integer, parameter :: max_iter = 5
+  real(kind=rp), parameter :: tol = 1.0e-8_rp
+
+  call ksp%init(1, max_iter, abs_tol = tol)
+
+  @assertFalse(ksp%is_converged(1, 2.0_rp * tol))
+  @assertFalse(ksp%is_converged(max_iter, 2.0_rp * tol))
+  @assertFalse(ksp%is_converged(max_iter + 1, 2.0_rp * tol))
+
+  call ksp%free()
+
+end subroutine test_krylov_not_converged_above_tolerance
 
 end module test_krylov

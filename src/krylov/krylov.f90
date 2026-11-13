@@ -1,4 +1,4 @@
-! Copyright (c) 2020-2023, The Neko Authors
+! Copyright (c) 2020-2026, The Neko Authors
 ! All rights reserved.
 !
 ! Redistribution and use in source and binary forms, with or without
@@ -449,20 +449,21 @@ contains
   !> Check for convergence
   !!
   !! This function checks if the Krylov solver has converged.
-  !! The solver is considered converged if the residual is less than the
-  !! absolute tolerance.
+  !! The solver is considered converged if the residual is at most the
+  !! absolute tolerance. The iteration count does not decide it: `max_iter`
+  !! only caps the iterations of a solve, so a solve that reaches the
+  !! tolerance on its last allowed iteration has converged.
   !!
+  !! @param iter Iteration number. It does not affect the result, and is kept
+  !! so that solvers can call this function unchanged.
   !! @param residual Residual
-  !! @param iter Iteration number
   pure function krylov_is_converged(this, iter, residual) result(converged)
     class(ksp_t), intent(in) :: this
     integer, intent(in) :: iter
     real(kind=rp), intent(in) :: residual
     logical :: converged
 
-    converged = .true.
-    if (iter .ge. this%max_iter) converged = .false.
-    if (residual .gt. this%abs_tol) converged = .false.
+    converged = residual .le. this%abs_tol
 
   end function krylov_is_converged
 
