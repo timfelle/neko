@@ -94,6 +94,8 @@ module PDE_filter
      character(len=:), allocatable :: ksp_solver
      ! > preconditioner type
      character(len=:), allocatable :: precon_type_filt
+     !> Whether a filter solve that does not converge is an error
+     logical :: strict_convergence = .false.
      integer :: ksp_n, n, i
 
 
@@ -120,6 +122,7 @@ contains
     real(kind=rp) :: r, tol
     integer :: max_iter
     character(len=:), allocatable :: ksp_solver, precon_type
+    logical :: strict_convergence
 
     ! user parameters
     call json_get(json, "radius", r)
@@ -127,20 +130,31 @@ contains
     call json_get_or_default(json, "max_iter", max_iter, 200)
     call json_get_or_default(json, "solver", ksp_solver, "cg")
     call json_get_or_default(json, "preconditioner", precon_type, "jacobi")
+    call json_get_or_default(json, "strict_convergence", strict_convergence, &
+         .false.)
 
     call this%init_from_components(coef, r, tol, max_iter, ksp_solver, &
-         precon_type)
+         precon_type, strict_convergence)
 
   end subroutine PDE_filter_init_from_json
 
   !> Actual constructor.
+  !! @param coef The SEM coefficients.
+  !! @param r The filter radius.
+  !! @param tol The absolute tolerance of the filter solve.
+  !! @param max_iter The maximum number of iterations of the filter solve.
+  !! @param ksp_solver The Krylov solver of the filter solve.
+  !! @param precon_type The preconditioner of the filter solve.
+  !! @param strict_convergence Whether a filter solve that does not converge
+  !! is an error rather than a warning, optional, defaults to false.
   subroutine PDE_filter_init_from_components(this, coef, r, tol, max_iter, &
-       ksp_solver, precon_type)
+       ksp_solver, precon_type, strict_convergence)
     class(PDE_filter_t), intent(inout) :: this
     type(coef_t), target, intent(in) :: coef
     real(kind=rp), intent(in) :: r, tol
     integer, intent(in) :: max_iter
     character(len=*), intent(in) :: ksp_solver, precon_type
+    logical, intent(in), optional :: strict_convergence
     integer :: n
 
     call this%init_base(coef)
@@ -150,6 +164,11 @@ contains
     this%ksp_max_iter = max_iter
     this%ksp_solver = ksp_solver
     this%precon_type_filt = precon_type
+    if (present(strict_convergence)) then
+       this%strict_convergence = strict_convergence
+    else
+       this%strict_convergence = .false.
+    end if
 
     ! set the number of dofs
     n = this%coef%dof%size()
@@ -203,6 +222,8 @@ contains
   end subroutine PDE_filter_free
 
   !> Apply the filter
+  !! A filter solve that does not converge is reported with a warning in the
+  !! log, or with an error under strict convergence.
   !! @param this the filter
   !! @param F_out filtered field
   !! @param F_in unfiltered field
@@ -291,6 +312,17 @@ contains
     call neko_log%end_section()
 
     call neko_scratch_registry%relinquish_field(temp_indices)
+
+    ! A solve stopped by max_iter leaves the field partially filtered, so
+    ! report it rather than use it silently.
+    if (.not. this%ksp_results(1)%converged) then
+       log_buf = 'PDE filter solver did not converge'
+       if (this%strict_convergence) then
+          call neko_error(log_buf)
+       else
+          call neko_log%warning(log_buf)
+       end if
+    end if
 
   end subroutine PDE_filter_apply
 

@@ -29,7 +29,13 @@ following input parameters:
 | `max_iter` | Maximum number of iterations when solving the system. | Integer | `200` |
 | `solver` | Numerical solver used to solve the system. | `cg`,`gmres`, `gmres` | `cg` |
 | `preconditioner` | Pre-conditioner used to solve the system. | `ident`, `hsmg`, `jacobi` | `jacobi`  |
+| `strict_convergence` | Stop with an error when a filter solve does not converge. | `true` or `false` | `false` |
 
+A filter solve that does not reach its tolerance within `max_iter` iterations
+is reported with a warning in the log, and the unconverged result is used. With
+`"strict_convergence": true` the run stops with an error instead. The filter
+does not follow `case.fluid.strict_convergence`; set the key on each filter
+that needs it.
 
 
 ## Elementwise filter {#filter_elementwise}

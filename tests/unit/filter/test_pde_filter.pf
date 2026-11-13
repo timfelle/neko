@@ -1,0 +1,287 @@
+! Tests that PDE_filter_t reports a filter solve that does not converge,
+! rather than returning the unconverged field silently, and that a solve
+! which reaches the tolerance on its last allowed iteration has converged.
+!
+! Each filter is set up from JSON, as a case file does, on a single unit hex
+! element at polynomial order 7 (lx = 8), and filters an impulse at an
+! interior node. Every filter run builds a fresh fixture: the filter sets the
+! Helmholtz coefficients in coef, and its Jacobi preconditioner is built from
+! them, so only a fresh fixture makes equal settings give an equal solve.
+!
+! A warning is found in the log, which each run writes to log_fname. An error
+! is found as the pFUnit exception that error_redirection turns it into.
+module test_pde_filter
+  use mpi
+  use pfunit
+  use funit, only : catch
+  use num_types, only : rp
+  use comm, only : NEKO_COMM, pe_rank, pe_size
+  use pfunit_comm_utils, only : comm_init_test, comm_free_test
+  use device, only : device_init, device_finalize, device_memcpy, &
+       HOST_TO_DEVICE
+  use neko_config, only : NEKO_BCKND_DEVICE
+  use neko_mpi_types, only : neko_mpi_types_init, neko_mpi_types_free
+  use mesh_fixture, only : single_unit_hex_mesh
+  use error_redirection, only : redirect_errors, restore_errors
+  use mesh, only : mesh_t
+  use space, only : space_t, GLL
+  use dofmap, only : dofmap_t
+  use gather_scatter, only : gs_t
+  use coefs, only : coef_t
+  use field, only : field_t
+  use PDE_filter, only : PDE_filter_t
+  use json_module, only : json_file
+  use scratch_registry, only : neko_scratch_registry
+  use logger, only : neko_log
+  use, intrinsic :: iso_c_binding, only : c_char, c_int, c_null_char
+  implicit none
+
+  !> Polynomial order of the test space (order 7 => lx = 8).
+  integer, parameter :: LX = 8
+
+  !> Name of the log file written by each filter run.
+  character(len=*), parameter :: log_fname = 'test_pde_filter.log'
+
+  !> Text of the warning logged for an unconverged filter solve.
+  character(len=*), parameter :: warning_text = &
+       'PDE filter solver did not converge'
+
+  !> A filter that cannot converge: the tolerance is below round-off and the
+  !! solve is stopped after a few iterations.
+  character(len=*), parameter :: unconverged_json = &
+       '{"radius": 0.2, "tolerance": 1.0e-30, "max_iter": 5}'
+
+  !> The same filter with strict convergence.
+  character(len=*), parameter :: strict_unconverged_json = &
+       '{"radius": 0.2, "tolerance": 1.0e-30, "max_iter": 5, ' // &
+       '"strict_convergence": true}'
+
+  !> A filter with the default tolerance and iteration cap, and strict
+  !! convergence.
+  character(len=*), parameter :: strict_converged_json = &
+       '{"radius": 0.2, "strict_convergence": true}'
+
+  interface
+     function c_setenv(name, val, overwrite) bind(c, name = 'setenv') &
+          result(ierr)
+       import :: c_char, c_int
+       character(kind=c_char), dimension(*), intent(in) :: name
+       character(kind=c_char), dimension(*), intent(in) :: val
+       integer(c_int), value :: overwrite
+       integer(c_int) :: ierr
+     end function c_setenv
+
+     function c_unsetenv(name) bind(c, name = 'unsetenv') result(ierr)
+       import :: c_char, c_int
+       character(kind=c_char), dimension(*), intent(in) :: name
+       integer(c_int) :: ierr
+     end function c_unsetenv
+  end interface
+
+  @TestCase
+  type, extends(MPITestCase) :: test_pde_filter_case
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_pde_filter_case
+
+contains
+
+  subroutine setUp(this)
+    class(test_pde_filter_case), intent(inout) :: this
+    call comm_init_test(this%getMpiCommunicator())
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_init
+    end if
+    call neko_mpi_types_init()
+    ! An error raised by a filter becomes a pFUnit exception, which the run
+    ! catches, in place of stopping the suite.
+    call redirect_errors()
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_pde_filter_case), intent(inout) :: this
+    call restore_errors()
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_finalize
+    end if
+    call neko_mpi_types_free()
+    call comm_free_test()
+  end subroutine tearDown
+
+  !> Point the global log at log_fname.
+  subroutine open_log()
+    integer(c_int) :: ierr
+
+    ierr = c_setenv('NEKO_LOG_FILE' // c_null_char, &
+         log_fname // c_null_char, 1_c_int)
+    @assertEqual(0, ierr)
+    call neko_log%init()
+  end subroutine open_log
+
+  !> Close the log opened by open_log, count its lines that report an
+  !! unconverged filter solve, and delete it. The log is closed first, as a
+  !! file may not be connected to two units at once.
+  !! @return The number of warnings.
+  function close_log() result(n)
+    integer :: n
+    character(len=1024) :: line
+    integer :: log_unit, stat
+    integer(c_int) :: ierr
+
+    call neko_log%free()
+    ierr = c_unsetenv('NEKO_LOG_FILE' // c_null_char)
+
+    n = 0
+    open(newunit = log_unit, file = log_fname, status = 'old', &
+         action = 'read')
+    do
+       read(log_unit, '(A)', iostat = stat) line
+       if (stat .ne. 0) exit
+       if (index(line, warning_text) .gt. 0) n = n + 1
+    end do
+    close(log_unit, status = 'delete')
+  end function close_log
+
+  !> Filter an impulse with a filter set up from @a json_string on a fresh
+  !! fixture, and record what its solve reported.
+  !! @param json_string The JSON object of the filter.
+  !! @param converged Whether the solve converged.
+  !! @param iter The iteration count of the solve.
+  !! @param raised Whether the filter raised an error.
+  !! @param n_warnings The number of unconverged solve warnings logged.
+  subroutine run_filter(json_string, converged, iter, raised, n_warnings)
+    character(len=*), intent(in) :: json_string
+    logical, intent(out) :: converged, raised
+    integer, intent(out) :: iter, n_warnings
+    type(mesh_t) :: msh
+    type(space_t) :: Xh
+    type(dofmap_t) :: dof
+    type(gs_t) :: gs
+    type(coef_t), target :: coef
+    type(PDE_filter_t) :: filter
+    type(json_file) :: json
+    type(field_t) :: f_in, f_out
+
+    call single_unit_hex_mesh(msh)
+    call Xh%init(GLL, LX, LX, LX)
+    call dof%init(msh, Xh)
+    call gs%init(dof)
+    call coef%init(gs)
+    call neko_scratch_registry%init(dof = dof)
+
+    call json%initialize()
+    call json%load_from_string(json_string)
+    call filter%init(json, coef)
+
+    call f_in%init(dof, 'f_in')
+    call f_out%init(dof, 'f_out')
+    f_in%x = 0.0_rp
+    f_in%x(4, 4, 4, 1) = 1.0_rp
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(f_in%x, f_in%x_d, f_in%size(), HOST_TO_DEVICE, &
+            .true.)
+    end if
+
+    call open_log()
+    call filter%apply(f_out, f_in)
+    raised = catch()
+    n_warnings = close_log()
+
+    converged = filter%ksp_results(1)%converged
+    iter = filter%ksp_results(1)%iter
+
+    call f_in%free()
+    call f_out%free()
+    call filter%free()
+    call json%destroy()
+    call neko_scratch_registry%free()
+    call coef%free()
+    call gs%free()
+    call dof%free()
+    call Xh%free()
+    call msh%free()
+  end subroutine run_filter
+
+  !> An unconverged solve logs one warning and raises no error.
+  @test(npes=[1])
+  subroutine test_unconverged_solve_warns(this)
+    class(test_pde_filter_case), intent(inout) :: this
+    logical :: converged, raised
+    integer :: iter, n_warnings
+
+    call run_filter(unconverged_json, converged, iter, raised, n_warnings)
+
+    @assertFalse(converged, 'The solve converged')
+    @assertFalse(raised, 'The filter raised an error')
+    @assertEqual(1, n_warnings, 'Warnings logged')
+  end subroutine test_unconverged_solve_warns
+
+  !> With strict convergence, an unconverged solve raises an error in place
+  !! of the warning.
+  @test(npes=[1])
+  subroutine test_strict_unconverged_solve_errors(this)
+    class(test_pde_filter_case), intent(inout) :: this
+    logical :: converged, raised
+    integer :: iter, n_warnings
+
+    call run_filter(strict_unconverged_json, converged, iter, raised, &
+         n_warnings)
+
+    @assertFalse(converged, 'The solve converged')
+    @assertTrue(raised, 'The filter raised no error')
+    @assertEqual(0, n_warnings, 'Warnings logged')
+  end subroutine test_strict_unconverged_solve_errors
+
+  !> A converged solve neither warns nor raises an error, even with strict
+  !! convergence. This also shows that the default tolerance is reached on
+  !! this mesh, so the unconverged solves above stop because of their cap.
+  @test(npes=[1])
+  subroutine test_converged_solve_is_silent(this)
+    class(test_pde_filter_case), intent(inout) :: this
+    logical :: converged, raised
+    integer :: iter, n_warnings
+
+    call run_filter(strict_converged_json, converged, iter, raised, &
+         n_warnings)
+
+    @assertTrue(converged, 'The solve did not converge')
+    @assertFalse(raised, 'The filter raised an error')
+    @assertEqual(0, n_warnings, 'Warnings logged')
+  end subroutine test_converged_solve_is_silent
+
+  !> A solve capped at exactly the iterations it needs reaches the tolerance
+  !! on its last allowed iteration, so it has converged: a strict filter
+  !! neither warns nor raises an error. One iteration fewer is not enough.
+  @test(npes=[1])
+  subroutine test_solve_converged_on_last_iteration(this)
+    class(test_pde_filter_case), intent(inout) :: this
+    logical :: converged, raised
+    integer :: iter, needed, n_warnings
+    character(len=128) :: json_string
+
+    ! The iterations the solve needs under the default cap.
+    call run_filter(strict_converged_json, converged, needed, raised, &
+         n_warnings)
+    @assertTrue(converged, 'The uncapped solve did not converge')
+    @assertTrue(needed .gt. 1, 'The solve needs a single iteration')
+
+    write(json_string, '(A,I0,A)') '{"radius": 0.2, "max_iter": ', needed, &
+         ', "strict_convergence": true}'
+    call run_filter(trim(json_string), converged, iter, raised, n_warnings)
+
+    @assertTrue(converged, 'The solve capped at its iterations failed')
+    @assertEqual(needed, iter, 'Iterations of the capped solve')
+    @assertFalse(raised, 'The capped solve raised an error')
+    @assertEqual(0, n_warnings, 'Warnings logged by the capped solve')
+
+    write(json_string, '(A,I0,A)') '{"radius": 0.2, "max_iter": ', &
+         needed - 1, '}'
+    call run_filter(trim(json_string), converged, iter, raised, n_warnings)
+
+    @assertFalse(converged, 'The solve capped below its iterations converged')
+    @assertFalse(raised, 'The solve capped below its iterations raised')
+    @assertEqual(1, n_warnings, 'Warnings logged by the under-capped solve')
+  end subroutine test_solve_converged_on_last_iteration
+
+end module test_pde_filter

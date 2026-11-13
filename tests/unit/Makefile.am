@@ -56,6 +56,7 @@ SUBDIRS = tuple\
 	  geo_compression\
 	  restart_consistency\
 	  crystal_router\
+	  filter\
 	  templates/serial
 
 TESTS = device/device_test\
@@ -116,6 +117,7 @@ TESTS = device/device_test\
 	geo_compression/geo_compression_test\
 	restart_consistency/restart_consistency_test\
 	crystal_router/crystal_router_test\
+	filter/filter_test\
 	templates/serial/serial_test
 
 # Note we need to list .pf and runner scripts manually
@@ -226,6 +228,8 @@ EXTRA_DIST = \
 	geo_compression/geo_compression_test\
 	restart_consistency/test_restart_consistency.pf\
 	restart_consistency/restart_consistency_test\
+	filter/test_pde_filter.pf\
+	filter/filter_test\
 	templates/parallel/test_parallel.pf\
 	templates/parallel/parallel_test\
 	checkpoint_payload/test_checkpoint_payload.pf\

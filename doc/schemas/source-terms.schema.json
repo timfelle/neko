@@ -462,6 +462,9 @@
             },
             "preconditioner": {
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
+            },
+            "strict_convergence": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false
