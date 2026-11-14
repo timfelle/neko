@@ -1,0 +1,47 @@
+USEMPI=YES
+ifneq ("$(wildcard @PFUNIT_DIR@/include/PFUNIT.mk)", "")
+include @PFUNIT_DIR@/include/PFUNIT.mk
+endif
+FFLAGS += $(PFUNIT_EXTRA_FFLAGS) @NEKO_PKG_FCFLAGS@ -I@top_builddir@/src
+FC = @FC@
+
+# Depend on the library so the test objects follow any change to Neko.
+NEKO_LIB := $(wildcard @top_builddir@/src/libneko.la)
+
+%.o : %.F90 $(NEKO_LIB)
+	$(FC) -c $(FFLAGS) $<
+
+# The fixtures are compiled here, not in ../fixtures, so that their module
+# files end up in this directory whatever other suite has compiled them before.
+mesh_fixture.o : ../fixtures/mesh_fixture.f90 $(NEKO_LIB)
+	$(FC) -c $(FFLAGS) -o $@ $<
+error_redirection.o : ../fixtures/error_redirection.f90 $(NEKO_LIB)
+	$(FC) -c $(FFLAGS) -o $@ $<
+
+check: brinkman_suite
+
+# Regenerate this Makefile from Makefile.in via config.status
+# whenever it changes.
+SUBDIR := $(patsubst $(abspath @top_builddir@)/%,%,$(CURDIR))
+
+Makefile: Makefile.in @top_builddir@/config.status
+	cd @top_builddir@ && $(SHELL) ./config.status $(SUBDIR)/Makefile
+
+
+brinkman_suite_TESTS := test_brinkman.pf
+brinkman_suite_OTHER_SOURCES = mesh_fixture.f90 error_redirection.f90
+brinkman_suite_OTHER_LIBRARIES = -L@top_builddir@/src/.libs -lneko @LDFLAGS@ @LIBS@
+$(eval $(call make_pfunit_test,brinkman_suite))
+brinkman_suite.inc: Makefile
+test_brinkman.o: mesh_fixture.o error_redirection.o
+
+distclean:
+clean:
+	$(RM) *.o *.mod *.a *.inc *.F90 brinkman_suite
+
+
+
+all:
+html:
+install:
+distdir:

@@ -71,6 +71,12 @@ module brinkman_source_term
   implicit none
   private
 
+  !> A helper type that is needed to have an array of polymorphic filters.
+  type :: filter_wrapper_t
+     !> Wrapped polymorphic filter, not allocated for no filtering.
+     class(filter_t), allocatable :: filter
+  end type filter_wrapper_t
+
   !> A Brinkman source term.
   !! The region and strength are controlled by assigning regions types and
   !! brinkman limits to the source term.
@@ -85,6 +91,8 @@ module brinkman_source_term
      type(field_t), pointer :: brinkman => null()
      !> Filter
      class(filter_t), allocatable :: filter
+     !> The filters of the objects that have a filter of their own, by object.
+     type(filter_wrapper_t), allocatable :: object_filters(:)
 
    contains
      !> The common constructor using a JSON object.
@@ -99,6 +107,7 @@ module brinkman_source_term
      ! Internal subroutines for adding a given object type to the Brinkman
      ! source term
 
+     procedure, pass(this) :: add_object
      procedure, pass(this) :: add_boundary_mesh
      procedure, pass(this) :: add_point_zone
      procedure, pass(this) :: add_file
@@ -124,15 +133,15 @@ contains
     type(coef_t), intent(in), target :: coef
     character(len=*), intent(in) :: variable_name
     real(kind=rp) :: start_time, end_time
-    character(len=LOG_SIZE) :: error_msg
 
-    character(len=:), allocatable :: filter_type
     real(kind=rp), dimension(:), allocatable :: brinkman_limits
     real(kind=rp) :: brinkman_penalty
 
-    character(len=:), allocatable :: object_type
-    type(json_file) :: object_settings, filter_settings
+    type(json_file) :: object_settings
     integer :: n_objects, i
+    logical :: any_object_filter
+    type(field_t), pointer :: object_field, filtered_field
+    integer :: object_idx, filtered_idx
 
     type(file_t) :: output
     type(field_list_t) :: output_fields
@@ -181,55 +190,74 @@ contains
     this%brinkman => neko_registry%get_field('brinkman_permeability')
 
     ! ------------------------------------------------------------------------ !
-    ! Select which constructor should be called
+    ! Add the objects without a filter of their own to the indicator field
 
     call json%info('objects', n_children = n_objects)
+    allocate(this%object_filters(n_objects))
+    any_object_filter = .false.
 
+    ! The filters of the other objects are only set up here, and applied
+    ! below. A PDE filter takes its preconditioner from the state of the SEM
+    ! coefficients when it is set up, and applying a PDE filter changes that
+    ! state, so all filters are set up before any of them is applied.
     do i = 1, n_objects
        call json_extract_item(json, "objects", i, object_settings)
-       call json_get(object_settings, 'type', object_type)
 
-       select case (object_type)
-       case ('boundary_mesh')
-          call this%add_boundary_mesh(object_settings)
-       case ('point_zone')
-          call this%add_point_zone(object_settings)
-       case ('field')
-          call this%add_field(object_settings)
-       case ('file')
-          call this%add_file(object_settings)
-
-       case default
-          write(error_msg, '(A,I0,A,A)') 'Brinkman object: ', i, &
-               ' unknown type: ', trim(object_type)
-          call neko_error(trim(error_msg))
-       end select
-
+       if (object_settings%valid_path('filter')) then
+          call init_filter(this%object_filters(i)%filter, object_settings, &
+               coef)
+          any_object_filter = any_object_filter .or. &
+               allocated(this%object_filters(i)%filter)
+       else
+          call this%add_object(object_settings, i, this%indicator)
+       end if
     end do
 
     ! ------------------------------------------------------------------------ !
-    ! Filter the indicator field
+    ! Filter the indicator field with the top-level filter
 
-    call json_get_or_default(json, 'filter.type', filter_type, 'none')
-    select case (filter_type)
-    case ('PDE')
+    call init_filter(this%filter, json, coef)
 
+    if (allocated(this%filter) .or. any_object_filter) then
        ! Copy the current indicator to unfiltered (essentially a rename)
        call neko_registry%add_field(coef%dof, 'brinkman_unfiltered', .true.)
        this%unfiltered => neko_registry%get_field('brinkman_unfiltered')
        call field_copy(this%unfiltered, this%indicator)
+    end if
 
-       ! Allocate a PDE filter
-       allocate(PDE_filter_t::this%filter)
-       call json_get(json, 'filter', filter_settings)
-       call this%filter%init(filter_settings, coef)
+    if (allocated(this%filter)) then
        call this%filter%apply(this%indicator, this%unfiltered)
+    end if
 
-    case ('none')
-       ! Do nothing
-    case default
-       call neko_error('Brinkman source term unknown filter type')
-    end select
+    ! ------------------------------------------------------------------------ !
+    ! Add the objects with a filter of their own, each filtered separately.
+    ! The unfiltered indicator gets the unfiltered object.
+
+    do i = 1, n_objects
+       call json_extract_item(json, "objects", i, object_settings)
+       if (.not. object_settings%valid_path('filter')) cycle
+
+       call neko_scratch_registry%request_field(object_field, object_idx, &
+            .true.)
+       call this%add_object(object_settings, i, object_field)
+
+       if (associated(this%unfiltered)) then
+          call field_pwmax2(this%unfiltered, object_field)
+       end if
+
+       if (allocated(this%object_filters(i)%filter)) then
+          call neko_scratch_registry%request_field(filtered_field, &
+               filtered_idx, .false.)
+          call this%object_filters(i)%filter%apply(filtered_field, &
+               object_field)
+          call field_pwmax2(this%indicator, filtered_field)
+          call neko_scratch_registry%relinquish(filtered_idx)
+       else
+          call field_pwmax2(this%indicator, object_field)
+       end if
+
+       call neko_scratch_registry%relinquish(object_idx)
+    end do
 
     ! ------------------------------------------------------------------------ !
     ! Compute the permeability field
@@ -290,6 +318,7 @@ contains
   !> Destructor.
   subroutine brinkman_source_term_free(this)
     class(brinkman_source_term_t), intent(inout) :: this
+    integer :: i
 
     if (associated(this%indicator)) nullify(this%indicator)
     if (associated(this%unfiltered)) nullify(this%unfiltered)
@@ -298,6 +327,16 @@ contains
     if (allocated(this%filter)) then
        call this%filter%free()
        deallocate(this%filter)
+    end if
+
+    if (allocated(this%object_filters)) then
+       do i = 1, size(this%object_filters)
+          if (allocated(this%object_filters(i)%filter)) then
+             call this%object_filters(i)%filter%free()
+             deallocate(this%object_filters(i)%filter)
+          end if
+       end do
+       deallocate(this%object_filters)
     end if
     call this%free_base()
 
@@ -332,15 +371,74 @@ contains
   ! ========================================================================== !
   ! Private methods
 
-  !> Initializes the source term from a boundary mesh.
-  subroutine add_boundary_mesh(this, json)
+  !> Sets up the filter given by the `filter` object of a JSON object.
+  !! @param filter The filter, left unallocated for the filter type `none`.
+  !! @param json The JSON object holding the `filter` object.
+  !! @param coef The SEM coefficients.
+  subroutine init_filter(filter, json, coef)
+    class(filter_t), allocatable, intent(inout) :: filter
+    type(json_file), intent(inout) :: json
+    type(coef_t), intent(in), target :: coef
+    character(len=:), allocatable :: filter_type
+    type(json_file) :: filter_settings
+
+    call json_get_or_default(json, 'filter.type', filter_type, 'none')
+    select case (filter_type)
+    case ('PDE')
+       allocate(PDE_filter_t::filter)
+       call json_get(json, 'filter', filter_settings)
+       call filter%init(filter_settings, coef)
+    case ('none')
+       ! Do nothing
+    case default
+       call neko_error('Brinkman source term unknown filter type')
+    end select
+
+  end subroutine init_filter
+
+  !> Adds an object to an indicator field by a point-wise max operator.
+  !! @param json The JSON object of the object.
+  !! @param i The index of the object in the `objects` array.
+  !! @param indicator The indicator field to add the object to.
+  subroutine add_object(this, json, i, indicator)
     class(brinkman_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
+    integer, intent(in) :: i
+    type(field_t), intent(inout) :: indicator
+    character(len=:), allocatable :: object_type
+    character(len=LOG_SIZE) :: error_msg
+
+    call json_get(json, 'type', object_type)
+
+    select case (object_type)
+    case ('boundary_mesh')
+       call this%add_boundary_mesh(json, indicator)
+    case ('point_zone')
+       call this%add_point_zone(json, indicator)
+    case ('field')
+       call this%add_field(json, indicator)
+    case ('file')
+       call this%add_file(json, indicator)
+
+    case default
+       write(error_msg, '(A,I0)') 'Brinkman object: ', i
+       call neko_error(trim(error_msg) // ' unknown type: ' // &
+            trim(object_type))
+    end select
+
+  end subroutine add_object
+
+  !> Initializes the source term from a boundary mesh.
+  !! @param json The JSON object of the boundary mesh.
+  !! @param indicator The indicator field to add the boundary mesh to.
+  subroutine add_boundary_mesh(this, json, indicator)
+    class(brinkman_source_term_t), intent(inout) :: this
+    type(json_file), intent(inout) :: json
+    type(field_t), intent(inout) :: indicator
 
     ! Options
     character(len=:), allocatable :: mesh_file_name
     character(len=:), allocatable :: distance_transform
-    character(len=:), allocatable :: filter_type
     character(len=:), allocatable :: mesh_transform
 
     ! Read the options for the boundary mesh
@@ -397,8 +495,8 @@ contains
           call cache_file%read(cache_data)
           call cache_data%import_fields(p = temp_field)
 
-          ! Update the global indicator field by max operator
-          call field_pwmax2(this%indicator, temp_field)
+          ! Update the indicator field by max operator
+          call field_pwmax2(indicator, temp_field)
 
           ! Clean up
           call neko_scratch_registry%relinquish(temp_idx)
@@ -506,17 +604,20 @@ contains
        call cache_output%sample(0.0_dp)
     end if
 
-    ! Update the global indicator field by max operator
-    call field_pwmax2(this%indicator, temp_field)
+    ! Update the indicator field by max operator
+    call field_pwmax2(indicator, temp_field)
 
     call neko_scratch_registry%relinquish(temp_idx)
 
   end subroutine add_boundary_mesh
 
   !> Initializes the source term from a point zone.
-  subroutine add_point_zone(this, json)
+  !! @param json The JSON object of the point zone.
+  !! @param indicator The indicator field to add the point zone to.
+  subroutine add_point_zone(this, json, indicator)
     class(brinkman_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
+    type(field_t), intent(inout) :: indicator
 
     ! Options
     character(len=:), allocatable :: zone_name
@@ -543,16 +644,19 @@ contains
             zone%mask%get(), zone%size)
     end if
 
-    ! Update the global indicator field by max operator
-    call field_pwmax2(this%indicator, temp_field)
+    ! Update the indicator field by max operator
+    call field_pwmax2(indicator, temp_field)
 
     call neko_scratch_registry%relinquish(temp_idx)
   end subroutine add_point_zone
 
   !> Initializes the source term from a file.
-  subroutine add_file(this, json)
+  !! @param json The JSON object of the file.
+  !! @param indicator The indicator field to add the file to.
+  subroutine add_file(this, json, indicator)
     class(brinkman_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
+    type(field_t), intent(inout) :: indicator
     type(file_t) :: file
     type(field_t), pointer :: temp_field
     character(len=:), allocatable :: file_name, field_name, tmp_str
@@ -631,8 +735,8 @@ contains
        call neko_error("Brinkman cannot read file: " // trim(file_name))
     end select
 
-    ! Update the global indicator field by max operator
-    call field_pwmax2(this%indicator, temp_field)
+    ! Update the indicator field by max operator
+    call field_pwmax2(indicator, temp_field)
 
     call neko_scratch_registry%relinquish(temp_idx)
     call file%free()
@@ -640,9 +744,12 @@ contains
   end subroutine add_file
 
   !> Initializes the source term from a field.
-  subroutine add_field(this, json)
+  !! @param json The JSON object of the field.
+  !! @param indicator The indicator field to add the field to.
+  subroutine add_field(this, json, indicator)
     class(brinkman_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
+    type(field_t), intent(inout) :: indicator
     character(len=:), allocatable :: field_name
     type(field_t), pointer :: temp_field
 
@@ -650,8 +757,8 @@ contains
     call json_get(json, 'name', field_name)
     temp_field => neko_registry%get_field(field_name)
 
-    ! Update the global indicator field by max operator
-    call field_pwmax2(this%indicator, temp_field)
+    ! Update the indicator field by max operator
+    call field_pwmax2(indicator, temp_field)
 
     if (associated(temp_field)) nullify(temp_field)
 

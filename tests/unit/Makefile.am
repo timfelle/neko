@@ -49,6 +49,7 @@ SUBDIRS = tuple\
 	  templates/parallel\
 	  bc_projector\
 	  boundary_operation\
+	  brinkman\
 	  checkpoint_payload\
 	  wall_sampling\
 	  map_1d\
@@ -109,6 +110,7 @@ TESTS = device/device_test\
 	templates/parallel/parallel_test\
 	bc_projector/bc_projector_test\
 	boundary_operation/boundary_operation_test\
+	brinkman/brinkman_test\
 	checkpoint_payload/checkpoint_payload_test\
 	wall_sampling/wall_sampling_test\
 	map_1d/map_1d_test\
@@ -214,6 +216,8 @@ EXTRA_DIST = \
 	bc_projector/test_bc_projector.pf\
 	bc_projector/test_coupled_bc_projector.pf\
 	boundary_operation/test_boundary_operation.pf\
+	brinkman/test_brinkman.pf\
+	brinkman/brinkman_test\
 	wall_sampling/test_base.pf\
 	wall_sampling/test_gll.pf\
 	wall_sampling/test_distance.pf\

@@ -958,9 +958,9 @@ types are currently implemented.
    to specify the field name in the file, which should be done by setting the
    `field_name` keyword.
 
-Each object are added to a common indicator field by means of a point-wise max
-operator. This means that the indicator field will be the union of all the
-regions defined by the objects.
+Each object is added to a common indicator field, which is initially zero, by
+means of a point-wise max operator. This means that the indicator field will be
+the union of all the regions defined by the objects.
 
 To assist correct placement and scaling of objects from external sources, the
 meshes can be transformed using the `mesh_transform` object. The object can be
@@ -979,10 +979,26 @@ before computing the Brinkman force. The following types are currently
 implemented.
 
 1. `none`, no filtering is applied.
+2. `PDE`, the indicator field is smoothed by the [PDE filter](@ref filter_pde),
+   which takes its other keywords, such as `radius`, from the same `filter`
+   object.
 
-The filtering can be defined for each object separately. Additionally, the
-filter can be specified for the entire source term, in which case it will be
-applied to the final indicator field, after all sources have been added.
+A filter is defined by a `filter` object, either at the top level of the source
+term or inside an object. The filter of an object replaces the top-level filter
+for that object alone, and a filter of type `none` keeps the object unfiltered.
+The indicator field is computed in the following order.
+
+1. The objects without a filter of their own are combined by the point-wise max
+   operator.
+2. The top-level filter is applied once to that combination.
+3. Each object with a filter of its own is filtered separately with that filter,
+   and the result is combined with the result of step 2 by the point-wise max
+   operator.
+
+Without a filter in any object, all objects are thus combined first and the
+top-level filter is applied once to the combination. When any filter other than
+`none` is used, the point-wise max of all objects before any filtering is
+stored in the `neko_registry` as `brinkman_unfiltered`.
 
 Additional keywords are available to modify the Brinkman force term.
 
@@ -993,7 +1009,8 @@ Additional keywords are available to modify the Brinkman force term.
 | `objects`                          | Array of JSON objects, defining the objects to be immersed.                                   | Each object must specify a `type` | -             |
 | `distance_transform.type`          | How to map from distance field to indicator field.                                            | `step`, `smooth_step`             | -             |
 | `distance_transform.value`         | Values used to define the distance transform, such as cut-off distance for the step function. | Real                              | -             |
-| `filter.type`                      | Type of filtering applied to the indicator field either globally or for the current object.   | `none`                            | `none`        |
+| `filter.type`                      | Type of filtering applied to the indicator field, at the top level or for one object.         | `none`, `PDE`                     | `none`        |
+| `filter.radius`                    | Radius of a `PDE` filter, see the [PDE filter](@ref filter_pde) for its other keywords.       | Real                              | -             |
 | `mesh_transform.type`              | Apply a transformation to the boundary mesh.                                                  | `bounding_box`, `none`            | `none`        |
 | `mesh_transform.box_min`           | Lower left front corner of the box to fit inside.                                             | Vector of 3 reals                 | -             |
 | `mesh_transform.box_max`           | Upper right back corner of the box to fit inside.                                             | Vector of 3 reals                 | -             |
@@ -1002,7 +1019,8 @@ Additional keywords are available to modify the Brinkman force term.
 Example of a Brinkman source term where a boundary mesh and a point zone are
 combined to define the resistance in the fluid domain. The indicator field for
 the boundary mesh is computed using a step function with a cut-off distance of
-\f$ 0.1 \f$. The indicator field for the point zone is not filtered.
+\f$ 0.1 \f$, and is smoothed by the top-level PDE filter. The point zone has a
+filter of type `none` of its own, so its indicator field is not filtered.
 
 ~~~~~~~~~~~~~~~{.json}
 "source_terms": [
@@ -1023,9 +1041,16 @@ the boundary mesh is computed using a step function with a cut-off distance of
          },
          {
             "type": "point_zone",
-            "name": "cylinder_zone"
+            "name": "cylinder_zone",
+            "filter": {
+               "type": "none"
+            }
          }
-      ]
+      ],
+      "filter": {
+         "type": "PDE",
+         "radius": 0.05
+      }
    }
 ]
 ~~~~~~~~~~~~~~~

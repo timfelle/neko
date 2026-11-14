@@ -512,6 +512,7 @@ AC_CONFIG_FILES([tests/unit/stack/Makefile\
         tests/unit/templates/parallel/Makefile\
         tests/unit/bc_projector/Makefile\
         tests/unit/boundary_operation/Makefile\
+        tests/unit/brinkman/Makefile\
         tests/unit/checkpoint_payload/Makefile\
         tests/unit/wall_sampling/Makefile\
         tests/unit/map_1d/Makefile\

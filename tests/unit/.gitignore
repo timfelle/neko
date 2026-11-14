@@ -16,6 +16,7 @@ test-suite.log
 !log/log_test
 !bc/bc_test
 !bc_projector/bc_projector_test
+!brinkman/brinkman_test
 !crystal_router/crystal_router_test
 !matrix/matrix_test
 !math/math_test
@@ -95,6 +96,7 @@ templates/parallel/parallel_suite
 templates/serial/serial_test
 bc_projector/bc_projector_suite
 boundary_operation/boundary_operation_suite
+brinkman/brinkman_suite
 checkpoint_payload/checkpoint_payload_test
 wall_sampling/wall_sampling_suite
 crystal_router/crystal_router_suite

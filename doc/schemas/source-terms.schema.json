@@ -97,6 +97,9 @@
         },
         "file_index": {
           "$ref": "urn:neko:schema:common#/$defs/nonNegativeIntegerOrRef"
+        },
+        "filter": {
+          "$ref": "#/$defs/brinkmanSourceTerm/properties/filter"
         }
       },
       "allOf": [
