@@ -1,4 +1,4 @@
-! Copyright (c) 2021-2024, The Neko Authors
+! Copyright (c) 2021-2026, The Neko Authors
 ! All rights reserved.
 !
 ! Redistribution and use in source and binary forms, with or without
@@ -225,10 +225,11 @@ contains
     real(kind=rp) :: rnorm
     real(kind=rp) :: alpha, temp, l
     real(kind=rp) :: ratio, div0, norm_fac
-    logical :: conv
+    logical :: conv, singular
     integer outer
 
     conv = .false.
+    singular = .false.
     iter = 0
     rnorm = 0.0_rp
     glb_n = n / x%msh%nelv * x%msh%glb_nelv
@@ -249,7 +250,7 @@ contains
     call rzero(this%h, this%lgmres * this%lgmres)
     outer = 0
     call this%monitor_start('GMRES')
-    do while (.not. conv .and. iter .lt. max_iter)
+    do while (.not. conv .and. .not. singular .and. iter .lt. max_iter)
        outer = outer + 1
 
        if (iter .eq. 0) then
@@ -315,7 +316,19 @@ contains
           alpha = sqrt(glsc3(this%w, this%w, coef%mult, n))
           rnorm = 0.0_rp
           if (abscmp(alpha, 0.0_rp)) then
-             conv = .true.
+             ! The Krylov space is invariant. It contains the solution only
+             ! if the rotated Hessenberg matrix is nonsingular, i.e. its last
+             ! diagonal entry is nonzero. Otherwise the last direction cannot
+             ! reduce the residual: solve without it, which leaves the
+             ! residual |gam(j)| of the previous directions, and stop. With a
+             ! fixed preconditioner a restart would span the same space; with
+             ! a varying one it might not, but stopping is the safe choice.
+             if (abscmp(this%h(j,j), 0.0_rp)) then
+                singular = .true.
+                rnorm = abs(this%gam(j)) * norm_fac
+             else
+                conv = .true.
+             end if
              exit
           end if
           l = sqrt(this%h(j,j) * this%h(j,j) + alpha**2)
@@ -342,6 +355,7 @@ contains
           end if
        end do
        j = min(j, this%lgmres)
+       if (singular) j = j - 1
        !back substitution
        do k = j, 1, -1
           temp = this%gam(k)

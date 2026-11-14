@@ -1,4 +1,4 @@
-! Copyright (c) 2022-2024, The Neko Authors
+! Copyright (c) 2022-2026, The Neko Authors
 ! All rights reserved.
 !
 ! Redistribution and use in source and binary forms, with or without
@@ -360,12 +360,13 @@ contains
     integer :: iter, max_iter
     integer :: i, j, k
     real(kind=rp) :: rnorm, alpha, temp, lr, alpha2, norm_fac
-    logical :: conv
+    logical :: conv, singular
     type(c_ptr) :: f_d
 
     f_d = device_get_ptr(f)
 
     conv = .false.
+    singular = .false.
     iter = 0
     rnorm = 0.0_rp
 
@@ -397,7 +398,7 @@ contains
       !       end do
 
       call this%monitor_start('GMRES')
-      do while (.not. conv .and. iter .lt. max_iter)
+      do while (.not. conv .and. .not. singular .and. iter .lt. max_iter)
 
          if (iter .eq. 0) then
             call device_copy(r_d, f_d, n)
@@ -456,7 +457,19 @@ contains
 
             rnorm = 0.0_rp
             if (abscmp(alpha, 0.0_rp)) then
-               conv = .true.
+               ! The Krylov space is invariant. It contains the solution only
+               ! if the rotated Hessenberg matrix is nonsingular, i.e. its last
+               ! diagonal entry is nonzero. Otherwise the last direction cannot
+               ! reduce the residual: solve without it, which leaves the
+               ! residual |gam(j)| of the previous directions, and stop. With a
+               ! fixed preconditioner a restart would span the same space; with
+               ! a varying one it might not, but stopping is the safe choice.
+               if (abscmp(h(j,j), 0.0_rp)) then
+                  singular = .true.
+                  rnorm = abs(gam(j)) * norm_fac
+               else
+                  conv = .true.
+               end if
                exit
             end if
 
@@ -487,6 +500,7 @@ contains
          end do
 
          j = min(j, this%m_restart)
+         if (singular) j = j - 1
          do k = j, 1, -1
             temp = gam(k)
             do i = j, k+1, -1

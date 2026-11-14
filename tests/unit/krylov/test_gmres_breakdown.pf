@@ -1,0 +1,324 @@
+!> Breakdowns of GMRES on diagonal systems whose Krylov space becomes
+!! invariant after one or two iterations. A breakdown solves the system only
+!! if the operator is nonsingular on that space. Otherwise GMRES must return
+!! a finite solution and must not report convergence.
+module test_gmres_breakdown
+  use pfunit
+  use num_types, only : rp
+  use pfunit_comm_utils, only : comm_init_test, comm_free_test
+  use device, only : device_init, device_finalize, device_get_ptr, &
+       HOST_TO_DEVICE, DEVICE_TO_HOST
+  use neko_config, only : NEKO_BCKND_DEVICE
+  use neko_mpi_types, only : neko_mpi_types_init, neko_mpi_types_free
+  use scratch_registry, only : neko_scratch_registry
+  use mesh_fixture, only : single_unit_hex_mesh
+  use mesh, only : mesh_t
+  use space, only : space_t, GLL
+  use dofmap, only : dofmap_t
+  use gather_scatter, only : gs_t
+  use coefs, only : coef_t
+  use field, only : field_t
+  use ax_product, only : ax_t
+  use krylov, only : ksp_t, ksp_monitor_t, krylov_solver_factory
+  use precon, only : pc_t
+  use identity, only : ident_t
+  use device_identity, only : device_ident_t
+  use scalar_bc_projector, only : scalar_bc_projector_t
+  use math, only : col3, NEKO_EPS
+  use device_math, only : device_col3
+  use, intrinsic :: iso_c_binding, only : c_ptr
+  use, intrinsic :: ieee_arithmetic, only : ieee_is_finite
+  implicit none
+
+  !> Number of points per direction, which gives the element eight points.
+  integer, parameter :: lx_test = 2
+  !> Iteration limit, well above the iterations of every solve.
+  integer, parameter :: max_iter_test = 10
+  !> Absolute tolerance, well below the residuals of the singular systems.
+  real(kind=rp), parameter :: abs_tol_test = 1.0e-6_rp
+  !> Tolerance of the comparisons of solutions and residuals.
+  real(kind=rp), parameter :: tol = 100.0_rp * NEKO_EPS
+
+  !> Diagonal operator \f$ w = d u \f$.
+  type, extends(ax_t) :: diag_ax_t
+     !> Diagonal of the operator.
+     type(field_t) :: d
+   contains
+     procedure, pass(this) :: compute => diag_ax_compute
+     procedure, pass(this) :: compute_vector => diag_ax_compute_vector
+     procedure, pass(this) :: free => diag_ax_free
+  end type diag_ax_t
+
+  @TestCase
+  type, extends(MPITestCase) :: gmres_breakdown_case
+     type(mesh_t) :: msh
+     type(space_t) :: Xh
+     type(dofmap_t) :: dof
+     type(gs_t) :: gs
+     type(coef_t) :: coef
+     !> Operator, set by each test through its diagonal.
+     type(diag_ax_t) :: Ax
+     !> Projector without any constrained points.
+     type(scalar_bc_projector_t) :: bcp
+     !> Right-hand side.
+     type(field_t) :: f
+     !> Solution.
+     type(field_t) :: x
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type gmres_breakdown_case
+
+contains
+
+  subroutine setUp(this)
+    class(gmres_breakdown_case), intent(inout) :: this
+
+    call comm_init_test(this%getMpiCommunicator())
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_init
+    end if
+    call neko_mpi_types_init()
+    call neko_scratch_registry%init()
+
+    ! A single element has no shared points, so the gather-scatter operation
+    ! is the identity and every point has unit multiplicity.
+    call single_unit_hex_mesh(this%msh)
+    call this%Xh%init(GLL, lx_test, lx_test, lx_test)
+    call this%dof%init(this%msh, this%Xh)
+    call this%gs%init(this%dof)
+    call this%coef%init(this%gs)
+
+    call this%Ax%d%init(this%dof, 'd')
+    call this%f%init(this%dof, 'f')
+    call this%x%init(this%dof, 'x')
+
+    ! The right-hand side is one on the four points of the bottom face and
+    ! zero elsewhere. With diagonals of small integers, the Arnoldi vectors
+    ! and Hessenberg entries are then exact in floating point, so the
+    ! breakdowns are exact, not approximate.
+    this%f%x(:,:,1,1) = 1.0_rp
+    call this%f%copy_from(HOST_TO_DEVICE, .true.)
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(gmres_breakdown_case), intent(inout) :: this
+
+    call this%x%free()
+    call this%f%free()
+    call this%bcp%free()
+    call this%Ax%free()
+    call this%coef%free()
+    call this%gs%free()
+    call this%dof%free()
+    call this%Xh%free()
+    call this%msh%free()
+
+    call neko_scratch_registry%free()
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_finalize
+    end if
+    call neko_mpi_types_free()
+    call comm_free_test()
+  end subroutine tearDown
+
+  !> A breakdown after one iteration, with an operator that is singular on
+  !! the Krylov space. The operator is zero on two of the four points of
+  !! the right-hand side, so the Krylov space is invariant after two
+  !! iterations, but the second one only adds a null direction. GMRES must
+  !! return the solution of the first iteration, which minimises the
+  !! residual over the Krylov space, and must not converge.
+  @test(npes=[1])
+  subroutine test_gmres_singular_breakdown(this)
+    class(gmres_breakdown_case), intent(inout) :: this
+    type(ksp_monitor_t) :: ksp_results
+    real(kind=rp) :: x_expected(lx_test, lx_test, lx_test, 1)
+    real(kind=rp) :: err, res
+    character(len=80) :: msg
+
+    this%Ax%d%x = 1.0_rp
+    this%Ax%d%x(:,2,1,1) = 0.0_rp
+    ksp_results = solve_gmres(this)
+    msg = solve_summary(this, ksp_results)
+
+    @assertTrue(all(ieee_is_finite(this%x%x)), message=msg)
+    @assertFalse(ksp_results%converged, message=msg)
+    @assertEqual(2, ksp_results%iter, message=msg)
+
+    ! The first iteration gives the multiple of f that minimises the
+    ! residual, which is f itself.
+    x_expected = 0.0_rp
+    x_expected(:,:,1,1) = 1.0_rp
+    err = maxval(abs(this%x%x - x_expected))
+    @assertEqual(0.0_rp, err, tolerance=tol, message=msg)
+
+    ! The residual is the part of f on the two null points, and the solver
+    ! reports it.
+    res = residual_norm(this)
+    @assertEqual(sqrt(2.0_rp / this%coef%volume), res, tolerance=tol)
+    @assertEqual(res, ksp_results%res_final, tolerance=tol, message=msg)
+  end subroutine test_gmres_singular_breakdown
+
+  !> A breakdown in the first iteration, with a right-hand side in the null
+  !! space of the operator. No direction reduces the residual, so GMRES must
+  !! return the initial solution, zero, and must not converge.
+  @test(npes=[1])
+  subroutine test_gmres_singular_first_iteration(this)
+    class(gmres_breakdown_case), intent(inout) :: this
+    type(ksp_monitor_t) :: ksp_results
+    real(kind=rp) :: res
+    character(len=80) :: msg
+
+    this%Ax%d%x = 1.0_rp
+    this%Ax%d%x(:,:,1,1) = 0.0_rp
+    ksp_results = solve_gmres(this)
+    msg = solve_summary(this, ksp_results)
+
+    @assertTrue(all(ieee_is_finite(this%x%x)), message=msg)
+    @assertFalse(ksp_results%converged, message=msg)
+    @assertEqual(1, ksp_results%iter, message=msg)
+    @assertEqual(0.0_rp, maxval(abs(this%x%x)), message=msg)
+
+    res = residual_norm(this)
+    @assertEqual(ksp_results%res_start, res, tolerance=tol, message=msg)
+    @assertEqual(res, ksp_results%res_final, tolerance=tol, message=msg)
+  end subroutine test_gmres_singular_first_iteration
+
+  !> A breakdown with an operator that is nonsingular on the Krylov space.
+  !! The breakdown after two iterations then solves the system, and GMRES
+  !! must converge to its exact solution.
+  @test(npes=[1])
+  subroutine test_gmres_happy_breakdown(this)
+    class(gmres_breakdown_case), intent(inout) :: this
+    type(ksp_monitor_t) :: ksp_results
+    real(kind=rp) :: x_expected(lx_test, lx_test, lx_test, 1)
+    real(kind=rp) :: err
+    character(len=80) :: msg
+
+    this%Ax%d%x = 1.0_rp
+    this%Ax%d%x(:,2,1,1) = 2.0_rp
+    ksp_results = solve_gmres(this)
+    msg = solve_summary(this, ksp_results)
+
+    @assertTrue(all(ieee_is_finite(this%x%x)), message=msg)
+    @assertTrue(ksp_results%converged, message=msg)
+    @assertEqual(2, ksp_results%iter, message=msg)
+
+    x_expected = 0.0_rp
+    x_expected(:,1,1,1) = 1.0_rp
+    x_expected(:,2,1,1) = 0.5_rp
+    err = maxval(abs(this%x%x - x_expected))
+    @assertEqual(0.0_rp, err, tolerance=tol, message=msg)
+    @assertEqual(0.0_rp, residual_norm(this), tolerance=tol, message=msg)
+  end subroutine test_gmres_happy_breakdown
+
+  !> Solve the system of the test case with a new GMRES solver and the
+  !! identity preconditioner, and return the solution on the host.
+  function solve_gmres(this) result(ksp_results)
+    class(gmres_breakdown_case), intent(inout) :: this
+    type(ksp_monitor_t) :: ksp_results
+    class(ksp_t), allocatable :: ksp
+    class(pc_t), allocatable, target :: M
+    integer :: n
+
+    n = this%dof%size()
+    call this%Ax%d%copy_from(HOST_TO_DEVICE, .true.)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       allocate(device_ident_t :: M)
+    else
+       allocate(ident_t :: M)
+    end if
+    call krylov_solver_factory(ksp, n, 'gmres', max_iter_test, &
+         abs_tol_test, M)
+    ksp_results = ksp%solve(this%Ax, this%x, this%f%x, n, this%coef, &
+         this%bcp, this%gs)
+    call ksp%free()
+    deallocate(ksp)
+    call M%free()
+    deallocate(M)
+    call this%x%copy_from(DEVICE_TO_HOST, .true.)
+  end function solve_gmres
+
+  !> Norm of the residual f - d x, as GMRES measures residuals. On a single
+  !! element the gather-scatter operation is the identity.
+  function residual_norm(this) result(rnorm)
+    class(gmres_breakdown_case), intent(in) :: this
+    real(kind=rp) :: rnorm
+
+    rnorm = sqrt(sum((this%f%x - this%Ax%d%x * this%x%x)**2 * &
+         this%coef%mult) / this%coef%volume)
+  end function residual_norm
+
+  !> Summary of a solve for the messages of failed assertions.
+  !! @param ksp_results Result of the solve.
+  function solve_summary(this, ksp_results) result(msg)
+    class(gmres_breakdown_case), intent(in) :: this
+    type(ksp_monitor_t), intent(in) :: ksp_results
+    character(len=80) :: msg
+
+    write(msg, '(A,L1,A,I0,A,L1)') 'converged = ', ksp_results%converged, &
+         ', iter = ', ksp_results%iter, ', finite solution = ', &
+         all(ieee_is_finite(this%x%x))
+  end function solve_summary
+
+  !> Compute \f$ w = d u \f$.
+  !! @param w Result, of size (lx,ly,lz,nelv).
+  !! @param u Vector the operator is applied to, of size (lx,ly,lz,nelv).
+  !! @param coef Coefficients, unused.
+  !! @param msh Mesh.
+  !! @param Xh Function space.
+  subroutine diag_ax_compute(this, w, u, coef, msh, Xh)
+    class(diag_ax_t), intent(in) :: this
+    type(space_t), intent(in) :: Xh
+    type(mesh_t), intent(in) :: msh
+    type(coef_t), intent(in) :: coef
+    real(kind=rp), intent(inout) :: w(Xh%lx, Xh%ly, Xh%lz, msh%nelv)
+    real(kind=rp), intent(in) :: u(Xh%lx, Xh%ly, Xh%lz, msh%nelv)
+    type(c_ptr) :: w_d, u_d
+    integer :: n
+
+    n = Xh%lxyz * msh%nelv
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       w_d = device_get_ptr(w)
+       u_d = device_get_ptr(u)
+       call device_col3(w_d, this%d%x_d, u_d, n)
+    else
+       call col3(w, this%d%x, u, n)
+    end if
+  end subroutine diag_ax_compute
+
+  !> Compute \f$ w = d u \f$ for each component of a vector.
+  !! @param au Result for the first component.
+  !! @param av Result for the second component.
+  !! @param aw Result for the third component.
+  !! @param u First component of the vector.
+  !! @param v Second component of the vector.
+  !! @param w Third component of the vector.
+  !! @param coef Coefficients, unused.
+  !! @param msh Mesh.
+  !! @param Xh Function space.
+  subroutine diag_ax_compute_vector(this, au, av, aw, u, v, w, coef, msh, Xh)
+    class(diag_ax_t), intent(in) :: this
+    type(space_t), intent(in) :: Xh
+    type(mesh_t), intent(in) :: msh
+    type(coef_t), intent(in) :: coef
+    real(kind=rp), intent(inout) :: au(Xh%lx, Xh%ly, Xh%lz, msh%nelv)
+    real(kind=rp), intent(inout) :: av(Xh%lx, Xh%ly, Xh%lz, msh%nelv)
+    real(kind=rp), intent(inout) :: aw(Xh%lx, Xh%ly, Xh%lz, msh%nelv)
+    real(kind=rp), intent(in) :: u(Xh%lx, Xh%ly, Xh%lz, msh%nelv)
+    real(kind=rp), intent(in) :: v(Xh%lx, Xh%ly, Xh%lz, msh%nelv)
+    real(kind=rp), intent(in) :: w(Xh%lx, Xh%ly, Xh%lz, msh%nelv)
+
+    call this%compute(au, u, coef, msh, Xh)
+    call this%compute(av, v, coef, msh, Xh)
+    call this%compute(aw, w, coef, msh, Xh)
+  end subroutine diag_ax_compute_vector
+
+  !> Free the diagonal of the operator.
+  subroutine diag_ax_free(this)
+    class(diag_ax_t), intent(inout) :: this
+
+    call this%d%free()
+  end subroutine diag_ax_free
+
+end module test_gmres_breakdown
