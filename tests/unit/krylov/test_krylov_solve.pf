@@ -7,8 +7,8 @@ module test_krylov_solve
   use pfunit_comm_utils, only : comm_init_test, comm_free_test
   use device, only : device_init, device_finalize, device_memcpy, &
        HOST_TO_DEVICE
-  use neko_config, only : NEKO_BCKND_DEVICE, NEKO_BCKND_OPENCL, &
-       NEKO_BCKND_METAL
+  use neko_config, only : NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA, &
+       NEKO_BCKND_HIP, NEKO_BCKND_OPENCL, NEKO_BCKND_METAL
   use neko_mpi_types, only : neko_mpi_types_init, neko_mpi_types_free
   use mesh_fixture, only : stacked_unit_hex_column_mesh
   use mesh, only : mesh_t
@@ -24,6 +24,7 @@ module test_krylov_solve
   use identity, only : ident_t
   use device_identity, only : device_ident_t
   use scalar_bc_projector, only : scalar_bc_projector_t
+  use vector_bc_projector, only : segregated_vector_bc_projector_t
   use math, only : glsc3, sub3, NEKO_EPS
   use device_math, only : device_glsc3, device_sub3
   implicit none
@@ -184,6 +185,77 @@ contains
     end do
   end subroutine test_pipecg_max_iter_solution
 
+  !> Fused CG stops at its iteration limit and returns the solution whose
+  !! residual it reports.
+  @test(npes=[1])
+  subroutine test_fusedcg_max_iter(this)
+    class(krylov_solve_case), intent(inout) :: this
+    type(ksp_monitor_t) :: ksp_results
+    real(kind=rp) :: res, tol
+    integer :: max_iter
+    character(len=80) :: msg
+
+    if (.not. fusedcg_supported()) return
+
+    do max_iter = 1, max_iter_test
+       ksp_results = solve_system(this, 'fused_cg', max_iter, &
+            unreachable_tol, this%x)
+       res = residual_norm(this, this%x)
+       tol = res_tol * ksp_results%res_start
+       write(msg, '(A,I0,A,I0)') 'fused_cg with max_iter = ', max_iter, &
+            ' stopped at ', ksp_results%iter
+       @assertTrue(ksp_results%iter .le. max_iter + 1, message=msg)
+       @assertFalse(ksp_results%converged, message=msg)
+       @assertEqual(res, ksp_results%res_final, tolerance=tol, message=msg)
+    end do
+  end subroutine test_fusedcg_max_iter
+
+  !> Coupled fused CG stops at its iteration limit and returns the solution
+  !! whose residual it reports.
+  @test(npes=[1])
+  subroutine test_fused_coupled_cg_max_iter(this)
+    class(krylov_solve_case), intent(inout) :: this
+    type(ksp_monitor_t) :: ksp_results(3)
+    type(segregated_vector_bc_projector_t) :: vbcp
+    type(field_t) :: y, z
+    class(ksp_t), allocatable :: ksp
+    class(pc_t), allocatable, target :: M
+    real(kind=rp) :: res, tol
+    integer :: max_iter, n
+    character(len=80) :: msg
+
+    if (.not. fusedcg_supported()) return
+
+    n = this%dof%size()
+    call y%init(this%dof, 'y')
+    call z%init(this%dof, 'z')
+    call vbcp%init(this%coef)
+    do max_iter = 1, max_iter_test
+       call identity_precon(M)
+       call krylov_solver_factory(ksp, n, 'fused_coupled_cg', max_iter, &
+            unreachable_tol, M)
+       ksp_results = ksp%solve_coupled(this%Ax, this%x, y, z, &
+            this%f%x, this%f%x, this%f%x, n, this%coef, vbcp, this%gs)
+       call ksp%free()
+       deallocate(ksp)
+       call M%free()
+       deallocate(M)
+
+       ! The solver reports the norm of the residuals of all components.
+       res = sqrt(residual_norm(this, this%x)**2 + &
+            residual_norm(this, y)**2 + residual_norm(this, z)**2)
+       tol = res_tol * ksp_results(1)%res_start
+       write(msg, '(A,I0,A,I0)') 'fused_coupled_cg with max_iter = ', &
+            max_iter, ' stopped at ', ksp_results(1)%iter
+       @assertTrue(ksp_results(1)%iter .le. max_iter + 1, message=msg)
+       @assertFalse(ksp_results(1)%converged, message=msg)
+       @assertEqual(res, ksp_results(1)%res_final, tolerance=tol, message=msg)
+    end do
+    call vbcp%free()
+    call z%free()
+    call y%free()
+  end subroutine test_fused_coupled_cg_max_iter
+
   !> Solve the system of the test case with a new Krylov solver and the
   !! identity preconditioner.
   !! @param type_name Type of the Krylov solver.
@@ -268,5 +340,12 @@ contains
 
     supported = NEKO_BCKND_OPENCL .ne. 1 .and. NEKO_BCKND_METAL .ne. 1
   end function pipecg_supported
+
+  !> Whether the backend has the fused CG solvers.
+  pure function fusedcg_supported() result(supported)
+    logical :: supported
+
+    supported = NEKO_BCKND_CUDA .eq. 1 .or. NEKO_BCKND_HIP .eq. 1
+  end function fusedcg_supported
 
 end module test_krylov_solve
