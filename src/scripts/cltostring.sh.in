@@ -1,8 +1,22 @@
 #!/bin/bash
-IN=$(basename $1)
-NAME=${IN%.cl}
+#
+# Convert an OpenCL kernel into a C header holding its source as a string.
+#
+# Stop at the first failing command, and write the header to a temporary
+# file that is only moved into place once complete, so that a failure never
+# leaves a truncated header behind for make to take as up to date.
+#
+set -e
 
-echo "const char *"${NAME}" =" > $1.h
-@SED@ -e 's/\\/\\\\/g;s/"/\\"/g;s/^/"/;s/$/\\n"/;s/real_xp/@NEKO_DEV_XREAL_TYPE@/g;s/real/@NEKO_DEV_REAL_TYPE@/g' \
-    $1 >> $1.h
-echo ";" >>$1.h
+IN=$(basename "$1")
+NAME=${IN%.cl}
+TMP="$1.h.tmp"
+trap 'rm -f "$TMP"' EXIT
+
+{
+    echo "const char *${NAME} ="
+    @SED@ -e 's/\\/\\\\/g;s/"/\\"/g;s/^/"/;s/$/\\n"/;s/real_xp/@NEKO_DEV_XREAL_TYPE@/g;s/real/@NEKO_DEV_REAL_TYPE@/g' \
+        "$1"
+    echo ";"
+} > "$TMP"
+mv "$TMP" "$1.h"
