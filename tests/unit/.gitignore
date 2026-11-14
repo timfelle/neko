@@ -20,6 +20,7 @@ test-suite.log
 !matrix/matrix_test
 !math/math_test
 !mean_field/mean_field_test
+!pc_jacobi/pc_jacobi_test
 !mesh/mesh_test
 !point_interpolation/point_interpolation_test
 !templates/parallel/parallel_test
@@ -54,6 +55,7 @@ hex/hex_test
 htable/htable_test
 krylov/krylov_test
 mathops/mathops_test
+pc_jacobi/pc_jacobi_suite
 point/point_test
 quad/quad_test
 octree/octree_test

@@ -1,0 +1,304 @@
+!> Tests of the Jacobi preconditioner.
+!! The preconditioner must invert the diagonal of the assembled Helmholtz
+!! operator. The reference diagonal is obtained here without any knowledge of
+!! its structure, by applying the operator to unit vectors, and the
+!! preconditioner's diagonal is recovered from its action on a vector of ones.
+module test_pc_jacobi
+  use pfunit
+  use num_types, only : rp
+  use math, only : NEKO_EPS
+  use pfunit_comm_utils, only : comm_init_test, comm_free_test
+  use device, only : device_init, device_finalize, device_map, device_unmap, &
+       device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
+  use neko_config, only : NEKO_BCKND_DEVICE
+  use neko_mpi_types, only : neko_mpi_types_init, neko_mpi_types_free
+  use mesh_fixture, only : perturbed_hex_block_mesh, &
+       single_sheared_element_mesh
+  use mesh, only : mesh_t
+  use space, only : space_t, GLL
+  use dofmap, only : dofmap_t
+  use gather_scatter, only : gs_t, GS_OP_ADD
+  use coefs, only : coef_t
+  use ax_product, only : ax_t, ax_helm_allocator
+  use ax_helm_cpu, only : ax_helm_cpu_t
+  use precon, only : pc_t, precon_allocator
+  use jacobi, only : jacobi_t
+  use sx_jacobi, only : sx_jacobi_t
+  use device_jacobi, only : device_jacobi_t
+  use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
+  implicit none
+
+  !> Relative tolerance on the diagonal. The preconditioner and the operator
+  !! sum the same terms, only in a different order.
+  real(kind=rp), parameter :: tol = 1000.0_rp * NEKO_EPS
+
+  @TestCase
+  type, extends(MPITestCase) :: test_pc_jacobi_case
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_pc_jacobi_case
+
+contains
+
+  subroutine setUp(this)
+    class(test_pc_jacobi_case), intent(inout) :: this
+    call comm_init_test(this%getMpiCommunicator())
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_init
+    end if
+    call neko_mpi_types_init()
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_pc_jacobi_case), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_finalize
+    end if
+    call neko_mpi_types_free()
+    call comm_free_test()
+  end subroutine tearDown
+
+  !> A single trilinear element with all three cross terms of the metric
+  !! non-zero, at every polynomial order with a specialised CPU kernel
+  !! (lx = 2 to 14) and at one that takes the generic kernel (lx = 15).
+  @test(npes=[1])
+  subroutine test_jacobi_trilinear_element(this)
+    class(test_pc_jacobi_case), intent(inout) :: this
+    type(mesh_t) :: msh
+    integer :: lx
+
+    do lx = 2, 15
+       call perturbed_hex_block_mesh(msh, 1)
+       call check_jacobi_diagonal(msh, lx)
+       call msh%free()
+    end do
+  end subroutine test_jacobi_trilinear_element
+
+  !> A 2 x 2 x 2 block of deformed elements, so that the diagonal is
+  !! assembled over the shared faces, edges and vertices.
+  @test(npes=[1])
+  subroutine test_jacobi_deformed_mesh(this)
+    class(test_pc_jacobi_case), intent(inout) :: this
+    type(mesh_t) :: msh
+
+    call perturbed_hex_block_mesh(msh, 2)
+    call check_jacobi_diagonal(msh, 5)
+    call msh%free()
+  end subroutine test_jacobi_deformed_mesh
+
+  !> The deformed block with a constant h1 other than one and a mass term.
+  @test(npes=[1])
+  subroutine test_jacobi_helmholtz(this)
+    class(test_pc_jacobi_case), intent(inout) :: this
+    type(mesh_t) :: msh
+
+    call perturbed_hex_block_mesh(msh, 2)
+    call check_jacobi_diagonal(msh, 4, h1 = 0.5_rp, h2 = 2.0_rp)
+    call msh%free()
+  end subroutine test_jacobi_helmholtz
+
+  !> A parallelepiped sheared in the y-z plane, which has G23 as its only
+  !! non-zero cross term. The deformed-element flag of the mesh only checks
+  !! the edges along x against the other edges, so it does not mark this
+  !! element as deformed.
+  @test(npes=[1])
+  subroutine test_jacobi_sheared_element(this)
+    class(test_pc_jacobi_case), intent(inout) :: this
+    type(mesh_t) :: msh
+
+    call single_sheared_element_mesh(msh)
+    call check_jacobi_diagonal(msh, 5)
+    call msh%free()
+  end subroutine test_jacobi_sheared_element
+
+  !> Check that the Jacobi preconditioner of the backend inverts the exact
+  !! diagonal.
+  !! @param msh Mesh to check on.
+  !! @param lx Number of GLL points in each direction.
+  !! @param h1 Constant value of h1, one by default.
+  !! @param h2 Constant value of h2. If present, the mass term is included.
+  subroutine check_jacobi_diagonal(msh, lx, h1, h2)
+    type(mesh_t), intent(inout), target :: msh
+    integer, intent(in) :: lx
+    real(kind=rp), intent(in), optional :: h1, h2
+    type(space_t), target :: Xh
+    type(dofmap_t), target :: dof
+    type(gs_t), target :: gs
+    type(coef_t), target :: coef
+    class(pc_t), allocatable :: pc
+    real(kind=rp), allocatable :: d_exact(:)
+    character(len=64) :: msg
+    integer :: n
+
+    call Xh%init(GLL, lx, lx, lx)
+    call dof%init(msh, Xh)
+    call gs%init(dof)
+    call coef%init(gs)
+    n = dof%size()
+
+    if (present(h1)) coef%h1 = h1
+    if (present(h2)) then
+       coef%h2 = h2
+       coef%ifh2 = .true.
+    end if
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(coef%h1, coef%h1_d, n, HOST_TO_DEVICE, &
+            sync = .false.)
+       call device_memcpy(coef%h2, coef%h2_d, n, HOST_TO_DEVICE, &
+            sync = .true.)
+    end if
+
+    allocate(d_exact(n))
+    call exact_diagonal(d_exact, coef, n)
+
+    call precon_allocator(pc, 'jacobi')
+    select type (p => pc)
+    type is (jacobi_t)
+       call p%init_from_components(coef, dof, gs)
+    type is (sx_jacobi_t)
+       call p%init_from_components(coef, dof, gs)
+    type is (device_jacobi_t)
+       call p%init_from_components(coef, dof, gs)
+    end select
+    write(msg, '(A,I0)') 'Jacobi diagonal, lx = ', lx
+    call check_inverse_diagonal(pc, d_exact, n, trim(msg))
+    call pc%free()
+    deallocate(pc)
+
+    deallocate(d_exact)
+    call coef%free()
+    call gs%free()
+    call dof%free()
+    call Xh%free()
+  end subroutine check_jacobi_diagonal
+
+  !> Check that a preconditioner inverts a given diagonal.
+  !! The assertion is the last statement, as a failed one returns from the
+  !! routine, so that a failure never skips the clean-up of the caller.
+  !! @param pc The preconditioner.
+  !! @param d Diagonal the preconditioner should invert.
+  !! @param n Number of local degrees of freedom.
+  !! @param msg Message identifying the check.
+  subroutine check_inverse_diagonal(pc, d, n, msg)
+    class(pc_t), intent(inout) :: pc
+    integer, intent(in) :: n
+    real(kind=rp), intent(in) :: d(n)
+    character(len=*), intent(in) :: msg
+    real(kind=rp), allocatable :: d_pc(:)
+    real(kind=rp) :: err
+
+    allocate(d_pc(n))
+    call preconditioner_diagonal(d_pc, pc, n)
+    err = maxval(abs(d_pc - d) / abs(d))
+    deallocate(d_pc)
+    @assertEqual(0.0_rp, err, tolerance=tol, message=msg)
+  end subroutine check_inverse_diagonal
+
+  !> Assembled diagonal of the Helmholtz operator, from unit vectors.
+  !! The local operator couples no two elements, so a unit vector at the same
+  !! local node of every element yields the local diagonal of all elements at
+  !! once. Gather-scatter then assembles it.
+  !! @param d Diagonal of the assembled operator.
+  !! @param coef Coefficients of the operator.
+  !! @param n Number of local degrees of freedom.
+  subroutine exact_diagonal(d, coef, n)
+    integer, intent(in) :: n
+    real(kind=rp), intent(inout) :: d(n)
+    type(coef_t), intent(inout) :: coef
+    class(ax_t), allocatable :: ax
+    real(kind=rp), allocatable :: u(:,:,:,:), w(:,:,:,:)
+    type(c_ptr) :: u_d, w_d, d_d
+    integer :: lx, nelv, i, j, k, e
+
+    lx = coef%Xh%lx
+    nelv = coef%msh%nelv
+    u_d = C_NULL_PTR
+    w_d = C_NULL_PTR
+    d_d = C_NULL_PTR
+
+    ! The reference operator is the plain CPU one on host builds, as the
+    ! operator of another backend may skip work based on the mesh
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call ax_helm_allocator(ax, "standard")
+    else
+       allocate(ax_helm_cpu_t::ax)
+    end if
+
+    allocate(u(lx, lx, lx, nelv), w(lx, lx, lx, nelv))
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_map(u, u_d, n)
+       call device_map(w, w_d, n)
+       call device_map(d, d_d, n)
+    end if
+
+    do k = 1, lx
+       do j = 1, lx
+          do i = 1, lx
+             u = 0.0_rp
+             u(i, j, k, :) = 1.0_rp
+             if (NEKO_BCKND_DEVICE .eq. 1) then
+                call device_memcpy(u, u_d, n, HOST_TO_DEVICE, sync = .false.)
+             end if
+             call ax%compute(w, u, coef, coef%msh, coef%Xh)
+             if (NEKO_BCKND_DEVICE .eq. 1) then
+                call device_memcpy(w, w_d, n, DEVICE_TO_HOST, sync = .true.)
+             end if
+             do e = 1, nelv
+                d(i + lx * (j - 1 + lx * (k - 1 + lx * (e - 1)))) = &
+                     w(i, j, k, e)
+             end do
+          end do
+       end do
+    end do
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(d, d_d, n, HOST_TO_DEVICE, sync = .false.)
+    end if
+    call coef%gs_h%op(d, n, GS_OP_ADD)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(d, d_d, n, DEVICE_TO_HOST, sync = .true.)
+       call device_unmap(u, u_d)
+       call device_unmap(w, w_d)
+       call device_unmap(d, d_d)
+    end if
+
+    deallocate(u, w)
+    call ax%free()
+    deallocate(ax)
+  end subroutine exact_diagonal
+
+  !> Diagonal inverted by a preconditioner, from its action on ones.
+  !! @param d Diagonal the preconditioner inverts.
+  !! @param pc The preconditioner.
+  !! @param n Number of local degrees of freedom.
+  subroutine preconditioner_diagonal(d, pc, n)
+    integer, intent(in) :: n
+    real(kind=rp), intent(inout) :: d(n)
+    class(pc_t), intent(inout) :: pc
+    real(kind=rp), allocatable :: r(:), z(:)
+    type(c_ptr) :: r_d, z_d
+
+    allocate(r(n), z(n))
+    r = 1.0_rp
+    z = 0.0_rp
+    r_d = C_NULL_PTR
+    z_d = C_NULL_PTR
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_map(r, r_d, n)
+       call device_map(z, z_d, n)
+       call device_memcpy(r, r_d, n, HOST_TO_DEVICE, sync = .true.)
+    end if
+
+    call pc%solve(z, r, n)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(z, z_d, n, DEVICE_TO_HOST, sync = .true.)
+       call device_unmap(r, r_d)
+       call device_unmap(z, z_d)
+    end if
+    d = 1.0_rp / z
+    deallocate(r, z)
+  end subroutine preconditioner_diagonal
+
+end module test_pc_jacobi

@@ -13,6 +13,8 @@ module mesh_fixture
   public :: two_adjacent_unit_hex_mesh
   public :: three_hex_right_triangle_tip_mesh
   public :: stacked_unit_hex_column_mesh
+  public :: perturbed_hex_block_mesh
+  public :: single_sheared_element_mesh
 
 contains
 
@@ -296,5 +298,81 @@ contains
     end do
     call msh%generate_conn()
   end subroutine stacked_unit_hex_column_mesh
+
+  !> Block of `n` x `n` x `n` unit hexes on [0, n]^3 with every vertex,
+  !! including those on the boundary, moved by a fixed pseudo-random amount.
+  !!
+  !! The elements are trilinear but not affine, so all their geometric factors
+  !! vary in space and none of the cross terms G12, G13 and G23 is zero. The
+  !! elements are distributed linearly over the ranks of NEKO_COMM and the
+  !! point ids are global. Element `g` in global numbering is at the position
+  !! (i, j, k) in the block with g - 1 = i + n * (j + n * k), and the lattice
+  !! point (i, j, k) has the id 1 + i + (n + 1) * (j + (n + 1) * k). The mesh
+  !! is finalized, so its deformed-element flags are set as for a mesh read
+  !! from file.
+  subroutine perturbed_hex_block_mesh(msh, n)
+    type(mesh_t), intent(inout) :: msh
+    integer, intent(in) :: n
+    real(kind=dp), parameter :: amp = 0.15_dp
+    type(linear_dist_t) :: dist
+    type(point_t) :: p(8)
+    integer :: e, g, i, j, k, l, ip, jp, kp, id
+
+    dist = linear_dist_t(n**3, pe_rank, pe_size, NEKO_COMM)
+    call msh%init(3, dist)
+
+    do e = 1, dist%num_local()
+       g = dist%start_idx() + e
+       i = mod(g - 1, n)
+       j = mod((g - 1) / n, n)
+       k = (g - 1) / n**2
+
+       ! The points in the NEKTON symmetric ordering of src/mesh/hex.f90,
+       ! i.e. x fastest, then y, then z.
+       do l = 1, 8
+          ip = i + mod(l - 1, 2)
+          jp = j + mod((l - 1) / 2, 2)
+          kp = k + (l - 1) / 4
+          id = 1 + ip + (n + 1) * (jp + (n + 1) * kp)
+          call p(l)%init(ip + amp * sin(1.7_dp * id + 0.3_dp), &
+               jp + amp * sin(2.3_dp * id + 1.1_dp), &
+               kp + amp * sin(3.1_dp * id + 2.7_dp), id)
+       end do
+
+       call msh%add_element(e, g, p(1), p(2), p(3), p(4), &
+            p(5), p(6), p(7), p(8))
+    end do
+    call msh%finalize()
+  end subroutine perturbed_hex_block_mesh
+
+  !> Single unit hex with its top face shifted by half its width in y.
+  !!
+  !! The element is a parallelepiped sheared in the y-z plane, which makes
+  !! G23 its only non-zero cross term. The mesh is finalized, so its
+  !! deformed-element flag is set as for a mesh read from file.
+  !!
+  !!   z = 0:  p3 ----- p4      z = 1:      p7 ----- p8
+  !!            |       |                    |       |
+  !!            |  e1   |                    |  e1   |
+  !!            |       |                    |       |
+  !!           p1 ----- p2       y = 0.5:   p5 ----- p6
+  subroutine single_sheared_element_mesh(msh)
+    type(mesh_t), intent(inout) :: msh
+    real(kind=dp), parameter :: shift = 0.5_dp
+    type(point_t) :: p(8)
+    integer :: l, i, j, k
+
+    do l = 1, 8
+       i = mod(l - 1, 2)
+       j = mod((l - 1) / 2, 2)
+       k = (l - 1) / 4
+       call p(l)%init(real(i, dp), j + shift * k, real(k, dp), l)
+    end do
+
+    call msh%init(3, 1)
+    call msh%add_element(1, 1, p(1), p(2), p(3), p(4), &
+         p(5), p(6), p(7), p(8))
+    call msh%finalize()
+  end subroutine single_sheared_element_mesh
 
 end module mesh_fixture

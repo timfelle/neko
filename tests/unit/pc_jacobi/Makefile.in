@@ -1,0 +1,51 @@
+USEMPI=YES
+ifneq ("$(wildcard @PFUNIT_DIR@/include/PFUNIT.mk)", "")
+include @PFUNIT_DIR@/include/PFUNIT.mk
+endif
+FFLAGS += $(PFUNIT_EXTRA_FFLAGS) @NEKO_PKG_FCFLAGS@ -I@top_builddir@/src
+FC = @FC@
+
+# Look for the sources in the source directory, as an out-of-tree
+# build has none of them in the build directory.
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+# Depend on the library so the test objects follow any change to Neko.
+NEKO_LIB := $(wildcard @top_builddir@/src/libneko.la)
+
+%.o : %.F90 $(NEKO_LIB)
+	$(FC) -c $(FFLAGS) $<
+
+# The fixture is compiled here, not in ../fixtures, so that its module file
+# ends up in this directory whatever other suite has compiled it before.
+mesh_fixture.o : ../fixtures/mesh_fixture.f90 $(NEKO_LIB)
+	$(FC) -c $(FFLAGS) -o $@ $<
+
+
+check: pc_jacobi_suite
+
+# Regenerate this Makefile from Makefile.in via config.status
+# whenever it changes.
+SUBDIR := $(patsubst $(abspath @top_builddir@)/%,%,$(CURDIR))
+
+Makefile: $(srcdir)/Makefile.in @top_builddir@/config.status
+	cd @top_builddir@ && $(SHELL) ./config.status $(SUBDIR)/Makefile
+
+
+pc_jacobi_suite_TESTS := test_pc_jacobi.pf
+pc_jacobi_suite_OTHER_SOURCES = mesh_fixture.f90
+pc_jacobi_suite_OTHER_LIBRARIES = -L@top_builddir@/src/.libs -lneko @LDFLAGS@ @LIBS@
+$(eval $(call make_pfunit_test,pc_jacobi_suite))
+pc_jacobi_suite.inc: Makefile
+test_pc_jacobi.o: mesh_fixture.o
+
+distclean:
+clean:
+	$(RM) *.o *.mod *.a *.inc *.F90 pc_jacobi_suite
+
+
+
+all:
+html:
+install:
+distdir:

@@ -17,6 +17,7 @@ SUBDIRS = tuple\
 	  gather_scatter\
 	  ax\
 	  krylov\
+	  pc_jacobi\
 	  bc\
 	  fluid_pnpn_bc\
 	  signal\
@@ -79,6 +80,7 @@ TESTS = device/device_test\
 	gather_scatter/gather_scatter_test\
 	ax/ax_test\
 	krylov/krylov_test\
+	pc_jacobi/pc_jacobi_test\
 	bc/bc_test\
 	fluid_pnpn_bc/fluid_pnpn_bc_test\
 	signal/signal_test\
@@ -124,6 +126,8 @@ EXTRA_DIST = \
 	quad/test_quad.pf\
 	gather_scatter/test_gather_scatter_parallel.pf\
 	ax/test_ax_factory.pf\
+	pc_jacobi/test_pc_jacobi.pf\
+	pc_jacobi/pc_jacobi_test\
 	krylov/test_krylov.pf\
 	hex/test_hex.pf\
 	tet/test_tet.pf\

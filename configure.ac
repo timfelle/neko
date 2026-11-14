@@ -479,6 +479,7 @@ AC_CONFIG_FILES([tests/unit/stack/Makefile\
         tests/unit/gather_scatter/Makefile\
         tests/unit/ax/Makefile\
         tests/unit/krylov/Makefile\
+        tests/unit/pc_jacobi/Makefile\
         tests/unit/bc/Makefile\
         tests/unit/fluid_pnpn_bc/Makefile\
         tests/unit/signal/Makefile\

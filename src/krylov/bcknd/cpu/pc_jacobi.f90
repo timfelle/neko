@@ -108,6 +108,15 @@ contains
   end subroutine jacobi_solve
 
   !> Update Jacobi preconditioner if the geometry G has changed
+  !! @details Computes the diagonal of the assembled Helmholtz operator of
+  !! ax_helm. On an element, the G11 term at node (i,j,k) sums over the line
+  !! through the node, G11(l,j,k) * dxt(i,l)**2, and likewise for G22 and
+  !! G33. A cross term reaches the diagonal only through the diagonals of the
+  !! derivative matrices, 2 * G12(i,j,k) * dxt(i,i) * dyt(j,j) for G12. These
+  !! vanish except at the end points, so the cross terms only contribute on
+  !! the edges of the element. They are added on every element; on an
+  !! undeformed one they are zero up to round-off. h1 is applied at the node,
+  !! which is exact when it is constant along the grid lines of each element.
   subroutine jacobi_update(this)
     class(jacobi_t), intent(inout) :: this
     associate(dof => this%dof, coef => this%coef, gs_h => this%gs_h)
@@ -117,59 +126,59 @@ contains
       case (14)
          call jacobi_update_lx14(this%d, dof%Xh%dxt, dof%Xh%dyt, dof%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, &
-              dof%msh%dfrmd_el, dof%msh%nelv)
+              dof%msh%nelv)
       case (13)
          call jacobi_update_lx13(this%d, dof%Xh%dxt, dof%Xh%dyt, dof%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, &
-              dof%msh%dfrmd_el, dof%msh%nelv)
+              dof%msh%nelv)
       case (12)
          call jacobi_update_lx12(this%d, dof%Xh%dxt, dof%Xh%dyt, dof%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, &
-              dof%msh%dfrmd_el, dof%msh%nelv)
+              dof%msh%nelv)
       case (11)
          call jacobi_update_lx11(this%d, dof%Xh%dxt, dof%Xh%dyt, dof%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, &
-              dof%msh%dfrmd_el, dof%msh%nelv)
+              dof%msh%nelv)
       case (10)
          call jacobi_update_lx10(this%d, dof%Xh%dxt, dof%Xh%dyt, dof%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, &
-              dof%msh%dfrmd_el, dof%msh%nelv)
+              dof%msh%nelv)
       case (9)
          call jacobi_update_lx9(this%d, dof%Xh%dxt, dof%Xh%dyt, dof%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, &
-              dof%msh%dfrmd_el, dof%msh%nelv)
+              dof%msh%nelv)
       case (8)
          call jacobi_update_lx8(this%d, dof%Xh%dxt, dof%Xh%dyt, dof%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, &
-              dof%msh%dfrmd_el, dof%msh%nelv)
+              dof%msh%nelv)
       case (7)
          call jacobi_update_lx7(this%d, dof%Xh%dxt, dof%Xh%dyt, dof%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, &
-              dof%msh%dfrmd_el, dof%msh%nelv)
+              dof%msh%nelv)
       case (6)
          call jacobi_update_lx6(this%d, dof%Xh%dxt, dof%Xh%dyt, dof%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, &
-              dof%msh%dfrmd_el, dof%msh%nelv)
+              dof%msh%nelv)
       case (5)
          call jacobi_update_lx5(this%d, dof%Xh%dxt, dof%Xh%dyt, dof%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, &
-              dof%msh%dfrmd_el, dof%msh%nelv)
+              dof%msh%nelv)
       case (4)
          call jacobi_update_lx4(this%d, dof%Xh%dxt, dof%Xh%dyt, dof%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, &
-              dof%msh%dfrmd_el, dof%msh%nelv)
+              dof%msh%nelv)
       case (3)
          call jacobi_update_lx3(this%d, dof%Xh%dxt, dof%Xh%dyt, dof%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, &
-              dof%msh%dfrmd_el, dof%msh%nelv)
+              dof%msh%nelv)
       case (2)
          call jacobi_update_lx2(this%d, dof%Xh%dxt, dof%Xh%dyt, dof%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, &
-              dof%msh%dfrmd_el, dof%msh%nelv)
+              dof%msh%nelv)
       case default
          call jacobi_update_lx(this%d, dof%Xh%dxt, dof%Xh%dyt, dof%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, &
-              dof%msh%dfrmd_el, dof%msh%nelv, dof%Xh%lx)
+              dof%msh%nelv, dof%Xh%lx)
       end select
       !$omp end parallel
 
@@ -182,7 +191,7 @@ contains
 
   !> Generic CPU kernel for updating the Jacobi preconditioner
   subroutine jacobi_update_lx(d, dxt, dyt, dzt, G11, G22, G33, &
-       G12, G13, G23, dfrmd_el, n, lx)
+       G12, G13, G23, n, lx)
     integer, intent(in) :: n, lx
     real(kind=rp), intent(inout) :: d(lx, lx, lx, n)
     real(kind=rp), intent(in) :: G11(lx, lx, lx, n)
@@ -194,7 +203,6 @@ contains
     real(kind=rp), intent(in) :: dxt(lx, lx)
     real(kind=rp), intent(in) :: dyt(lx, lx)
     real(kind=rp), intent(in) :: dzt(lx, lx)
-    logical, intent(in) :: dfrmd_el(n)
     integer :: i, j, k, l, e
 
     !$omp do
@@ -242,45 +250,37 @@ contains
           end do
        end do
 
-       if (dfrmd_el(e)) then
-          do j = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(1,j,k,e) = d(1,j,k,e) &
-                     + G12(1,j,k,e) * dxt(1,1)*dyt(j,j) &
-                     + G13(1,j,k,e) * dxt(1,1)*dzt(k,k)
-                d(lx,j,k,e) = d(lx,j,k,e) &
-                     + G12(lx,j,k,e) * dxt(lx,lx)*dyt(j,j) &
-                     + G13(lx,j,k,e) * dxt(lx,lx)*dzt(k,k)
+       ! Cross terms, only on the edges, see jacobi_update
+       do k = 1, lx
+          do j = 1, lx, lx - 1
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G12(i,j,k,e) * dxt(i,i) * dyt(j,j)
              end do
           end do
-
-          do i = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(i,1,k,e) = d(i,1,k,e) &
-                     + G12(i,1,k,e) * dyt(1,1)*dxt(i,i) &
-                     + G23(i,1,k,e) * dyt(1,1)*dzt(k,k)
-                d(i,lx,k,e) = d(i,lx,k,e) &
-                     + G12(i,lx,k,e) * dyt(lx,lx)*dxt(i,i) &
-                     + G23(i,lx,k,e) * dyt(lx,lx)*dzt(k,k)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G13(i,j,k,e) * dxt(i,i) * dzt(k,k)
              end do
           end do
-          do i = 1, lx, lx-1
-             do j = 1, lx, lx-1
-                d(i,j,1,e) = d(i,j,1,e) &
-                     + G13(i,j,1,e) * dzt(1,1)*dxt(i,i) &
-                     + G23(i,j,1,e) * dzt(1,1)*dyt(j,j)
-                d(i,j,lx,e) = d(i,j,lx,e) &
-                     + G13(i,j,lx,e) * dzt(lx,lx)*dxt(i,i) &
-                     + G23(i,j,lx,e) * dzt(lx,lx)*dyt(j,j)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx, lx - 1
+             do i = 1, lx
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G23(i,j,k,e) * dyt(j,j) * dzt(k,k)
              end do
           end do
-       end if
+       end do
     end do
     !$omp end do
   end subroutine jacobi_update_lx
 
   subroutine jacobi_update_lx14(d, dxt, dyt, dzt, G11, G22, G33, &
-       G12, G13, G23, dfrmd_el, n)
+       G12, G13, G23, n)
     integer, parameter :: lx = 14
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: d(lx, lx, lx, n)
@@ -293,7 +293,6 @@ contains
     real(kind=rp), intent(in) :: dxt(lx, lx)
     real(kind=rp), intent(in) :: dyt(lx, lx)
     real(kind=rp), intent(in) :: dzt(lx, lx)
-    logical, intent(in) :: dfrmd_el(n)
     integer :: i, j, k, l, e
 
     !$omp do
@@ -341,45 +340,37 @@ contains
           end do
        end do
 
-       if (dfrmd_el(e)) then
-          do j = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(1,j,k,e) = d(1,j,k,e) &
-                     + G12(1,j,k,e) * dxt(1,1)*dyt(j,j) &
-                     + G13(1,j,k,e) * dxt(1,1)*dzt(k,k)
-                d(lx,j,k,e) = d(lx,j,k,e) &
-                     + G12(lx,j,k,e) * dxt(lx,lx)*dyt(j,j) &
-                     + G13(lx,j,k,e) * dxt(lx,lx)*dzt(k,k)
+       ! Cross terms, only on the edges, see jacobi_update
+       do k = 1, lx
+          do j = 1, lx, lx - 1
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G12(i,j,k,e) * dxt(i,i) * dyt(j,j)
              end do
           end do
-
-          do i = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(i,1,k,e) = d(i,1,k,e) &
-                     + G12(i,1,k,e) * dyt(1,1)*dxt(i,i) &
-                     + G23(i,1,k,e) * dyt(1,1)*dzt(k,k)
-                d(i,lx,k,e) = d(i,lx,k,e) &
-                     + G12(i,lx,k,e) * dyt(lx,lx)*dxt(i,i) &
-                     + G23(i,lx,k,e) * dyt(lx,lx)*dzt(k,k)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G13(i,j,k,e) * dxt(i,i) * dzt(k,k)
              end do
           end do
-          do i = 1, lx, lx-1
-             do j = 1, lx, lx-1
-                d(i,j,1,e) = d(i,j,1,e) &
-                     + G13(i,j,1,e) * dzt(1,1)*dxt(i,i) &
-                     + G23(i,j,1,e) * dzt(1,1)*dyt(j,j)
-                d(i,j,lx,e) = d(i,j,lx,e) &
-                     + G13(i,j,lx,e) * dzt(lx,lx)*dxt(i,i) &
-                     + G23(i,j,lx,e) * dzt(lx,lx)*dyt(j,j)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx, lx - 1
+             do i = 1, lx
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G23(i,j,k,e) * dyt(j,j) * dzt(k,k)
              end do
           end do
-       end if
+       end do
     end do
     !$omp end do
   end subroutine jacobi_update_lx14
 
   subroutine jacobi_update_lx13(d, dxt, dyt, dzt, G11, G22, G33, &
-       G12, G13, G23, dfrmd_el, n)
+       G12, G13, G23, n)
     integer, parameter :: lx = 13
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: d(lx, lx, lx, n)
@@ -392,7 +383,6 @@ contains
     real(kind=rp), intent(in) :: dxt(lx, lx)
     real(kind=rp), intent(in) :: dyt(lx, lx)
     real(kind=rp), intent(in) :: dzt(lx, lx)
-    logical, intent(in) :: dfrmd_el(n)
     integer :: i, j, k, l, e
 
     !$omp do
@@ -440,45 +430,37 @@ contains
           end do
        end do
 
-       if (dfrmd_el(e)) then
-          do j = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(1,j,k,e) = d(1,j,k,e) &
-                     + G12(1,j,k,e) * dxt(1,1)*dyt(j,j) &
-                     + G13(1,j,k,e) * dxt(1,1)*dzt(k,k)
-                d(lx,j,k,e) = d(lx,j,k,e) &
-                     + G12(lx,j,k,e) * dxt(lx,lx)*dyt(j,j) &
-                     + G13(lx,j,k,e) * dxt(lx,lx)*dzt(k,k)
+       ! Cross terms, only on the edges, see jacobi_update
+       do k = 1, lx
+          do j = 1, lx, lx - 1
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G12(i,j,k,e) * dxt(i,i) * dyt(j,j)
              end do
           end do
-
-          do i = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(i,1,k,e) = d(i,1,k,e) &
-                     + G12(i,1,k,e) * dyt(1,1)*dxt(i,i) &
-                     + G23(i,1,k,e) * dyt(1,1)*dzt(k,k)
-                d(i,lx,k,e) = d(i,lx,k,e) &
-                     + G12(i,lx,k,e) * dyt(lx,lx)*dxt(i,i) &
-                     + G23(i,lx,k,e) * dyt(lx,lx)*dzt(k,k)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G13(i,j,k,e) * dxt(i,i) * dzt(k,k)
              end do
           end do
-          do i = 1, lx, lx-1
-             do j = 1, lx, lx-1
-                d(i,j,1,e) = d(i,j,1,e) &
-                     + G13(i,j,1,e) * dzt(1,1)*dxt(i,i) &
-                     + G23(i,j,1,e) * dzt(1,1)*dyt(j,j)
-                d(i,j,lx,e) = d(i,j,lx,e) &
-                     + G13(i,j,lx,e) * dzt(lx,lx)*dxt(i,i) &
-                     + G23(i,j,lx,e) * dzt(lx,lx)*dyt(j,j)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx, lx - 1
+             do i = 1, lx
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G23(i,j,k,e) * dyt(j,j) * dzt(k,k)
              end do
           end do
-       end if
+       end do
     end do
     !$omp end do
   end subroutine jacobi_update_lx13
 
   subroutine jacobi_update_lx12(d, dxt, dyt, dzt, G11, G22, G33, &
-       G12, G13, G23, dfrmd_el, n)
+       G12, G13, G23, n)
     integer, parameter :: lx = 12
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: d(lx, lx, lx, n)
@@ -491,7 +473,6 @@ contains
     real(kind=rp), intent(in) :: dxt(lx, lx)
     real(kind=rp), intent(in) :: dyt(lx, lx)
     real(kind=rp), intent(in) :: dzt(lx, lx)
-    logical, intent(in) :: dfrmd_el(n)
     integer :: i, j, k, l, e
 
     !$omp do
@@ -539,45 +520,37 @@ contains
           end do
        end do
 
-       if (dfrmd_el(e)) then
-          do j = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(1,j,k,e) = d(1,j,k,e) &
-                     + G12(1,j,k,e) * dxt(1,1)*dyt(j,j) &
-                     + G13(1,j,k,e) * dxt(1,1)*dzt(k,k)
-                d(lx,j,k,e) = d(lx,j,k,e) &
-                     + G12(lx,j,k,e) * dxt(lx,lx)*dyt(j,j) &
-                     + G13(lx,j,k,e) * dxt(lx,lx)*dzt(k,k)
+       ! Cross terms, only on the edges, see jacobi_update
+       do k = 1, lx
+          do j = 1, lx, lx - 1
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G12(i,j,k,e) * dxt(i,i) * dyt(j,j)
              end do
           end do
-
-          do i = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(i,1,k,e) = d(i,1,k,e) &
-                     + G12(i,1,k,e) * dyt(1,1)*dxt(i,i) &
-                     + G23(i,1,k,e) * dyt(1,1)*dzt(k,k)
-                d(i,lx,k,e) = d(i,lx,k,e) &
-                     + G12(i,lx,k,e) * dyt(lx,lx)*dxt(i,i) &
-                     + G23(i,lx,k,e) * dyt(lx,lx)*dzt(k,k)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G13(i,j,k,e) * dxt(i,i) * dzt(k,k)
              end do
           end do
-          do i = 1, lx, lx-1
-             do j = 1, lx, lx-1
-                d(i,j,1,e) = d(i,j,1,e) &
-                     + G13(i,j,1,e) * dzt(1,1)*dxt(i,i) &
-                     + G23(i,j,1,e) * dzt(1,1)*dyt(j,j)
-                d(i,j,lx,e) = d(i,j,lx,e) &
-                     + G13(i,j,lx,e) * dzt(lx,lx)*dxt(i,i) &
-                     + G23(i,j,lx,e) * dzt(lx,lx)*dyt(j,j)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx, lx - 1
+             do i = 1, lx
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G23(i,j,k,e) * dyt(j,j) * dzt(k,k)
              end do
           end do
-       end if
+       end do
     end do
     !$omp end do
   end subroutine jacobi_update_lx12
 
   subroutine jacobi_update_lx11(d, dxt, dyt, dzt, G11, G22, G33, &
-       G12, G13, G23, dfrmd_el, n)
+       G12, G13, G23, n)
     integer, parameter :: lx = 11
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: d(lx, lx, lx, n)
@@ -590,7 +563,6 @@ contains
     real(kind=rp), intent(in) :: dxt(lx, lx)
     real(kind=rp), intent(in) :: dyt(lx, lx)
     real(kind=rp), intent(in) :: dzt(lx, lx)
-    logical, intent(in) :: dfrmd_el(n)
     integer :: i, j, k, l, e
 
     !$omp do
@@ -638,45 +610,37 @@ contains
           end do
        end do
 
-       if (dfrmd_el(e)) then
-          do j = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(1,j,k,e) = d(1,j,k,e) &
-                     + G12(1,j,k,e) * dxt(1,1)*dyt(j,j) &
-                     + G13(1,j,k,e) * dxt(1,1)*dzt(k,k)
-                d(lx,j,k,e) = d(lx,j,k,e) &
-                     + G12(lx,j,k,e) * dxt(lx,lx)*dyt(j,j) &
-                     + G13(lx,j,k,e) * dxt(lx,lx)*dzt(k,k)
+       ! Cross terms, only on the edges, see jacobi_update
+       do k = 1, lx
+          do j = 1, lx, lx - 1
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G12(i,j,k,e) * dxt(i,i) * dyt(j,j)
              end do
           end do
-
-          do i = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(i,1,k,e) = d(i,1,k,e) &
-                     + G12(i,1,k,e) * dyt(1,1)*dxt(i,i) &
-                     + G23(i,1,k,e) * dyt(1,1)*dzt(k,k)
-                d(i,lx,k,e) = d(i,lx,k,e) &
-                     + G12(i,lx,k,e) * dyt(lx,lx)*dxt(i,i) &
-                     + G23(i,lx,k,e) * dyt(lx,lx)*dzt(k,k)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G13(i,j,k,e) * dxt(i,i) * dzt(k,k)
              end do
           end do
-          do i = 1, lx, lx-1
-             do j = 1, lx, lx-1
-                d(i,j,1,e) = d(i,j,1,e) &
-                     + G13(i,j,1,e) * dzt(1,1)*dxt(i,i) &
-                     + G23(i,j,1,e) * dzt(1,1)*dyt(j,j)
-                d(i,j,lx,e) = d(i,j,lx,e) &
-                     + G13(i,j,lx,e) * dzt(lx,lx)*dxt(i,i) &
-                     + G23(i,j,lx,e) * dzt(lx,lx)*dyt(j,j)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx, lx - 1
+             do i = 1, lx
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G23(i,j,k,e) * dyt(j,j) * dzt(k,k)
              end do
           end do
-       end if
+       end do
     end do
     !$omp end do
   end subroutine jacobi_update_lx11
 
   subroutine jacobi_update_lx10(d, dxt, dyt, dzt, G11, G22, G33, &
-       G12, G13, G23, dfrmd_el, n)
+       G12, G13, G23, n)
     integer, parameter :: lx = 10
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: d(lx, lx, lx, n)
@@ -689,7 +653,6 @@ contains
     real(kind=rp), intent(in) :: dxt(lx, lx)
     real(kind=rp), intent(in) :: dyt(lx, lx)
     real(kind=rp), intent(in) :: dzt(lx, lx)
-    logical, intent(in) :: dfrmd_el(n)
     integer :: i, j, k, l, e
 
     !$omp do
@@ -737,45 +700,37 @@ contains
           end do
        end do
 
-       if (dfrmd_el(e)) then
-          do j = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(1,j,k,e) = d(1,j,k,e) &
-                     + G12(1,j,k,e) * dxt(1,1)*dyt(j,j) &
-                     + G13(1,j,k,e) * dxt(1,1)*dzt(k,k)
-                d(lx,j,k,e) = d(lx,j,k,e) &
-                     + G12(lx,j,k,e) * dxt(lx,lx)*dyt(j,j) &
-                     + G13(lx,j,k,e) * dxt(lx,lx)*dzt(k,k)
+       ! Cross terms, only on the edges, see jacobi_update
+       do k = 1, lx
+          do j = 1, lx, lx - 1
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G12(i,j,k,e) * dxt(i,i) * dyt(j,j)
              end do
           end do
-
-          do i = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(i,1,k,e) = d(i,1,k,e) &
-                     + G12(i,1,k,e) * dyt(1,1)*dxt(i,i) &
-                     + G23(i,1,k,e) * dyt(1,1)*dzt(k,k)
-                d(i,lx,k,e) = d(i,lx,k,e) &
-                     + G12(i,lx,k,e) * dyt(lx,lx)*dxt(i,i) &
-                     + G23(i,lx,k,e) * dyt(lx,lx)*dzt(k,k)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G13(i,j,k,e) * dxt(i,i) * dzt(k,k)
              end do
           end do
-          do i = 1, lx, lx-1
-             do j = 1, lx, lx-1
-                d(i,j,1,e) = d(i,j,1,e) &
-                     + G13(i,j,1,e) * dzt(1,1)*dxt(i,i) &
-                     + G23(i,j,1,e) * dzt(1,1)*dyt(j,j)
-                d(i,j,lx,e) = d(i,j,lx,e) &
-                     + G13(i,j,lx,e) * dzt(lx,lx)*dxt(i,i) &
-                     + G23(i,j,lx,e) * dzt(lx,lx)*dyt(j,j)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx, lx - 1
+             do i = 1, lx
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G23(i,j,k,e) * dyt(j,j) * dzt(k,k)
              end do
           end do
-       end if
+       end do
     end do
     !$omp end do
   end subroutine jacobi_update_lx10
 
   subroutine jacobi_update_lx9(d, dxt, dyt, dzt, G11, G22, G33, &
-       G12, G13, G23, dfrmd_el, n)
+       G12, G13, G23, n)
     integer, parameter :: lx = 9
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: d(lx, lx, lx, n)
@@ -788,7 +743,6 @@ contains
     real(kind=rp), intent(in) :: dxt(lx, lx)
     real(kind=rp), intent(in) :: dyt(lx, lx)
     real(kind=rp), intent(in) :: dzt(lx, lx)
-    logical, intent(in) :: dfrmd_el(n)
     integer :: i, j, k, l, e
 
     !$omp do
@@ -836,45 +790,37 @@ contains
           end do
        end do
 
-       if (dfrmd_el(e)) then
-          do j = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(1,j,k,e) = d(1,j,k,e) &
-                     + G12(1,j,k,e) * dxt(1,1)*dyt(j,j) &
-                     + G13(1,j,k,e) * dxt(1,1)*dzt(k,k)
-                d(lx,j,k,e) = d(lx,j,k,e) &
-                     + G12(lx,j,k,e) * dxt(lx,lx)*dyt(j,j) &
-                     + G13(lx,j,k,e) * dxt(lx,lx)*dzt(k,k)
+       ! Cross terms, only on the edges, see jacobi_update
+       do k = 1, lx
+          do j = 1, lx, lx - 1
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G12(i,j,k,e) * dxt(i,i) * dyt(j,j)
              end do
           end do
-
-          do i = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(i,1,k,e) = d(i,1,k,e) &
-                     + G12(i,1,k,e) * dyt(1,1)*dxt(i,i) &
-                     + G23(i,1,k,e) * dyt(1,1)*dzt(k,k)
-                d(i,lx,k,e) = d(i,lx,k,e) &
-                     + G12(i,lx,k,e) * dyt(lx,lx)*dxt(i,i) &
-                     + G23(i,lx,k,e) * dyt(lx,lx)*dzt(k,k)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G13(i,j,k,e) * dxt(i,i) * dzt(k,k)
              end do
           end do
-          do i = 1, lx, lx-1
-             do j = 1, lx, lx-1
-                d(i,j,1,e) = d(i,j,1,e) &
-                     + G13(i,j,1,e) * dzt(1,1)*dxt(i,i) &
-                     + G23(i,j,1,e) * dzt(1,1)*dyt(j,j)
-                d(i,j,lx,e) = d(i,j,lx,e) &
-                     + G13(i,j,lx,e) * dzt(lx,lx)*dxt(i,i) &
-                     + G23(i,j,lx,e) * dzt(lx,lx)*dyt(j,j)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx, lx - 1
+             do i = 1, lx
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G23(i,j,k,e) * dyt(j,j) * dzt(k,k)
              end do
           end do
-       end if
+       end do
     end do
     !$omp end do
   end subroutine jacobi_update_lx9
 
   subroutine jacobi_update_lx8(d, dxt, dyt, dzt, G11, G22, G33, &
-       G12, G13, G23, dfrmd_el, n)
+       G12, G13, G23, n)
     integer, parameter :: lx = 8
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: d(lx, lx, lx, n)
@@ -887,7 +833,6 @@ contains
     real(kind=rp), intent(in) :: dxt(lx, lx)
     real(kind=rp), intent(in) :: dyt(lx, lx)
     real(kind=rp), intent(in) :: dzt(lx, lx)
-    logical, intent(in) :: dfrmd_el(n)
     integer :: i, j, k, l, e
 
     !$omp do
@@ -935,45 +880,37 @@ contains
           end do
        end do
 
-       if (dfrmd_el(e)) then
-          do j = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(1,j,k,e) = d(1,j,k,e) &
-                     + G12(1,j,k,e) * dxt(1,1)*dyt(j,j) &
-                     + G13(1,j,k,e) * dxt(1,1)*dzt(k,k)
-                d(lx,j,k,e) = d(lx,j,k,e) &
-                     + G12(lx,j,k,e) * dxt(lx,lx)*dyt(j,j) &
-                     + G13(lx,j,k,e) * dxt(lx,lx)*dzt(k,k)
+       ! Cross terms, only on the edges, see jacobi_update
+       do k = 1, lx
+          do j = 1, lx, lx - 1
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G12(i,j,k,e) * dxt(i,i) * dyt(j,j)
              end do
           end do
-
-          do i = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(i,1,k,e) = d(i,1,k,e) &
-                     + G12(i,1,k,e) * dyt(1,1)*dxt(i,i) &
-                     + G23(i,1,k,e) * dyt(1,1)*dzt(k,k)
-                d(i,lx,k,e) = d(i,lx,k,e) &
-                     + G12(i,lx,k,e) * dyt(lx,lx)*dxt(i,i) &
-                     + G23(i,lx,k,e) * dyt(lx,lx)*dzt(k,k)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G13(i,j,k,e) * dxt(i,i) * dzt(k,k)
              end do
           end do
-          do i = 1, lx, lx-1
-             do j = 1, lx, lx-1
-                d(i,j,1,e) = d(i,j,1,e) &
-                     + G13(i,j,1,e) * dzt(1,1)*dxt(i,i) &
-                     + G23(i,j,1,e) * dzt(1,1)*dyt(j,j)
-                d(i,j,lx,e) = d(i,j,lx,e) &
-                     + G13(i,j,lx,e) * dzt(lx,lx)*dxt(i,i) &
-                     + G23(i,j,lx,e) * dzt(lx,lx)*dyt(j,j)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx, lx - 1
+             do i = 1, lx
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G23(i,j,k,e) * dyt(j,j) * dzt(k,k)
              end do
           end do
-       end if
+       end do
     end do
     !$omp end do
   end subroutine jacobi_update_lx8
 
   subroutine jacobi_update_lx7(d, dxt, dyt, dzt, G11, G22, G33, &
-       G12, G13, G23, dfrmd_el, n)
+       G12, G13, G23, n)
     integer, parameter :: lx = 7
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: d(lx, lx, lx, n)
@@ -986,7 +923,6 @@ contains
     real(kind=rp), intent(in) :: dxt(lx, lx)
     real(kind=rp), intent(in) :: dyt(lx, lx)
     real(kind=rp), intent(in) :: dzt(lx, lx)
-    logical, intent(in) :: dfrmd_el(n)
     integer :: i, j, k, l, e
 
     !$omp do
@@ -1034,45 +970,37 @@ contains
           end do
        end do
 
-       if (dfrmd_el(e)) then
-          do j = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(1,j,k,e) = d(1,j,k,e) &
-                     + G12(1,j,k,e) * dxt(1,1)*dyt(j,j) &
-                     + G13(1,j,k,e) * dxt(1,1)*dzt(k,k)
-                d(lx,j,k,e) = d(lx,j,k,e) &
-                     + G12(lx,j,k,e) * dxt(lx,lx)*dyt(j,j) &
-                     + G13(lx,j,k,e) * dxt(lx,lx)*dzt(k,k)
+       ! Cross terms, only on the edges, see jacobi_update
+       do k = 1, lx
+          do j = 1, lx, lx - 1
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G12(i,j,k,e) * dxt(i,i) * dyt(j,j)
              end do
           end do
-
-          do i = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(i,1,k,e) = d(i,1,k,e) &
-                     + G12(i,1,k,e) * dyt(1,1)*dxt(i,i) &
-                     + G23(i,1,k,e) * dyt(1,1)*dzt(k,k)
-                d(i,lx,k,e) = d(i,lx,k,e) &
-                     + G12(i,lx,k,e) * dyt(lx,lx)*dxt(i,i) &
-                     + G23(i,lx,k,e) * dyt(lx,lx)*dzt(k,k)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G13(i,j,k,e) * dxt(i,i) * dzt(k,k)
              end do
           end do
-          do i = 1, lx, lx-1
-             do j = 1, lx, lx-1
-                d(i,j,1,e) = d(i,j,1,e) &
-                     + G13(i,j,1,e) * dzt(1,1)*dxt(i,i) &
-                     + G23(i,j,1,e) * dzt(1,1)*dyt(j,j)
-                d(i,j,lx,e) = d(i,j,lx,e) &
-                     + G13(i,j,lx,e) * dzt(lx,lx)*dxt(i,i) &
-                     + G23(i,j,lx,e) * dzt(lx,lx)*dyt(j,j)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx, lx - 1
+             do i = 1, lx
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G23(i,j,k,e) * dyt(j,j) * dzt(k,k)
              end do
           end do
-       end if
+       end do
     end do
     !$omp end do
   end subroutine jacobi_update_lx7
 
   subroutine jacobi_update_lx6(d, dxt, dyt, dzt, G11, G22, G33, &
-       G12, G13, G23, dfrmd_el, n)
+       G12, G13, G23, n)
     integer, parameter :: lx = 6
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: d(lx, lx, lx, n)
@@ -1085,7 +1013,6 @@ contains
     real(kind=rp), intent(in) :: dxt(lx, lx)
     real(kind=rp), intent(in) :: dyt(lx, lx)
     real(kind=rp), intent(in) :: dzt(lx, lx)
-    logical, intent(in) :: dfrmd_el(n)
     integer :: i, j, k, l, e
 
     !$omp do
@@ -1133,45 +1060,37 @@ contains
           end do
        end do
 
-       if (dfrmd_el(e)) then
-          do j = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(1,j,k,e) = d(1,j,k,e) &
-                     + G12(1,j,k,e) * dxt(1,1)*dyt(j,j) &
-                     + G13(1,j,k,e) * dxt(1,1)*dzt(k,k)
-                d(lx,j,k,e) = d(lx,j,k,e) &
-                     + G12(lx,j,k,e) * dxt(lx,lx)*dyt(j,j) &
-                     + G13(lx,j,k,e) * dxt(lx,lx)*dzt(k,k)
+       ! Cross terms, only on the edges, see jacobi_update
+       do k = 1, lx
+          do j = 1, lx, lx - 1
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G12(i,j,k,e) * dxt(i,i) * dyt(j,j)
              end do
           end do
-
-          do i = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(i,1,k,e) = d(i,1,k,e) &
-                     + G12(i,1,k,e) * dyt(1,1)*dxt(i,i) &
-                     + G23(i,1,k,e) * dyt(1,1)*dzt(k,k)
-                d(i,lx,k,e) = d(i,lx,k,e) &
-                     + G12(i,lx,k,e) * dyt(lx,lx)*dxt(i,i) &
-                     + G23(i,lx,k,e) * dyt(lx,lx)*dzt(k,k)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G13(i,j,k,e) * dxt(i,i) * dzt(k,k)
              end do
           end do
-          do i = 1, lx, lx-1
-             do j = 1, lx, lx-1
-                d(i,j,1,e) = d(i,j,1,e) &
-                     + G13(i,j,1,e) * dzt(1,1)*dxt(i,i) &
-                     + G23(i,j,1,e) * dzt(1,1)*dyt(j,j)
-                d(i,j,lx,e) = d(i,j,lx,e) &
-                     + G13(i,j,lx,e) * dzt(lx,lx)*dxt(i,i) &
-                     + G23(i,j,lx,e) * dzt(lx,lx)*dyt(j,j)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx, lx - 1
+             do i = 1, lx
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G23(i,j,k,e) * dyt(j,j) * dzt(k,k)
              end do
           end do
-       end if
+       end do
     end do
     !$omp end do
   end subroutine jacobi_update_lx6
 
   subroutine jacobi_update_lx5(d, dxt, dyt, dzt, G11, G22, G33, &
-       G12, G13, G23, dfrmd_el, n)
+       G12, G13, G23, n)
     integer, parameter :: lx = 5
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: d(lx, lx, lx, n)
@@ -1184,7 +1103,6 @@ contains
     real(kind=rp), intent(in) :: dxt(lx, lx)
     real(kind=rp), intent(in) :: dyt(lx, lx)
     real(kind=rp), intent(in) :: dzt(lx, lx)
-    logical, intent(in) :: dfrmd_el(n)
     integer :: i, j, k, l, e
 
     !$omp do
@@ -1232,45 +1150,37 @@ contains
           end do
        end do
 
-       if (dfrmd_el(e)) then
-          do j = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(1,j,k,e) = d(1,j,k,e) &
-                     + G12(1,j,k,e) * dxt(1,1)*dyt(j,j) &
-                     + G13(1,j,k,e) * dxt(1,1)*dzt(k,k)
-                d(lx,j,k,e) = d(lx,j,k,e) &
-                     + G12(lx,j,k,e) * dxt(lx,lx)*dyt(j,j) &
-                     + G13(lx,j,k,e) * dxt(lx,lx)*dzt(k,k)
+       ! Cross terms, only on the edges, see jacobi_update
+       do k = 1, lx
+          do j = 1, lx, lx - 1
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G12(i,j,k,e) * dxt(i,i) * dyt(j,j)
              end do
           end do
-
-          do i = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(i,1,k,e) = d(i,1,k,e) &
-                     + G12(i,1,k,e) * dyt(1,1)*dxt(i,i) &
-                     + G23(i,1,k,e) * dyt(1,1)*dzt(k,k)
-                d(i,lx,k,e) = d(i,lx,k,e) &
-                     + G12(i,lx,k,e) * dyt(lx,lx)*dxt(i,i) &
-                     + G23(i,lx,k,e) * dyt(lx,lx)*dzt(k,k)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G13(i,j,k,e) * dxt(i,i) * dzt(k,k)
              end do
           end do
-          do i = 1, lx, lx-1
-             do j = 1, lx, lx-1
-                d(i,j,1,e) = d(i,j,1,e) &
-                     + G13(i,j,1,e) * dzt(1,1)*dxt(i,i) &
-                     + G23(i,j,1,e) * dzt(1,1)*dyt(j,j)
-                d(i,j,lx,e) = d(i,j,lx,e) &
-                     + G13(i,j,lx,e) * dzt(lx,lx)*dxt(i,i) &
-                     + G23(i,j,lx,e) * dzt(lx,lx)*dyt(j,j)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx, lx - 1
+             do i = 1, lx
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G23(i,j,k,e) * dyt(j,j) * dzt(k,k)
              end do
           end do
-       end if
+       end do
     end do
     !$omp end do
   end subroutine jacobi_update_lx5
 
   subroutine jacobi_update_lx4(d, dxt, dyt, dzt, G11, G22, G33, &
-       G12, G13, G23, dfrmd_el, n)
+       G12, G13, G23, n)
     integer, parameter :: lx = 4
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: d(lx, lx, lx, n)
@@ -1283,7 +1193,6 @@ contains
     real(kind=rp), intent(in) :: dxt(lx, lx)
     real(kind=rp), intent(in) :: dyt(lx, lx)
     real(kind=rp), intent(in) :: dzt(lx, lx)
-    logical, intent(in) :: dfrmd_el(n)
     integer :: i, j, k, l, e
 
     !$omp do
@@ -1331,45 +1240,37 @@ contains
           end do
        end do
 
-       if (dfrmd_el(e)) then
-          do j = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(1,j,k,e) = d(1,j,k,e) &
-                     + G12(1,j,k,e) * dxt(1,1)*dyt(j,j) &
-                     + G13(1,j,k,e) * dxt(1,1)*dzt(k,k)
-                d(lx,j,k,e) = d(lx,j,k,e) &
-                     + G12(lx,j,k,e) * dxt(lx,lx)*dyt(j,j) &
-                     + G13(lx,j,k,e) * dxt(lx,lx)*dzt(k,k)
+       ! Cross terms, only on the edges, see jacobi_update
+       do k = 1, lx
+          do j = 1, lx, lx - 1
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G12(i,j,k,e) * dxt(i,i) * dyt(j,j)
              end do
           end do
-
-          do i = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(i,1,k,e) = d(i,1,k,e) &
-                     + G12(i,1,k,e) * dyt(1,1)*dxt(i,i) &
-                     + G23(i,1,k,e) * dyt(1,1)*dzt(k,k)
-                d(i,lx,k,e) = d(i,lx,k,e) &
-                     + G12(i,lx,k,e) * dyt(lx,lx)*dxt(i,i) &
-                     + G23(i,lx,k,e) * dyt(lx,lx)*dzt(k,k)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G13(i,j,k,e) * dxt(i,i) * dzt(k,k)
              end do
           end do
-          do i = 1, lx, lx-1
-             do j = 1, lx, lx-1
-                d(i,j,1,e) = d(i,j,1,e) &
-                     + G13(i,j,1,e) * dzt(1,1)*dxt(i,i) &
-                     + G23(i,j,1,e) * dzt(1,1)*dyt(j,j)
-                d(i,j,lx,e) = d(i,j,lx,e) &
-                     + G13(i,j,lx,e) * dzt(lx,lx)*dxt(i,i) &
-                     + G23(i,j,lx,e) * dzt(lx,lx)*dyt(j,j)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx, lx - 1
+             do i = 1, lx
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G23(i,j,k,e) * dyt(j,j) * dzt(k,k)
              end do
           end do
-       end if
+       end do
     end do
     !$omp end do
   end subroutine jacobi_update_lx4
 
   subroutine jacobi_update_lx3(d, dxt, dyt, dzt, G11, G22, G33, &
-       G12, G13, G23, dfrmd_el, n)
+       G12, G13, G23, n)
     integer, parameter :: lx = 3
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: d(lx, lx, lx, n)
@@ -1382,7 +1283,6 @@ contains
     real(kind=rp), intent(in) :: dxt(lx, lx)
     real(kind=rp), intent(in) :: dyt(lx, lx)
     real(kind=rp), intent(in) :: dzt(lx, lx)
-    logical, intent(in) :: dfrmd_el(n)
     integer :: i, j, k, l, e
 
     !$omp do
@@ -1430,45 +1330,37 @@ contains
           end do
        end do
 
-       if (dfrmd_el(e)) then
-          do j = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(1,j,k,e) = d(1,j,k,e) &
-                     + G12(1,j,k,e) * dxt(1,1)*dyt(j,j) &
-                     + G13(1,j,k,e) * dxt(1,1)*dzt(k,k)
-                d(lx,j,k,e) = d(lx,j,k,e) &
-                     + G12(lx,j,k,e) * dxt(lx,lx)*dyt(j,j) &
-                     + G13(lx,j,k,e) * dxt(lx,lx)*dzt(k,k)
+       ! Cross terms, only on the edges, see jacobi_update
+       do k = 1, lx
+          do j = 1, lx, lx - 1
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G12(i,j,k,e) * dxt(i,i) * dyt(j,j)
              end do
           end do
-
-          do i = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(i,1,k,e) = d(i,1,k,e) &
-                     + G12(i,1,k,e) * dyt(1,1)*dxt(i,i) &
-                     + G23(i,1,k,e) * dyt(1,1)*dzt(k,k)
-                d(i,lx,k,e) = d(i,lx,k,e) &
-                     + G12(i,lx,k,e) * dyt(lx,lx)*dxt(i,i) &
-                     + G23(i,lx,k,e) * dyt(lx,lx)*dzt(k,k)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G13(i,j,k,e) * dxt(i,i) * dzt(k,k)
              end do
           end do
-          do i = 1, lx, lx-1
-             do j = 1, lx, lx-1
-                d(i,j,1,e) = d(i,j,1,e) &
-                     + G13(i,j,1,e) * dzt(1,1)*dxt(i,i) &
-                     + G23(i,j,1,e) * dzt(1,1)*dyt(j,j)
-                d(i,j,lx,e) = d(i,j,lx,e) &
-                     + G13(i,j,lx,e) * dzt(lx,lx)*dxt(i,i) &
-                     + G23(i,j,lx,e) * dzt(lx,lx)*dyt(j,j)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx, lx - 1
+             do i = 1, lx
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G23(i,j,k,e) * dyt(j,j) * dzt(k,k)
              end do
           end do
-       end if
+       end do
     end do
     !$omp end do
   end subroutine jacobi_update_lx3
 
   subroutine jacobi_update_lx2(d, dxt, dyt, dzt, G11, G22, G33, &
-       G12, G13, G23, dfrmd_el, n)
+       G12, G13, G23, n)
     integer, parameter :: lx = 2
     integer, intent(in) :: n
     real(kind=rp), intent(inout) :: d(lx, lx, lx, n)
@@ -1481,7 +1373,6 @@ contains
     real(kind=rp), intent(in) :: dxt(lx, lx)
     real(kind=rp), intent(in) :: dyt(lx, lx)
     real(kind=rp), intent(in) :: dzt(lx, lx)
-    logical, intent(in) :: dfrmd_el(n)
     integer :: i, j, k, l, e
 
     !$omp do
@@ -1529,39 +1420,31 @@ contains
           end do
        end do
 
-       if (dfrmd_el(e)) then
-          do j = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(1,j,k,e) = d(1,j,k,e) &
-                     + G12(1,j,k,e) * dxt(1,1)*dyt(j,j) &
-                     + G13(1,j,k,e) * dxt(1,1)*dzt(k,k)
-                d(lx,j,k,e) = d(lx,j,k,e) &
-                     + G12(lx,j,k,e) * dxt(lx,lx)*dyt(j,j) &
-                     + G13(lx,j,k,e) * dxt(lx,lx)*dzt(k,k)
+       ! Cross terms, only on the edges, see jacobi_update
+       do k = 1, lx
+          do j = 1, lx, lx - 1
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G12(i,j,k,e) * dxt(i,i) * dyt(j,j)
              end do
           end do
-
-          do i = 1, lx, lx-1
-             do k = 1, lx, lx-1
-                d(i,1,k,e) = d(i,1,k,e) &
-                     + G12(i,1,k,e) * dyt(1,1)*dxt(i,i) &
-                     + G23(i,1,k,e) * dyt(1,1)*dzt(k,k)
-                d(i,lx,k,e) = d(i,lx,k,e) &
-                     + G12(i,lx,k,e) * dyt(lx,lx)*dxt(i,i) &
-                     + G23(i,lx,k,e) * dyt(lx,lx)*dzt(k,k)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx
+             do i = 1, lx, lx - 1
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G13(i,j,k,e) * dxt(i,i) * dzt(k,k)
              end do
           end do
-          do i = 1, lx, lx-1
-             do j = 1, lx, lx-1
-                d(i,j,1,e) = d(i,j,1,e) &
-                     + G13(i,j,1,e) * dzt(1,1)*dxt(i,i) &
-                     + G23(i,j,1,e) * dzt(1,1)*dyt(j,j)
-                d(i,j,lx,e) = d(i,j,lx,e) &
-                     + G13(i,j,lx,e) * dzt(lx,lx)*dxt(i,i) &
-                     + G23(i,j,lx,e) * dzt(lx,lx)*dyt(j,j)
+       end do
+       do k = 1, lx, lx - 1
+          do j = 1, lx, lx - 1
+             do i = 1, lx
+                d(i,j,k,e) = d(i,j,k,e) &
+                     + 2.0_rp * G23(i,j,k,e) * dyt(j,j) * dzt(k,k)
              end do
           end do
-       end if
+       end do
     end do
     !$omp end do
   end subroutine jacobi_update_lx2
