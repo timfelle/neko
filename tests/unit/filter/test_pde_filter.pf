@@ -1,6 +1,7 @@
 ! Tests that PDE_filter_t reports a filter solve that does not converge,
-! rather than returning the unconverged field silently, and that a solve
-! which reaches the tolerance on its last allowed iteration has converged.
+! rather than returning the unconverged field silently, that a solve which
+! reaches the tolerance on its last allowed iteration has converged, and that
+! the filter refuses solvers that do not report whether they converged.
 !
 ! Each filter is set up from JSON, as a case file does, on a single unit hex
 ! element at polynomial order 7 (lx = 8), and filters an impulse at an
@@ -17,8 +18,7 @@ module test_pde_filter
   use num_types, only : rp
   use comm, only : NEKO_COMM, pe_rank, pe_size
   use pfunit_comm_utils, only : comm_init_test, comm_free_test
-  use device, only : device_init, device_finalize, device_memcpy, &
-       HOST_TO_DEVICE
+  use device, only : device_init, device_finalize, HOST_TO_DEVICE
   use neko_config, only : NEKO_BCKND_DEVICE
   use neko_mpi_types, only : neko_mpi_types_init, neko_mpi_types_free
   use mesh_fixture, only : single_unit_hex_mesh
@@ -143,6 +143,76 @@ contains
     close(log_unit, status = 'delete')
   end function close_log
 
+  !> Build the SEM coefficients on a single unit hex element, and the
+  !! scratch registry the filter takes its work fields from.
+  !! @param msh The mesh.
+  !! @param Xh The function space.
+  !! @param dof The dofmap.
+  !! @param gs The gather-scatter handle.
+  !! @param coef The SEM coefficients.
+  subroutine build_fixture(msh, Xh, dof, gs, coef)
+    type(mesh_t), intent(inout) :: msh
+    type(space_t), intent(inout) :: Xh
+    type(dofmap_t), intent(inout) :: dof
+    type(gs_t), intent(inout) :: gs
+    type(coef_t), intent(inout) :: coef
+
+    call single_unit_hex_mesh(msh)
+    call Xh%init(GLL, LX, LX, LX)
+    call dof%init(msh, Xh)
+    call gs%init(dof)
+    call coef%init(gs)
+    call neko_scratch_registry%init(dof = dof)
+  end subroutine build_fixture
+
+  !> Free everything build_fixture set up.
+  !! @param msh The mesh.
+  !! @param Xh The function space.
+  !! @param dof The dofmap.
+  !! @param gs The gather-scatter handle.
+  !! @param coef The SEM coefficients.
+  subroutine free_fixture(msh, Xh, dof, gs, coef)
+    type(mesh_t), intent(inout) :: msh
+    type(space_t), intent(inout) :: Xh
+    type(dofmap_t), intent(inout) :: dof
+    type(gs_t), intent(inout) :: gs
+    type(coef_t), intent(inout) :: coef
+
+    call neko_scratch_registry%free()
+    call coef%free()
+    call gs%free()
+    call dof%free()
+    call Xh%free()
+    call msh%free()
+  end subroutine free_fixture
+
+  !> Set up a filter from @a json_string on a fresh fixture, without
+  !! applying it, and tell whether setting it up raised an error.
+  !! @param json_string The JSON object of the filter.
+  !! @return Whether setting up the filter raised an error.
+  function init_raises(json_string) result(raised)
+    character(len=*), intent(in) :: json_string
+    logical :: raised
+    type(mesh_t) :: msh
+    type(space_t) :: Xh
+    type(dofmap_t) :: dof
+    type(gs_t) :: gs
+    type(coef_t), target :: coef
+    type(PDE_filter_t) :: filter
+    type(json_file) :: json
+
+    call build_fixture(msh, Xh, dof, gs, coef)
+
+    call json%initialize()
+    call json%load_from_string(json_string)
+    call filter%init(json, coef)
+    raised = catch()
+
+    call filter%free()
+    call json%destroy()
+    call free_fixture(msh, Xh, dof, gs, coef)
+  end function init_raises
+
   !> Filter an impulse with a filter set up from @a json_string on a fresh
   !! fixture, and record what its solve reported.
   !! @param json_string The JSON object of the filter.
@@ -163,12 +233,7 @@ contains
     type(json_file) :: json
     type(field_t) :: f_in, f_out
 
-    call single_unit_hex_mesh(msh)
-    call Xh%init(GLL, LX, LX, LX)
-    call dof%init(msh, Xh)
-    call gs%init(dof)
-    call coef%init(gs)
-    call neko_scratch_registry%init(dof = dof)
+    call build_fixture(msh, Xh, dof, gs, coef)
 
     call json%initialize()
     call json%load_from_string(json_string)
@@ -179,8 +244,7 @@ contains
     f_in%x = 0.0_rp
     f_in%x(4, 4, 4, 1) = 1.0_rp
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(f_in%x, f_in%x_d, f_in%size(), HOST_TO_DEVICE, &
-            .true.)
+       call f_in%copy_from(HOST_TO_DEVICE, sync = .true.)
     end if
 
     call open_log()
@@ -195,12 +259,7 @@ contains
     call f_out%free()
     call filter%free()
     call json%destroy()
-    call neko_scratch_registry%free()
-    call coef%free()
-    call gs%free()
-    call dof%free()
-    call Xh%free()
-    call msh%free()
+    call free_fixture(msh, Xh, dof, gs, coef)
   end subroutine run_filter
 
   !> An unconverged solve logs one warning and raises no error.
@@ -283,5 +342,23 @@ contains
     @assertFalse(raised, 'The solve capped below its iterations raised')
     @assertEqual(1, n_warnings, 'Warnings logged by the under-capped solve')
   end subroutine test_solve_converged_on_last_iteration
+
+  !> A solver whose result does not say whether its solve reached the
+  !! tolerance is refused when the filter is set up: Chebyshev never says so,
+  !! BiCGStab can stop on a relative tolerance, and a coupled solver has no
+  !! solve for a single field.
+  @test(npes=[1])
+  subroutine test_unsupported_solver_errors(this)
+    class(test_pde_filter_case), intent(inout) :: this
+    logical :: cheby_raised, bicgstab_raised, coupled_raised
+
+    cheby_raised = init_raises('{"radius": 0.2, "solver": "cheby"}')
+    bicgstab_raised = init_raises('{"radius": 0.2, "solver": "bicgstab"}')
+    coupled_raised = init_raises('{"radius": 0.2, "solver": "coupled_cg"}')
+
+    @assertTrue(cheby_raised, 'cheby was accepted')
+    @assertTrue(bicgstab_raised, 'bicgstab was accepted')
+    @assertTrue(coupled_raised, 'coupled_cg was accepted')
+  end subroutine test_unsupported_solver_errors
 
 end module test_pde_filter

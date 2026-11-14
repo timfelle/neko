@@ -143,7 +143,8 @@ contains
   !! @param r The filter radius.
   !! @param tol The absolute tolerance of the filter solve.
   !! @param max_iter The maximum number of iterations of the filter solve.
-  !! @param ksp_solver The Krylov solver of the filter solve.
+  !! @param ksp_solver The Krylov solver of the filter solve, one of cg,
+  !! pipecg, fused_cg, cacg and gmres.
   !! @param precon_type The preconditioner of the filter solve.
   !! @param strict_convergence Whether a filter solve that does not converge
   !! is an error rather than a warning, optional, defaults to false.
@@ -158,6 +159,17 @@ contains
     integer :: n
 
     call this%free()
+
+    ! A filter solve that does not converge is reported, so only solvers
+    ! whose result says whether the solve reached the tolerance are taken.
+    ! Chebyshev never says so, and BiCGStab can stop on a relative tolerance,
+    ! which the filter cannot set, before it reaches the filter tolerance.
+    select case (trim(ksp_solver))
+    case ('cg', 'pipecg', 'fused_cg', 'cacg', 'gmres')
+    case default
+       call neko_error('PDE filter solver ' // trim(ksp_solver) // &
+            ' is not supported, use cg, pipecg, fused_cg, cacg or gmres')
+    end select
 
     call this%init_base(coef)
 
