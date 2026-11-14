@@ -108,4 +108,28 @@ subroutine test_krylov_not_converged_above_tolerance
 
 end subroutine test_krylov_not_converged_above_tolerance
 
+!> A solve whose residual is NaN has not converged, whether it stopped
+!! before or on its last allowed iteration.
+@test
+subroutine test_krylov_not_converged_nan_residual
+  use pfunit
+  use num_types, only : rp
+  use cg, only : cg_t
+  use, intrinsic :: ieee_arithmetic, only : ieee_value, ieee_quiet_nan
+  implicit none
+  type(cg_t), target :: ksp
+  integer, parameter :: max_iter = 5
+  real(kind=rp), parameter :: tol = 1.0e-8_rp
+  real(kind=rp) :: nan
+
+  nan = ieee_value(1.0_rp, ieee_quiet_nan)
+  call ksp%init(1, max_iter, abs_tol = tol)
+
+  @assertFalse(ksp%is_converged(1, nan))
+  @assertFalse(ksp%is_converged(max_iter, nan))
+
+  call ksp%free()
+
+end subroutine test_krylov_not_converged_nan_residual
+
 end module test_krylov
