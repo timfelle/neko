@@ -157,6 +157,8 @@ contains
     logical, intent(in), optional :: strict_convergence
     integer :: n
 
+    call this%free()
+
     call this%init_base(coef)
 
     this%r = r
