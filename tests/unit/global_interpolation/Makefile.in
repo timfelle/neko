@@ -17,7 +17,10 @@ NEKO_LIB := $(wildcard @top_builddir@/src/libneko.la)
 	$(FC) -c $(FFLAGS) $<
 
 
+# The suite reads its mesh from this directory of the build tree, which in
+# an out-of-tree build has no copy of it, or possibly an outdated one.
 check: global_interpolation_suite
+	cmp -s $(srcdir)/cylinder.nmsh cylinder.nmsh || cp $(srcdir)/cylinder.nmsh .
 
 # Regenerate this Makefile from Makefile.in via config.status
 # whenever it changes.

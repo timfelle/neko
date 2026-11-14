@@ -251,12 +251,15 @@ suite is registered in:
    `<suite>_test` for a serial suite and `<suite>_suite` for an MPI suite.
    `configure` turns `Makefile.in` into `Makefile`. Its `srcdir` and `VPATH`
    lines let `make` find the sources of the suite in the source directory
-   when the build directory is a different one.
+   when the build directory is a different one. A suite whose tests read a
+   data file relative to `tests/unit` copies the file into the build
+   directory from its `check` target, as
+   `tests/unit/global_interpolation/Makefile.in` does.
 2. For an MPI suite, the runner script `tests/unit/<suite>/<suite>_test`,
    which launches `./<suite>/<suite>_suite` with `mpirun` or `mpiexec`.
 3. `tests/unit/Makefile.am`: the directory in `SUBDIRS`, `<suite>/<suite>_test`
-   in `TESTS`, and every `.pf` file, runner script and fixture source in
-   `EXTRA_DIST`.
+   in `TESTS`, and every `.pf` file, runner script, fixture source and data
+   file in `EXTRA_DIST`.
 4. `configure.ac`: `tests/unit/<suite>/Makefile` in the `AC_CONFIG_FILES` list
    below the comment `# Config tests/unit`.
 5. `tests/unit/.gitignore`: the executable, and any files the tests write. The

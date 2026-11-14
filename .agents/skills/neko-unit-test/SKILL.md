@@ -123,6 +123,10 @@ parts:
 - `<binary>_OTHER_SOURCES`: fixtures compiled into the suite, see below.
 - `clean`: add any files the tests write (`*.nmsh`, `*.chkp`, `*.h5`, ...)
   and add matching patterns to `tests/unit/.gitignore`.
+- `check`: a suite whose tests read a data file relative to `tests/unit`
+  copies it into the build tree here, so that out-of-tree builds find it,
+  as `tests/unit/global_interpolation/Makefile.in` does. List the file in
+  `EXTRA_DIST` too.
 
 Do not copy `Makefile.in` from an arbitrary older suite; several still lack
 the `NEKO_LIB` dependency and the `Makefile` regeneration rule.
@@ -271,8 +275,8 @@ the `if ENABLE_HDF5` block at the end of the file, following `vtkhdf` and
 
 - Module name equals the `.pf` basename in every file of the suite.
 - `tests/unit/Makefile.am` lists the directory in `SUBDIRS`, the runner or
-  binary in `TESTS`, and every `.pf`, runner script and fixture in
-  `EXTRA_DIST`.
+  binary in `TESTS`, and every `.pf`, runner script, fixture and data file
+  in `EXTRA_DIST`.
 - `configure.ac` lists `tests/unit/<name>/Makefile`.
 - `tests/unit/.gitignore` lists the binary and any files the tests write;
   `clean` removes the same files.

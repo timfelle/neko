@@ -140,6 +140,7 @@ EXTRA_DIST = \
 	dofmap/test_dofmap_parallel.pf\
 	field/test_field_parallel.pf\
 	global_interpolation/test_glob_interp_par.pf\
+	global_interpolation/cylinder.nmsh\
 	mean_field/test_mean_field_parallel.pf\
 	device/test_device.pf\
 	data_types/test_host_array_types.pf\
