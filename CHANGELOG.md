@@ -11,6 +11,14 @@
 - PR#2891 `csv_file_t%header` is now a deferred-length allocatable, which
   stays unallocated until the header is set. Code reading it directly must
   check `allocated()` first.
+- `ale_body_t%name`, `%rotation_type` and `%rotation_center_type`,
+  `stiffness_geometry_t%type` and `%decay_profile`,
+  `ale_config_t%stiffness_type` and `force_torque_t%linked_body_name` are now
+  deferred-length allocatables without default values, unallocated until set.
+  The ALE manager and `force_torque_t` set them on initialisation; code that
+  builds these types itself must set them before calling
+  `update_pivot_location`, `compute_body_kinematics_built_in` or
+  `compute_stiffness_ale`.
 
 ## Develop
 

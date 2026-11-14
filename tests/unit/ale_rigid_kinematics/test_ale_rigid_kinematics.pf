@@ -1,0 +1,82 @@
+module test_ale_rigid_kinematics
+  use pfunit
+  use device, only : device_init, device_finalize
+  use neko_config, only : NEKO_BCKND_DEVICE
+  use ale_rigid_kinematics, only : ale_config_t
+  implicit none
+
+  @TestCase
+  type, extends(TestCase) :: test_ale_rigid_kinematics_case
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_ale_rigid_kinematics_case
+
+contains
+
+  subroutine setUp(this)
+    class(test_ale_rigid_kinematics_case), intent(inout) :: this
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_init
+    end if
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_ale_rigid_kinematics_case), intent(inout) :: this
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_finalize
+    end if
+  end subroutine tearDown
+
+  !> The name of a body and the type strings of the configuration are
+  !! stored in full, so two body names that only differ after the 32nd
+  !! character stay distinct, and the destructors release them.
+  @test
+  subroutine test_ale_long_strings_stored(this)
+    class(test_ale_rigid_kinematics_case), intent(inout) :: this
+    type(ale_config_t) :: config
+    character(len=:), allocatable :: name_a, name_b, long_str
+
+    ! Equal in the first 40 characters
+    name_a = repeat('b', 40) // '_upstream'
+    name_b = repeat('b', 40) // '_downstream'
+    long_str = repeat('t', 100)
+
+    config%nbodies = 2
+    allocate(config%bodies(config%nbodies))
+    config%bodies(1)%name = name_a
+    config%bodies(2)%name = name_b
+    config%bodies(1)%rotation_type = long_str
+    config%bodies(1)%rotation_center_type = long_str
+    config%bodies(1)%stiff_geom%type = long_str
+    config%bodies(1)%stiff_geom%decay_profile = long_str
+    config%stiffness_type = long_str
+
+    @assertEqual(len(name_a), len_trim(config%bodies(1)%name))
+    @assertEqual(name_a, config%bodies(1)%name)
+    @assertEqual(name_b, config%bodies(2)%name)
+    @assertFalse(config%bodies(1)%name == config%bodies(2)%name)
+    @assertEqual(long_str, config%bodies(1)%rotation_type)
+    @assertEqual(long_str, config%bodies(1)%rotation_center_type)
+    @assertEqual(long_str, config%bodies(1)%stiff_geom%type)
+    @assertEqual(long_str, config%bodies(1)%stiff_geom%decay_profile)
+    @assertEqual(long_str, config%stiffness_type)
+
+    call config%bodies(1)%free()
+    @assertFalse(allocated(config%bodies(1)%name))
+    @assertFalse(allocated(config%bodies(1)%rotation_type))
+    @assertFalse(allocated(config%bodies(1)%rotation_center_type))
+    @assertFalse(allocated(config%bodies(1)%stiff_geom%type))
+    @assertFalse(allocated(config%bodies(1)%stiff_geom%decay_profile))
+
+    call config%free()
+    @assertFalse(allocated(config%bodies))
+    @assertFalse(allocated(config%stiffness_type))
+    @assertEqual(0, config%nbodies)
+
+    deallocate(name_a, name_b, long_str)
+  end subroutine test_ale_long_strings_stored
+
+end module test_ale_rigid_kinematics

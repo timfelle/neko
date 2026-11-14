@@ -1,4 +1,4 @@
-! Copyright (c) 2023, The Neko Authors
+! Copyright (c) 2023-2026, The Neko Authors
 ! All rights reserved.
 !
 ! Redistribution and use in source and binary forms, with or without
@@ -100,7 +100,7 @@ module force_torque
      type(pivot_state_t), pointer :: pivot_link => null()
      logical :: moving_center = .false.
      logical :: update_normals = .false.
-     character(len=64) :: linked_body_name = 'NOT_LINKED'
+     character(len=:), allocatable :: linked_body_name
      ! Stores the Time=0 offset from the initial pivot
      real(kind=rp) :: local_offset(3) = 0.0_rp
      ! Current Pivot Position
@@ -374,9 +374,8 @@ contains
 
     if (trim(ctype_str) == 'pivot' .or. &
          trim(ctype_str) == 'body_attached') then
-       write(log_buf, '(A,A)') 'Linked to ALE Body movement: ', &
-            trim(this%linked_body_name)
-       call neko_log%message(log_buf)
+       call neko_log%message('Linked to ALE Body movement: ' // &
+            trim(this%linked_body_name))
        write(log_buf, '(A,E15.7,E15.7,E15.7)') &
             'Initial center for torque calculation: ', this%center
        call neko_log%message(log_buf)
@@ -448,6 +447,7 @@ contains
     nullify(this%coef)
     nullify(this%mu)
     nullify(this%pivot_link)
+    if (allocated(this%linked_body_name)) deallocate(this%linked_body_name)
   end subroutine force_torque_free
 
   !> Compute the force_torque field.
@@ -675,6 +675,7 @@ contains
     ale_active = .false.
     this%moving_center = .false.
     this%update_normals = .false.
+    this%linked_body_name = 'NOT_LINKED'
     this%local_offset = 0.0_rp
     nullify(this%body_P)
     nullify(this%body_R)

@@ -388,11 +388,18 @@ contains
           call json_extract_item(json, 'case.fluid.ale.bodies', i, body_sub)
           this%config%bodies(i)%id = i
 
+          ! Defaults for the optional entries read below
+          this%config%bodies(i)%rotation_type = ''
+          this%config%bodies(i)%rotation_center_type = 'relative'
+          this%config%bodies(i)%stiff_geom%type = 'cheap_dist'
+          this%config%bodies(i)%stiff_geom%decay_profile = 'gaussian'
+
           if (body_sub%valid_path('name')) then
              call json_get(body_sub, 'name', tmp_str)
              this%config%bodies(i)%name = tmp_str
           else
-             write(this%config%bodies(i)%name, '(A,I0)') 'body_', i
+             write(log_buf, '(A,I0)') 'body_', i
+             this%config%bodies(i)%name = trim(log_buf)
           end if
 
           if (body_sub%valid_path('zone_indices')) then
@@ -782,12 +789,11 @@ contains
              do k = j + 1, this%config%nbodies
                 if (allocated(this%config%bodies(k)%zone_indices)) then
                    if (any(this%config%bodies(k)%zone_indices .eq. z)) then
-                      write(log_buf_l, '(A,I0,A,A,A,A,A)') &
-                           "ALE: zone index ", z, &
-                           " is assigned to multiple bodies ('", &
-                           trim(this%config%bodies(j)%name), "' and '", &
-                           trim(this%config%bodies(k)%name), "')."
-                      call neko_error(trim(log_buf_l))
+                      write(log_buf_l, '(A,I0)') "ALE: zone index ", z
+                      call neko_error(trim(log_buf_l) // &
+                           " is assigned to multiple bodies ('" // &
+                           trim(this%config%bodies(j)%name) // "' and '" // &
+                           trim(this%config%bodies(k)%name) // "').")
                    end if
                 end if
              end do
@@ -1060,11 +1066,9 @@ contains
           call MPI_Barrier(NEKO_COMM, ierr)
           sample_end_time = MPI_WTIME()
           sample_time = sample_end_time - sample_start_time
-          write(log_buf, '(A, A, A, ES11.4, A)') "   Laplace solve for '", &
-               trim(this%config%bodies(body_idx)%name), "' took ", &
-               sample_time, " (s)"
-
-          call neko_log%message(log_buf)
+          write(log_buf, '(A, ES11.4, A)') "' took ", sample_time, " (s)"
+          call neko_log%message("   Laplace solve for '" // &
+               trim(this%config%bodies(body_idx)%name) // trim(log_buf))
 
           call bc_active_body%free()
           call bc_inactive_body%free()
@@ -1327,9 +1331,9 @@ contains
              sample_end_time = MPI_WTIME()
              sample_time = sample_end_time - sample_start_time
 
-             write(log_buf, '(A, A, A, ES11.4, A)') "    cheap dist for '", &
-                  trim(params%bodies(b)%name), "' took ", sample_time, " (s)"
-             call neko_log%message(log_buf)
+             write(log_buf, '(A, ES11.4, A)') "' took ", sample_time, " (s)"
+             call neko_log%message("    cheap dist for '" // &
+                  trim(params%bodies(b)%name) // trim(log_buf))
           end if
        end do
     end if
@@ -1492,7 +1496,7 @@ contains
     call this%z_ref%free()
 
     if (allocated(this%ale_pivot)) deallocate(this%ale_pivot)
-    if (allocated(this%config%bodies)) deallocate(this%config%bodies)
+    call this%config%free()
     if (allocated(this%body_kin)) deallocate(this%body_kin)
     if (associated(this%global_pivot_pos)) deallocate(this%global_pivot_pos)
     if (associated(this%global_pivot_vel_lag)) &
@@ -2035,7 +2039,7 @@ contains
     integer :: i, idx, n_log
     real(kind=rp) :: roll_deg, pitch_deg, yaw_deg
     real(kind=rp) :: R(3,3)
-    character(len=256) :: log_buf
+    character(len=256) :: log_buf, val_buf
     real(kind=rp), parameter :: rad_to_deg = 180.0_rp / pi
 
     if (.not. this%active) return
@@ -2069,11 +2073,11 @@ contains
        roll_deg = atan2(R(3,2), R(3,3)) * rad_to_deg
 
        ! Log Rotation Angles (Roll, Pitch, Yaw) -> (X, Y, Z)
-       write(log_buf, '(A, I0, A, ES13.6, A, A, A, 3(ES17.10, :, 2X))') &
-            "Total_Rot_deg    ", time%tstep, "  ", time%t, "  ", &
-            trim(this%config%bodies(idx)%name), "  ", &
-            roll_deg, pitch_deg, yaw_deg
-       call neko_log%message(trim(log_buf))
+       write(log_buf, '(A, I0, A, ES13.6)') "Total_Rot_deg    ", &
+            time%tstep, "  ", time%t
+       write(val_buf, '(3(ES17.10, :, 2X))') roll_deg, pitch_deg, yaw_deg
+       call neko_log%message(trim(log_buf) // "  " // &
+            trim(this%config%bodies(idx)%name) // "  " // trim(val_buf))
 
     end do
 
@@ -2088,7 +2092,7 @@ contains
     integer, optional, intent(in) :: body_idxs(:)
     integer :: i, idx, n_log
     real(kind=rp) :: pivot_pos(3), pivot_vel(3)
-    character(len=256) :: log_buf
+    character(len=256) :: log_buf, val_buf
 
     if (.not. this%active) return
     if (.not. this%has_moving_boundary) return
@@ -2117,18 +2121,18 @@ contains
        pivot_vel = this%ale_pivot(idx)%vel
 
        ! Pivot Position
-       write(log_buf, '(A, I0, A, ES13.6, A, A, A, 3(ES17.10, :, 2X))') &
-            "Total_Pivot_pos  ", time%tstep, "  ", time%t, "  ", &
-            trim(this%config%bodies(idx)%name), "  ", &
-            this%ale_pivot(idx)%pos
-       call neko_log%message(trim(log_buf))
+       write(log_buf, '(A, I0, A, ES13.6)') "Total_Pivot_pos  ", &
+            time%tstep, "  ", time%t
+       write(val_buf, '(3(ES17.10, :, 2X))') this%ale_pivot(idx)%pos
+       call neko_log%message(trim(log_buf) // "  " // &
+            trim(this%config%bodies(idx)%name) // "  " // trim(val_buf))
 
        ! Pivot Velocity
-       write(log_buf, '(A, I0, A, ES13.6, A, A, A, 3(ES17.10, :, 2X))') &
-            "Total_Pivot_vel  ", time%tstep, "  ", time%t, "  ", &
-            trim(this%config%bodies(idx)%name), "  ", &
-            this%ale_pivot(idx)%vel
-       call neko_log%message(trim(log_buf))
+       write(log_buf, '(A, I0, A, ES13.6)') "Total_Pivot_vel  ", &
+            time%tstep, "  ", time%t
+       write(val_buf, '(3(ES17.10, :, 2X))') this%ale_pivot(idx)%vel
+       call neko_log%message(trim(log_buf) // "  " // &
+            trim(this%config%bodies(idx)%name) // "  " // trim(val_buf))
     end do
 
   end subroutine log_pivot
@@ -2225,6 +2229,7 @@ contains
     end if
 
     ! Mesh Stiffness
+    this%config%stiffness_type = 'built-in'
     if (json%valid_path('case.fluid.ale.solver.mesh_stiffness.type')) then
        call json%get('case.fluid.ale.solver.mesh_stiffness.type', tmp_str)
        this%config%stiffness_type = tmp_str

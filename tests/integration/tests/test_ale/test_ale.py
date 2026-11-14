@@ -53,8 +53,10 @@ USER_FILE = "test_ale.f90"
 CASE_FILE = "test_ale.case"
 MESH_NAME = "small_test_cyl.nmsh"
 
-# Name of the ALE body in the case file.
-BODY_NAME = "cylinder"
+# Name of the ALE body in the case file. Longer than the 32 characters a
+# body name used to be cut to, so that a cut name shows up as a missing
+# phi file and as log lines that do not match.
+BODY_NAME = "cylinder_with_a_name_of_more_than_32_characters"
 
 #: Base-shape (phi) field written by part 1 when output_base_shape is on. Part 2
 #: imports this.

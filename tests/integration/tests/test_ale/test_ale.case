@@ -63,7 +63,7 @@
                 },
                 "bodies": [
                     {
-                        "name": "cylinder",
+                        "name": "cylinder_with_a_name_of_more_than_32_characters",
                         "zone_indices": [ 7 ],
                         "oscillation": {
                             "amplitude": [ 0.1, 0.3, 0.0 ],

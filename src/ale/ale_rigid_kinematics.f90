@@ -54,10 +54,12 @@ module ale_rigid_kinematics
 
   !> Stiff Geometry
   type, public :: stiffness_geometry_t
-     !> 'sphere', 'cylinder', 'cheap_dist', 'box (not implemented)'
-     character(len=32) :: type = 'cheap_dist'
-     !> 'gaussian' or 'tanh'
-     character(len=32) :: decay_profile = 'gaussian'
+     !> 'sphere', 'cylinder', 'cheap_dist', 'box (not implemented)'.
+     !! Set to 'cheap_dist' by the ALE manager unless given.
+     character(len=:), allocatable :: type
+     !> 'gaussian' or 'tanh'. Set to 'gaussian' by the ALE manager unless
+     !! given.
+     character(len=:), allocatable :: decay_profile
      !> Stiffness Gain
      real(kind=rp) :: gain
      !> Center for geometric shapes
@@ -73,19 +75,27 @@ module ale_rigid_kinematics
      !> Coefficient defining the cutoff sharpness (Default: 9.0 for Gaussian,
      !> 3.5 for Tanh)
      real(kind=rp) :: cutoff_coef
+   contains
+     !> Destructor.
+     procedure, pass(this) :: free => stiffness_geometry_free
   end type stiffness_geometry_t
 
   !> Configuration for a single moving body
   type, public :: ale_body_t
      integer :: id
-     character(len=32) :: name = 'body'
+     !> Name of the body. Set to 'body_<id>' by the ALE manager unless given.
+     character(len=:), allocatable :: name
      type(stiffness_geometry_t) :: stiff_geom
      !> Oscillation (x, y, z)
      real(kind=rp) :: osc_amp(3) = 0.0_rp
      real(kind=rp) :: osc_freq(3) = 0.0_rp
      !> Rotation Control
-     character(len=32) :: rotation_center_type = 'relative'
-     character(len=32) :: rotation_type
+     !> 'relative' or 'relative_sin'. Set to 'relative' by the ALE manager
+     !! unless given.
+     character(len=:), allocatable :: rotation_center_type
+     !> 'harmonic', 'ramp' or 'smooth_step'. Set to an empty string by the
+     !! ALE manager unless given.
+     character(len=:), allocatable :: rotation_type
      real(kind=rp) :: rot_amp_degree(3) = 0.0_rp
      real(kind=rp) :: rot_freq(3) = 0.0_rp
      real(kind=rp) :: rot_center(3) = 0.0_rp
@@ -100,18 +110,25 @@ module ale_rigid_kinematics
      real(kind=rp) :: ramp_t0(3) = 1.0_rp
      !> Boundary Zone Indices associated with this body
      integer, allocatable :: zone_indices(:)
+   contains
+     !> Destructor.
+     procedure, pass(this) :: free => ale_body_free
   end type ale_body_t
 
   !> Global ALE Configuration
   type, public :: ale_config_t
      !> Stiffness Control.
      !> A placeholder for future options.
-     character(len=32) :: stiffness_type = 'built-in'
+     !! Set to 'built-in' by the ALE manager unless given.
+     character(len=:), allocatable :: stiffness_type
      logical :: if_output_phi = .true.
      logical :: if_output_stiffness = .false.
      !> Array of Moving Bodies
      type(ale_body_t), allocatable :: bodies(:)
      integer :: nbodies = 0
+   contains
+     !> Destructor.
+     procedure, pass(this) :: free => ale_config_free
   end type ale_config_t
 
   !> Calculated Kinematics for a body at current time
@@ -137,6 +154,41 @@ module ale_rigid_kinematics
   end type point_tracker_t
 
 contains
+
+  !> Destructor.
+  subroutine stiffness_geometry_free(this)
+    class(stiffness_geometry_t), intent(inout) :: this
+
+    if (allocated(this%type)) deallocate(this%type)
+    if (allocated(this%decay_profile)) deallocate(this%decay_profile)
+  end subroutine stiffness_geometry_free
+
+  !> Destructor.
+  subroutine ale_body_free(this)
+    class(ale_body_t), intent(inout) :: this
+
+    if (allocated(this%name)) deallocate(this%name)
+    if (allocated(this%rotation_center_type)) &
+         deallocate(this%rotation_center_type)
+    if (allocated(this%rotation_type)) deallocate(this%rotation_type)
+    if (allocated(this%zone_indices)) deallocate(this%zone_indices)
+    call this%stiff_geom%free()
+  end subroutine ale_body_free
+
+  !> Destructor.
+  subroutine ale_config_free(this)
+    class(ale_config_t), intent(inout) :: this
+    integer :: i
+
+    if (allocated(this%bodies)) then
+       do i = 1, size(this%bodies)
+          call this%bodies(i)%free()
+       end do
+       deallocate(this%bodies)
+    end if
+    if (allocated(this%stiffness_type)) deallocate(this%stiffness_type)
+    this%nbodies = 0
+  end subroutine ale_config_free
 
   !> Initialize pivot state
   subroutine init_pivot_state(pivot, body_conf)

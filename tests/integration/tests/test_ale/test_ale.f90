@@ -38,7 +38,7 @@ contains
     ! NOT the zone_id of the moving boundary condition.
     select case (body_id)
 
-    case (1) ! "cylinder", the only body registered in the case file.
+    case (1) ! The cylinder, the only body registered in the case file.
        vel_trans(1) = vel_trans(1) - &
             0.15_rp * 2 * pi * 0.1_rp * cos(2*pi*0.1_rp*t)
 
