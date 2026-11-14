@@ -55,6 +55,7 @@ SUBDIRS = tuple\
 	  runtime_stats\
 	  geo_compression\
 	  restart_consistency\
+	  csv_file\
 	  crystal_router\
 	  ale_rigid_kinematics\
 	  templates/serial
@@ -116,6 +117,7 @@ TESTS = device/device_test\
 	runtime_stats/runtime_stats_test\
 	geo_compression/geo_compression_test\
 	restart_consistency/restart_consistency_test\
+	csv_file/csv_file_test\
 	crystal_router/crystal_router_test\
 	ale_rigid_kinematics/ale_rigid_kinematics_test\
 	templates/serial/serial_test
@@ -228,6 +230,8 @@ EXTRA_DIST = \
 	geo_compression/geo_compression_test\
 	restart_consistency/test_restart_consistency.pf\
 	restart_consistency/restart_consistency_test\
+	csv_file/test_csv_file.pf\
+	csv_file/csv_file_test\
 	templates/parallel/test_parallel.pf\
 	templates/parallel/parallel_test\
 	checkpoint_payload/test_checkpoint_payload.pf\

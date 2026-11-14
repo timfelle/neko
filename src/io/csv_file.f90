@@ -42,6 +42,8 @@ module csv_file
   use comm
   implicit none
 
+  private :: csv_file_read_line
+
   type, public, extends(generic_file_t) :: csv_file_t
      character(len=:), allocatable :: header !< Contains header of file.
      logical :: header_is_written = .false. !< Has header already been written?
@@ -263,7 +265,7 @@ contains
     type(csv_file_t), intent(inout) :: f
     type(vector_t), intent(inout) :: vec
     integer :: ierr, file_unit, n_lines
-    character(len=80) :: tmp
+    character(len=:), allocatable :: line
 
     n_lines = f%count_lines()
 
@@ -275,8 +277,9 @@ contains
 
     ! If there is more than 1 line, assume that means there is a header
     if (n_lines .gt. 1) then
-       read (file_unit, '(A)') tmp
-       f%header = trim(tmp)
+       call csv_file_read_line(file_unit, trim(f%get_fname()), line)
+       f%header = trim(line)
+       deallocate(line)
     end if
 
     read (file_unit,*) vec%x
@@ -294,7 +297,7 @@ contains
     type(csv_file_t), intent(inout) :: f
     type(matrix_t), intent(inout) :: mat
     integer :: ierr, file_unit, i, n_lines
-    character(len=80) :: tmp
+    character(len=:), allocatable :: line
 
     n_lines = f%count_lines()
 
@@ -307,8 +310,9 @@ contains
     ! If the number of lines is larger than the number of rows in the
     ! matrix, assume that means there is a header
     if (n_lines .gt. mat%get_nrows()) then
-       read (file_unit, '(A)') tmp
-       f%header = trim(tmp)
+       call csv_file_read_line(file_unit, trim(f%get_fname()), line)
+       f%header = trim(line)
+       deallocate(line)
     end if
 
     do i = 1, mat%get_nrows()
@@ -317,6 +321,37 @@ contains
     close(unit = file_unit)
 
   end subroutine csv_file_read_matrix
+
+  !> Read one line of a formatted file in full, however long it is.
+  !! @param file_unit Unit of a file opened for formatted sequential reading.
+  !! @param fname Name of the file, used in the error message.
+  !! @param line The line that was read.
+  subroutine csv_file_read_line(file_unit, fname, line)
+    integer, intent(in) :: file_unit
+    character(len=*), intent(in) :: fname
+    character(len=:), allocatable, intent(out) :: line
+    character(len=256) :: chunk
+    integer :: n_read, ierr
+
+    ! Read the line in chunks until the end of the record is reached
+    line = ""
+    do
+       read (file_unit, '(A)', advance = 'no', size = n_read, &
+            iostat = ierr) chunk
+       if (ierr .eq. 0 .or. is_iostat_eor(ierr)) then
+          line = line // chunk(1:n_read)
+       end if
+       if (ierr .ne. 0) exit
+    end do
+
+    ! A last line without a newline whose length is a multiple of the chunk
+    ! size ends at the end of the file instead of the end of a record
+    if (.not. (is_iostat_eor(ierr) .or. &
+         (is_iostat_end(ierr) .and. len(line) .gt. 0))) then
+       call neko_error("Error while reading " // fname)
+    end if
+
+  end subroutine csv_file_read_line
 
   !> Sets the header for a csv file. For example: `hd = "u,v,w,p"`.
   !! @param hd Header.

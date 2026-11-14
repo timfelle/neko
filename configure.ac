@@ -517,6 +517,7 @@ AC_CONFIG_FILES([tests/unit/stack/Makefile\
         tests/unit/map_1d/Makefile\
         tests/unit/runtime_stats/Makefile\
         tests/unit/crystal_router/Makefile\
+        tests/unit/csv_file/Makefile\
         tests/unit/geo_compression/Makefile\
         tests/unit/ale_rigid_kinematics/Makefile\
         tests/unit/templates/serial/Makefile])

@@ -1,0 +1,219 @@
+module test_csv_file
+  use mpi
+  use pfunit
+  use comm, only : NEKO_COMM, pe_rank, pe_size
+  use pfunit_comm_utils, only : comm_init_test, comm_free_test
+  use device, only : device_init, device_finalize
+  use neko_config, only : NEKO_BCKND_DEVICE
+  use neko_mpi_types, only : neko_mpi_types_init, neko_mpi_types_free
+  use num_types, only : rp
+  use math, only : NEKO_EPS
+  use csv_file, only : csv_file_t
+  use vector, only : vector_t
+  use matrix, only : matrix_t
+  implicit none
+
+  @TestCase
+  type, extends(MPITestCase) :: test_csv_file_case
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_csv_file_case
+
+contains
+
+  subroutine setUp(this)
+    class(test_csv_file_case), intent(inout) :: this
+    call comm_init_test(this%getMpiCommunicator())
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_init
+    end if
+    call neko_mpi_types_init()
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_csv_file_case), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_finalize
+    end if
+    call neko_mpi_types_free()
+    call comm_free_test()
+  end subroutine tearDown
+
+  !> Build a header of comma-separated column names, cut to `n` characters.
+  !! @param n Length of the header.
+  function long_header(n) result(header)
+    integer, intent(in) :: n
+    character(len=:), allocatable :: header
+    character(len=16) :: column
+    integer :: i
+
+    header = ""
+    i = 0
+    do while (len(header) .lt. n)
+       i = i + 1
+       write(column, '(A,I0)') "column_", i
+       if (i .gt. 1) header = header // ","
+       header = header // trim(column)
+    end do
+    header = header(1:n)
+  end function long_header
+
+  !> Delete a file written by a test.
+  !! @param fname Name of the file.
+  subroutine delete_file(fname)
+    character(len=*), intent(in) :: fname
+    integer :: file_unit, ierr
+
+    open(newunit = file_unit, file = fname, status = 'old', iostat = ierr)
+    if (ierr .eq. 0) close(file_unit, status = 'delete')
+  end subroutine delete_file
+
+  !> Write a vector with a header to a new csv file and read both back.
+  !! @param fname Name of the file.
+  !! @param header Header to write.
+  !! @param v_out Vector to write.
+  !! @param v_in Vector to read into.
+  !! @param header_in Header read back, empty if none was read.
+  subroutine round_trip_vector(fname, header, v_out, v_in, header_in)
+    character(len=*), intent(in) :: fname
+    character(len=*), intent(in) :: header
+    type(vector_t), intent(inout) :: v_out
+    type(vector_t), intent(inout) :: v_in
+    character(len=:), allocatable, intent(out) :: header_in
+    type(csv_file_t) :: f_out, f_in
+
+    call f_out%init(fname)
+    call f_out%set_overwrite(.true.)
+    call f_out%set_header(header)
+    call f_out%write(v_out)
+
+    call f_in%init(fname)
+    call f_in%read(v_in)
+
+    header_in = ""
+    if (allocated(f_in%header)) header_in = f_in%header
+  end subroutine round_trip_vector
+
+  !> Write a file holding only a header, without a trailing newline, and
+  !! read the header back with a matrix of no rows.
+  !! @param fname Name of the file.
+  !! @param header Header to write.
+  !! @param header_in Header read back, empty if none was read.
+  subroutine read_header_only_file(fname, header, header_in)
+    character(len=*), intent(in) :: fname
+    character(len=*), intent(in) :: header
+    character(len=:), allocatable, intent(out) :: header_in
+    type(csv_file_t) :: f_in
+    type(matrix_t) :: m_in
+    integer :: file_unit
+
+    open(newunit = file_unit, file = fname, access = 'stream', &
+         form = 'unformatted', status = 'replace')
+    write(file_unit) header
+    close(file_unit)
+
+    call m_in%init(0, 3)
+    call f_in%init(fname)
+    call f_in%read(m_in)
+
+    header_in = ""
+    if (allocated(f_in%header)) header_in = f_in%header
+    call m_in%free()
+  end subroutine read_header_only_file
+
+  !> Headers longer than 80 characters, including lengths at and around
+  !! powers of two, are read back in full, followed by the vector data.
+  @test(npes=[1])
+  subroutine test_csv_file_long_header_vector(this)
+    class(test_csv_file_case), intent(inout) :: this
+    character(len=*), parameter :: fname = "test_csv_file_vector.csv"
+    integer, parameter :: lengths(9) = &
+         [81, 255, 256, 257, 1023, 1024, 1025, 2048, 4100]
+    type(vector_t) :: v_out, v_in
+    character(len=:), allocatable :: header, header_in
+    integer :: i
+
+    call v_out%init(3)
+    call v_in%init(3)
+    v_out%x = [1.0_rp, 2.0_rp, 3.0_rp]
+
+    do i = 1, size(lengths)
+       header = long_header(lengths(i))
+       v_in%x = 0.0_rp
+
+       call round_trip_vector(fname, header, v_out, v_in, header_in)
+
+       @assertEqual(lengths(i), len(header_in))
+       @assertEqual(header, header_in)
+       @assertEqual(v_out%x, v_in%x, tolerance = NEKO_EPS)
+    end do
+
+    call delete_file(fname)
+    call v_out%free()
+    call v_in%free()
+    deallocate(header, header_in)
+  end subroutine test_csv_file_long_header_vector
+
+  !> A header longer than 80 characters is read back in full from a file
+  !! holding a matrix.
+  @test(npes=[1])
+  subroutine test_csv_file_long_header_matrix(this)
+    class(test_csv_file_case), intent(inout) :: this
+    character(len=*), parameter :: fname = "test_csv_file_matrix.csv"
+    type(csv_file_t) :: f_out, f_in
+    type(matrix_t) :: m_out, m_in
+    character(len=:), allocatable :: header
+
+    header = long_header(1500)
+
+    call m_out%init(2, 3)
+    call m_in%init(2, 3)
+    m_out%x = reshape([1.0_rp, 2.0_rp, 3.0_rp, 4.0_rp, 5.0_rp, 6.0_rp], &
+         [2, 3])
+    m_in%x = 0.0_rp
+
+    call f_out%init(fname)
+    call f_out%set_overwrite(.true.)
+    call f_out%set_header(header)
+    call f_out%write(m_out)
+
+    call f_in%init(fname)
+    call f_in%read(m_in)
+
+    @assertTrue(allocated(f_in%header))
+    @assertEqual(len(header), len(f_in%header))
+    @assertEqual(header, f_in%header)
+    @assertEqual(m_out%x, m_in%x, tolerance = NEKO_EPS)
+
+    call delete_file(fname)
+    call m_out%free()
+    call m_in%free()
+    deallocate(header)
+  end subroutine test_csv_file_long_header_matrix
+
+  !> A header that is the last line of the file is read in full when it has
+  !! no trailing newline, also when its length is a multiple of the chunk
+  !! size of the line reader.
+  @test(npes=[1])
+  subroutine test_csv_file_header_no_newline(this)
+    class(test_csv_file_case), intent(inout) :: this
+    character(len=*), parameter :: fname = "test_csv_file_no_newline.csv"
+    integer, parameter :: lengths(3) = [255, 256, 512]
+    character(len=:), allocatable :: header, header_in
+    integer :: i
+
+    do i = 1, size(lengths)
+       header = long_header(lengths(i))
+
+       call read_header_only_file(fname, header, header_in)
+
+       @assertEqual(lengths(i), len(header_in))
+       @assertEqual(header, header_in)
+    end do
+
+    call delete_file(fname)
+    deallocate(header, header_in)
+  end subroutine test_csv_file_header_no_newline
+
+end module test_csv_file

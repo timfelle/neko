@@ -30,6 +30,7 @@ test-suite.log
 !restart_consistency/restart_consistency_test
 !restart_consistency_hdf5/restart_consistency_hdf5_test
 !geo_compression/geo_compression_test
+!csv_file/csv_file_test
 
 # Processed files
 **.inc
@@ -91,6 +92,8 @@ restart_consistency/restart_consistency_suite
 restart_consistency_hdf5/restart_consistency_hdf5_suite
 **/restart_consistency*.nmsh
 **/restart_consistency*.h5
+**/test_csv_file_*.csv
+csv_file/csv_file_suite
 templates/parallel/parallel_suite
 templates/serial/serial_test
 bc_projector/bc_projector_suite
