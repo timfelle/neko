@@ -249,7 +249,9 @@ suite is registered in:
    `check` target, the `_TESTS` and `_OTHER_LIBRARIES` variables, the
    `make_pfunit_test` call and the `clean` target all use the executable name,
    `<suite>_test` for a serial suite and `<suite>_suite` for an MPI suite.
-   `configure` turns `Makefile.in` into `Makefile`.
+   `configure` turns `Makefile.in` into `Makefile`. Its `srcdir` and `VPATH`
+   lines let `make` find the sources of the suite in the source directory
+   when the build directory is a different one.
 2. For an MPI suite, the runner script `tests/unit/<suite>/<suite>_test`,
    which launches `./<suite>/<suite>_suite` with `mpirun` or `mpiexec`.
 3. `tests/unit/Makefile.am`: the directory in `SUBDIRS`, `<suite>/<suite>_test`

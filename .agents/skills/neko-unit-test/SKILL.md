@@ -111,10 +111,12 @@ compiles and runs.
 ## Anatomy of the Makefile.in
 
 The template `Makefile.in` already contains everything a plain suite needs:
-the `USEMPI=YES` line (MPI only), the `NEKO_LIB` dependency so test
-objects are rebuilt when `libneko` changes, a rule that regenerates the
-`Makefile` from `Makefile.in` through `config.status`, the pFUnit
-`make_pfunit_test` call, and a `clean` target. Only touch these parts:
+the `USEMPI=YES` line (MPI only), the `srcdir` and `VPATH` lines that let
+an out-of-tree build find the sources of the suite, the `NEKO_LIB`
+dependency so test objects are rebuilt when `libneko` changes, a rule that
+regenerates the `Makefile` from `Makefile.in` through `config.status`, the
+pFUnit `make_pfunit_test` call, and a `clean` target. Only touch these
+parts:
 
 - `<binary>_TESTS`: the list of `.pf` files, one per line with `\`
   continuations. `add_pf_to_unit_test.sh` maintains it.

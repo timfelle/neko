@@ -5,6 +5,11 @@ endif
 FFLAGS += $(PFUNIT_EXTRA_FFLAGS) @NEKO_PKG_FCFLAGS@ -I@top_builddir@/src
 FC = @FC@
 
+# Look for the sources in the source directory, as an out-of-tree
+# build has none of them in the build directory.
+srcdir = @srcdir@
+VPATH = @srcdir@
+
 # Depend on the library so the test objects follow any change to Neko.
 NEKO_LIB := $(wildcard @top_builddir@/src/libneko.la)
 
@@ -24,7 +29,7 @@ check: runtime_stats_suite
 # whenever it changes.
 SUBDIR := $(patsubst $(abspath @top_builddir@)/%,%,$(CURDIR))
 
-Makefile: Makefile.in @top_builddir@/config.status
+Makefile: $(srcdir)/Makefile.in @top_builddir@/config.status
 	cd @top_builddir@ && $(SHELL) ./config.status $(SUBDIR)/Makefile
 
 runtime_stats_suite_TESTS := test_runtime_stats.pf
