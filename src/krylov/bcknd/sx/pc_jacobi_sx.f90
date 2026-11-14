@@ -107,6 +107,16 @@ contains
     call col3(z, r, this%d, n)
   end subroutine sx_jacobi_solve
 
+  !> Update Jacobi preconditioner if the geometry G has changed
+  !! @details Computes the diagonal of the assembled Helmholtz operator of
+  !! ax_helm. On an element, the G11 term at node (i,j,k) sums over the line
+  !! through the node, G11(l,j,k) * dxt(i,l)**2, and likewise for G22 and
+  !! G33. A cross term reaches the diagonal only through the diagonals of the
+  !! derivative matrices, 2 * G12(i,j,k) * dxt(i,i) * dyt(j,j) for G12. These
+  !! vanish except at the end points, so the cross terms only contribute on
+  !! the edges of the element. They are added on every element; on an
+  !! undeformed one they are zero up to round-off. h1 is applied at the node,
+  !! which is exact when it is constant along the grid lines of each element.
   subroutine sx_jacobi_update(this)
     class(sx_jacobi_t), intent(inout) :: this
     integer :: lz, ly, lx
@@ -165,7 +175,6 @@ contains
       call col2(this%d, coef%h1, coef%dof%size())
       if (coef%ifh2) call addcol3(this%d, coef%h2, coef%B, coef%dof%size())
       call gs_h%op(this%d, dof%size(), GS_OP_ADD)
-      if (.not. coef%ifh2) call col2(this%d, coef%mult, coef%dof%size())
       call invcol1(this%d, dof%size())
     end associate
   end subroutine sx_jacobi_update
@@ -205,41 +214,36 @@ contains
        end do
     end do
 
-    do j = 1, lx, lx-1
-       do k = 1, lx, lx-1
-          do e = 1, n
-             d(1, j, k, e) = d(1, j, k, e) &
-                  + G12(1, j, k, e) * dxt(1, 1)*dyt(j, j) &
-                  + G13(1, j, k, e) * dxt(1, 1)*dzt(k, k)
-             d(lx, j, k, e) = d(lx, j, k, e) &
-                  + G12(lx, j, k, e) * dxt(lx, lx)*dyt(j, j) &
-                  + G13(lx, j, k, e) * dxt(lx, lx)*dzt(k, k)
+    ! Cross terms, only on the edges, see sx_jacobi_update
+    do k = 1, lx
+       do j = 1, lx, lx - 1
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G12(i, j, k, e) * dxt(i, i) * dyt(j, j)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do k = 1, lx, lx-1
-          do e = 1, n
-             d(i, 1, k, e) = d(i, 1, k, e) &
-                  + G12(i, 1, k, e) * dyt(1, 1)*dxt(i, i) &
-                  + G23(i, 1, k, e) * dyt(1, 1)*dzt(k, k)
-             d(i, lx, k, e) = d(i, lx, k, e) &
-                  + G12(i, lx, k, e) * dyt(lx, lx)*dxt(i, i) &
-                  + G23(i, lx, k, e) * dyt(lx, lx)*dzt(k, k)
+    do k = 1, lx, lx - 1
+       do j = 1, lx
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G13(i, j, k, e) * dxt(i, i) * dzt(k, k)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do j = 1, lx, lx-1
-          do e = 1, n
-             d(i, j, 1, e) = d(i, j, 1, e) &
-                  + G13(i, j, 1, e) * dzt(1, 1)*dxt(i, i) &
-                  + G23(i, j, 1, e) * dzt(1, 1)*dyt(j, j)
-             d(i, j, lx, e) = d(i, j, lx, e) &
-                  + G13(i, j, lx, e) * dzt(lx, lx)*dxt(i, i) &
-                  + G23(i, j, lx, e) * dzt(lx, lx)*dyt(j, j)
+    do k = 1, lx, lx - 1
+       do j = 1, lx, lx - 1
+          do i = 1, lx
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G23(i, j, k, e) * dyt(j, j) * dzt(k, k)
+             end do
           end do
        end do
     end do
@@ -284,41 +288,36 @@ contains
        end do
     end do
 
-    do j = 1, ly, ly-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(1, j, k, e) = d(1, j, k, e) &
-                  + G12(1, j, k, e) * dxt(1, 1)*dyt(j, j) &
-                  + G13(1, j, k, e) * dxt(1, 1)*dzt(k, k)
-             d(lx, j, k, e) = d(lx, j, k, e) &
-                  + G12(lx, j, k, e) * dxt(lx, lx)*dyt(j, j) &
-                  + G13(lx, j, k, e) * dxt(lx, lx)*dzt(k, k)
+    ! Cross terms, only on the edges, see sx_jacobi_update
+    do k = 1, lz
+       do j = 1, ly, ly - 1
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G12(i, j, k, e) * dxt(i, i) * dyt(j, j)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(i, 1, k, e) = d(i, 1, k, e) &
-                  + G12(i, 1, k, e) * dyt(1, 1)*dxt(i, i) &
-                  + G23(i, 1, k, e) * dyt(1, 1)*dzt(k, k)
-             d(i, ly, k, e) = d(i, ly, k, e) &
-                  + G12(i, ly, k, e) * dyt(ly, ly)*dxt(i, i) &
-                  + G23(i, ly, k, e) * dyt(ly, ly)*dzt(k, k)
+    do k = 1, lz, lz - 1
+       do j = 1, ly
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G13(i, j, k, e) * dxt(i, i) * dzt(k, k)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do j = 1, ly, ly-1
-          do e = 1, n
-             d(i, j, 1, e) = d(i, j, 1, e) &
-                  + G13(i, j, 1, e) * dzt(1, 1)*dxt(i, i) &
-                  + G23(i, j, 1, e) * dzt(1, 1)*dyt(j, j)
-             d(i, j, lz, e) = d(i, j, lz, e) &
-                  + G13(i, j, lz, e) * dzt(lz, lz)*dxt(i, i) &
-                  + G23(i, j, lz, e) * dzt(lz, lz)*dyt(j, j)
+    do k = 1, lz, lz - 1
+       do j = 1, ly, ly - 1
+          do i = 1, lx
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G23(i, j, k, e) * dyt(j, j) * dzt(k, k)
+             end do
           end do
        end do
     end do
@@ -363,41 +362,36 @@ contains
        end do
     end do
 
-    do j = 1, ly, ly-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(1, j, k, e) = d(1, j, k, e) &
-                  + G12(1, j, k, e) * dxt(1, 1)*dyt(j, j) &
-                  + G13(1, j, k, e) * dxt(1, 1)*dzt(k, k)
-             d(lx, j, k, e) = d(lx, j, k, e) &
-                  + G12(lx, j, k, e) * dxt(lx, lx)*dyt(j, j) &
-                  + G13(lx, j, k, e) * dxt(lx, lx)*dzt(k, k)
+    ! Cross terms, only on the edges, see sx_jacobi_update
+    do k = 1, lz
+       do j = 1, ly, ly - 1
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G12(i, j, k, e) * dxt(i, i) * dyt(j, j)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(i, 1, k, e) = d(i, 1, k, e) &
-                  + G12(i, 1, k, e) * dyt(1, 1)*dxt(i, i) &
-                  + G23(i, 1, k, e) * dyt(1, 1)*dzt(k, k)
-             d(i, ly, k, e) = d(i, ly, k, e) &
-                  + G12(i, ly, k, e) * dyt(ly, ly)*dxt(i, i) &
-                  + G23(i, ly, k, e) * dyt(ly, ly)*dzt(k, k)
+    do k = 1, lz, lz - 1
+       do j = 1, ly
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G13(i, j, k, e) * dxt(i, i) * dzt(k, k)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do j = 1, ly, ly-1
-          do e = 1, n
-             d(i, j, 1, e) = d(i, j, 1, e) &
-                  + G13(i, j, 1, e) * dzt(1, 1)*dxt(i, i) &
-                  + G23(i, j, 1, e) * dzt(1, 1)*dyt(j, j)
-             d(i, j, lz, e) = d(i, j, lz, e) &
-                  + G13(i, j, lz, e) * dzt(lz, lz)*dxt(i, i) &
-                  + G23(i, j, lz, e) * dzt(lz, lz)*dyt(j, j)
+    do k = 1, lz, lz - 1
+       do j = 1, ly, ly - 1
+          do i = 1, lx
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G23(i, j, k, e) * dyt(j, j) * dzt(k, k)
+             end do
           end do
        end do
     end do
@@ -442,41 +436,36 @@ contains
        end do
     end do
 
-    do j = 1, ly, ly-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(1, j, k, e) = d(1, j, k, e) &
-                  + G12(1, j, k, e) * dxt(1, 1)*dyt(j, j) &
-                  + G13(1, j, k, e) * dxt(1, 1)*dzt(k, k)
-             d(lx, j, k, e) = d(lx, j, k, e) &
-                  + G12(lx, j, k, e) * dxt(lx, lx)*dyt(j, j) &
-                  + G13(lx, j, k, e) * dxt(lx, lx)*dzt(k, k)
+    ! Cross terms, only on the edges, see sx_jacobi_update
+    do k = 1, lz
+       do j = 1, ly, ly - 1
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G12(i, j, k, e) * dxt(i, i) * dyt(j, j)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(i, 1, k, e) = d(i, 1, k, e) &
-                  + G12(i, 1, k, e) * dyt(1, 1)*dxt(i, i) &
-                  + G23(i, 1, k, e) * dyt(1, 1)*dzt(k, k)
-             d(i, ly, k, e) = d(i, ly, k, e) &
-                  + G12(i, ly, k, e) * dyt(ly, ly)*dxt(i, i) &
-                  + G23(i, ly, k, e) * dyt(ly, ly)*dzt(k, k)
+    do k = 1, lz, lz - 1
+       do j = 1, ly
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G13(i, j, k, e) * dxt(i, i) * dzt(k, k)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do j = 1, ly, ly-1
-          do e = 1, n
-             d(i, j, 1, e) = d(i, j, 1, e) &
-                  + G13(i, j, 1, e) * dzt(1, 1)*dxt(i, i) &
-                  + G23(i, j, 1, e) * dzt(1, 1)*dyt(j, j)
-             d(i, j, lz, e) = d(i, j, lz, e) &
-                  + G13(i, j, lz, e) * dzt(lz, lz)*dxt(i, i) &
-                  + G23(i, j, lz, e) * dzt(lz, lz)*dyt(j, j)
+    do k = 1, lz, lz - 1
+       do j = 1, ly, ly - 1
+          do i = 1, lx
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G23(i, j, k, e) * dyt(j, j) * dzt(k, k)
+             end do
           end do
        end do
     end do
@@ -521,41 +510,36 @@ contains
        end do
     end do
 
-    do j = 1, ly, ly-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(1, j, k, e) = d(1, j, k, e) &
-                  + G12(1, j, k, e) * dxt(1, 1)*dyt(j, j) &
-                  + G13(1, j, k, e) * dxt(1, 1)*dzt(k, k)
-             d(lx, j, k, e) = d(lx, j, k, e) &
-                  + G12(lx, j, k, e) * dxt(lx, lx)*dyt(j, j) &
-                  + G13(lx, j, k, e) * dxt(lx, lx)*dzt(k, k)
+    ! Cross terms, only on the edges, see sx_jacobi_update
+    do k = 1, lz
+       do j = 1, ly, ly - 1
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G12(i, j, k, e) * dxt(i, i) * dyt(j, j)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(i, 1, k, e) = d(i, 1, k, e) &
-                  + G12(i, 1, k, e) * dyt(1, 1)*dxt(i, i) &
-                  + G23(i, 1, k, e) * dyt(1, 1)*dzt(k, k)
-             d(i, ly, k, e) = d(i, ly, k, e) &
-                  + G12(i, ly, k, e) * dyt(ly, ly)*dxt(i, i) &
-                  + G23(i, ly, k, e) * dyt(ly, ly)*dzt(k, k)
+    do k = 1, lz, lz - 1
+       do j = 1, ly
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G13(i, j, k, e) * dxt(i, i) * dzt(k, k)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do j = 1, ly, ly-1
-          do e = 1, n
-             d(i, j, 1, e) = d(i, j, 1, e) &
-                  + G13(i, j, 1, e) * dzt(1, 1)*dxt(i, i) &
-                  + G23(i, j, 1, e) * dzt(1, 1)*dyt(j, j)
-             d(i, j, lz, e) = d(i, j, lz, e) &
-                  + G13(i, j, lz, e) * dzt(lz, lz)*dxt(i, i) &
-                  + G23(i, j, lz, e) * dzt(lz, lz)*dyt(j, j)
+    do k = 1, lz, lz - 1
+       do j = 1, ly, ly - 1
+          do i = 1, lx
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G23(i, j, k, e) * dyt(j, j) * dzt(k, k)
+             end do
           end do
        end do
     end do
@@ -600,41 +584,36 @@ contains
        end do
     end do
 
-    do j = 1, ly, ly-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(1, j, k, e) = d(1, j, k, e) &
-                  + G12(1, j, k, e) * dxt(1, 1)*dyt(j, j) &
-                  + G13(1, j, k, e) * dxt(1, 1)*dzt(k, k)
-             d(lx, j, k, e) = d(lx, j, k, e) &
-                  + G12(lx, j, k, e) * dxt(lx, lx)*dyt(j, j) &
-                  + G13(lx, j, k, e) * dxt(lx, lx)*dzt(k, k)
+    ! Cross terms, only on the edges, see sx_jacobi_update
+    do k = 1, lz
+       do j = 1, ly, ly - 1
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G12(i, j, k, e) * dxt(i, i) * dyt(j, j)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(i, 1, k, e) = d(i, 1, k, e) &
-                  + G12(i, 1, k, e) * dyt(1, 1)*dxt(i, i) &
-                  + G23(i, 1, k, e) * dyt(1, 1)*dzt(k, k)
-             d(i, ly, k, e) = d(i, ly, k, e) &
-                  + G12(i, ly, k, e) * dyt(ly, ly)*dxt(i, i) &
-                  + G23(i, ly, k, e) * dyt(ly, ly)*dzt(k, k)
+    do k = 1, lz, lz - 1
+       do j = 1, ly
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G13(i, j, k, e) * dxt(i, i) * dzt(k, k)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do j = 1, ly, ly-1
-          do e = 1, n
-             d(i, j, 1, e) = d(i, j, 1, e) &
-                  + G13(i, j, 1, e) * dzt(1, 1)*dxt(i, i) &
-                  + G23(i, j, 1, e) * dzt(1, 1)*dyt(j, j)
-             d(i, j, lz, e) = d(i, j, lz, e) &
-                  + G13(i, j, lz, e) * dzt(lz, lz)*dxt(i, i) &
-                  + G23(i, j, lz, e) * dzt(lz, lz)*dyt(j, j)
+    do k = 1, lz, lz - 1
+       do j = 1, ly, ly - 1
+          do i = 1, lx
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G23(i, j, k, e) * dyt(j, j) * dzt(k, k)
+             end do
           end do
        end do
     end do
@@ -679,41 +658,36 @@ contains
        end do
     end do
 
-    do j = 1, ly, ly-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(1, j, k, e) = d(1, j, k, e) &
-                  + G12(1, j, k, e) * dxt(1, 1)*dyt(j, j) &
-                  + G13(1, j, k, e) * dxt(1, 1)*dzt(k, k)
-             d(lx, j, k, e) = d(lx, j, k, e) &
-                  + G12(lx, j, k, e) * dxt(lx, lx)*dyt(j, j) &
-                  + G13(lx, j, k, e) * dxt(lx, lx)*dzt(k, k)
+    ! Cross terms, only on the edges, see sx_jacobi_update
+    do k = 1, lz
+       do j = 1, ly, ly - 1
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G12(i, j, k, e) * dxt(i, i) * dyt(j, j)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(i, 1, k, e) = d(i, 1, k, e) &
-                  + G12(i, 1, k, e) * dyt(1, 1)*dxt(i, i) &
-                  + G23(i, 1, k, e) * dyt(1, 1)*dzt(k, k)
-             d(i, ly, k, e) = d(i, ly, k, e) &
-                  + G12(i, ly, k, e) * dyt(ly, ly)*dxt(i, i) &
-                  + G23(i, ly, k, e) * dyt(ly, ly)*dzt(k, k)
+    do k = 1, lz, lz - 1
+       do j = 1, ly
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G13(i, j, k, e) * dxt(i, i) * dzt(k, k)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do j = 1, ly, ly-1
-          do e = 1, n
-             d(i, j, 1, e) = d(i, j, 1, e) &
-                  + G13(i, j, 1, e) * dzt(1, 1)*dxt(i, i) &
-                  + G23(i, j, 1, e) * dzt(1, 1)*dyt(j, j)
-             d(i, j, lz, e) = d(i, j, lz, e) &
-                  + G13(i, j, lz, e) * dzt(lz, lz)*dxt(i, i) &
-                  + G23(i, j, lz, e) * dzt(lz, lz)*dyt(j, j)
+    do k = 1, lz, lz - 1
+       do j = 1, ly, ly - 1
+          do i = 1, lx
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G23(i, j, k, e) * dyt(j, j) * dzt(k, k)
+             end do
           end do
        end do
     end do
@@ -758,41 +732,36 @@ contains
        end do
     end do
 
-    do j = 1, ly, ly-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(1, j, k, e) = d(1, j, k, e) &
-                  + G12(1, j, k, e) * dxt(1, 1)*dyt(j, j) &
-                  + G13(1, j, k, e) * dxt(1, 1)*dzt(k, k)
-             d(lx, j, k, e) = d(lx, j, k, e) &
-                  + G12(lx, j, k, e) * dxt(lx, lx)*dyt(j, j) &
-                  + G13(lx, j, k, e) * dxt(lx, lx)*dzt(k, k)
+    ! Cross terms, only on the edges, see sx_jacobi_update
+    do k = 1, lz
+       do j = 1, ly, ly - 1
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G12(i, j, k, e) * dxt(i, i) * dyt(j, j)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(i, 1, k, e) = d(i, 1, k, e) &
-                  + G12(i, 1, k, e) * dyt(1, 1)*dxt(i, i) &
-                  + G23(i, 1, k, e) * dyt(1, 1)*dzt(k, k)
-             d(i, ly, k, e) = d(i, ly, k, e) &
-                  + G12(i, ly, k, e) * dyt(ly, ly)*dxt(i, i) &
-                  + G23(i, ly, k, e) * dyt(ly, ly)*dzt(k, k)
+    do k = 1, lz, lz - 1
+       do j = 1, ly
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G13(i, j, k, e) * dxt(i, i) * dzt(k, k)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do j = 1, ly, ly-1
-          do e = 1, n
-             d(i, j, 1, e) = d(i, j, 1, e) &
-                  + G13(i, j, 1, e) * dzt(1, 1)*dxt(i, i) &
-                  + G23(i, j, 1, e) * dzt(1, 1)*dyt(j, j)
-             d(i, j, lz, e) = d(i, j, lz, e) &
-                  + G13(i, j, lz, e) * dzt(lz, lz)*dxt(i, i) &
-                  + G23(i, j, lz, e) * dzt(lz, lz)*dyt(j, j)
+    do k = 1, lz, lz - 1
+       do j = 1, ly, ly - 1
+          do i = 1, lx
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G23(i, j, k, e) * dyt(j, j) * dzt(k, k)
+             end do
           end do
        end do
     end do
@@ -836,45 +805,39 @@ contains
        end do
     end do
 
-    do j = 1, ly, ly-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(1, j, k, e) = d(1, j, k, e) &
-                  + G12(1, j, k, e) * dxt(1, 1)*dyt(j, j) &
-                  + G13(1, j, k, e) * dxt(1, 1)*dzt(k, k)
-             d(lx, j, k, e) = d(lx, j, k, e) &
-                  + G12(lx, j, k, e) * dxt(lx, lx)*dyt(j, j) &
-                  + G13(lx, j, k, e) * dxt(lx, lx)*dzt(k, k)
+    ! Cross terms, only on the edges, see sx_jacobi_update
+    do k = 1, lz
+       do j = 1, ly, ly - 1
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G12(i, j, k, e) * dxt(i, i) * dyt(j, j)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(i, 1, k, e) = d(i, 1, k, e) &
-                  + G12(i, 1, k, e) * dyt(1, 1)*dxt(i, i) &
-                  + G23(i, 1, k, e) * dyt(1, 1)*dzt(k, k)
-             d(i, ly, k, e) = d(i, ly, k, e) &
-                  + G12(i, ly, k, e) * dyt(ly, ly)*dxt(i, i) &
-                  + G23(i, ly, k, e) * dyt(ly, ly)*dzt(k, k)
+    do k = 1, lz, lz - 1
+       do j = 1, ly
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G13(i, j, k, e) * dxt(i, i) * dzt(k, k)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do j = 1, ly, ly-1
-          do e = 1, n
-             d(i, j, 1, e) = d(i, j, 1, e) &
-                  + G13(i, j, 1, e) * dzt(1, 1)*dxt(i, i) &
-                  + G23(i, j, 1, e) * dzt(1, 1)*dyt(j, j)
-             d(i, j, lz, e) = d(i, j, lz, e) &
-                  + G13(i, j, lz, e) * dzt(lz, lz)*dxt(i, i) &
-                  + G23(i, j, lz, e) * dzt(lz, lz)*dyt(j, j)
+    do k = 1, lz, lz - 1
+       do j = 1, ly, ly - 1
+          do i = 1, lx
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G23(i, j, k, e) * dyt(j, j) * dzt(k, k)
+             end do
           end do
        end do
     end do
-
 
   end subroutine sx_update_lx7
 
@@ -915,45 +878,39 @@ contains
        end do
     end do
 
-    do j = 1, ly, ly-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(1, j, k, e) = d(1, j, k, e) &
-                  + G12(1, j, k, e) * dxt(1, 1)*dyt(j, j) &
-                  + G13(1, j, k, e) * dxt(1, 1)*dzt(k, k)
-             d(lx, j, k, e) = d(lx, j, k, e) &
-                  + G12(lx, j, k, e) * dxt(lx, lx)*dyt(j, j) &
-                  + G13(lx, j, k, e) * dxt(lx, lx)*dzt(k, k)
+    ! Cross terms, only on the edges, see sx_jacobi_update
+    do k = 1, lz
+       do j = 1, ly, ly - 1
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G12(i, j, k, e) * dxt(i, i) * dyt(j, j)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(i, 1, k, e) = d(i, 1, k, e) &
-                  + G12(i, 1, k, e) * dyt(1, 1)*dxt(i, i) &
-                  + G23(i, 1, k, e) * dyt(1, 1)*dzt(k, k)
-             d(i, ly, k, e) = d(i, ly, k, e) &
-                  + G12(i, ly, k, e) * dyt(ly, ly)*dxt(i, i) &
-                  + G23(i, ly, k, e) * dyt(ly, ly)*dzt(k, k)
+    do k = 1, lz, lz - 1
+       do j = 1, ly
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G13(i, j, k, e) * dxt(i, i) * dzt(k, k)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do j = 1, ly, ly-1
-          do e = 1, n
-             d(i, j, 1, e) = d(i, j, 1, e) &
-                  + G13(i, j, 1, e) * dzt(1, 1)*dxt(i, i) &
-                  + G23(i, j, 1, e) * dzt(1, 1)*dyt(j, j)
-             d(i, j, lz, e) = d(i, j, lz, e) &
-                  + G13(i, j, lz, e) * dzt(lz, lz)*dxt(i, i) &
-                  + G23(i, j, lz, e) * dzt(lz, lz)*dyt(j, j)
+    do k = 1, lz, lz - 1
+       do j = 1, ly, ly - 1
+          do i = 1, lx
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G23(i, j, k, e) * dyt(j, j) * dzt(k, k)
+             end do
           end do
        end do
     end do
-
 
   end subroutine sx_update_lx6
 
@@ -994,45 +951,39 @@ contains
        end do
     end do
 
-    do j = 1, ly, ly-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(1, j, k, e) = d(1, j, k, e) &
-                  + G12(1, j, k, e) * dxt(1, 1)*dyt(j, j) &
-                  + G13(1, j, k, e) * dxt(1, 1)*dzt(k, k)
-             d(lx, j, k, e) = d(lx, j, k, e) &
-                  + G12(lx, j, k, e) * dxt(lx, lx)*dyt(j, j) &
-                  + G13(lx, j, k, e) * dxt(lx, lx)*dzt(k, k)
+    ! Cross terms, only on the edges, see sx_jacobi_update
+    do k = 1, lz
+       do j = 1, ly, ly - 1
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G12(i, j, k, e) * dxt(i, i) * dyt(j, j)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(i, 1, k, e) = d(i, 1, k, e) &
-                  + G12(i, 1, k, e) * dyt(1, 1)*dxt(i, i) &
-                  + G23(i, 1, k, e) * dyt(1, 1)*dzt(k, k)
-             d(i, ly, k, e) = d(i, ly, k, e) &
-                  + G12(i, ly, k, e) * dyt(ly, ly)*dxt(i, i) &
-                  + G23(i, ly, k, e) * dyt(ly, ly)*dzt(k, k)
+    do k = 1, lz, lz - 1
+       do j = 1, ly
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G13(i, j, k, e) * dxt(i, i) * dzt(k, k)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do j = 1, ly, ly-1
-          do e = 1, n
-             d(i, j, 1, e) = d(i, j, 1, e) &
-                  + G13(i, j, 1, e) * dzt(1, 1)*dxt(i, i) &
-                  + G23(i, j, 1, e) * dzt(1, 1)*dyt(j, j)
-             d(i, j, lz, e) = d(i, j, lz, e) &
-                  + G13(i, j, lz, e) * dzt(lz, lz)*dxt(i, i) &
-                  + G23(i, j, lz, e) * dzt(lz, lz)*dyt(j, j)
+    do k = 1, lz, lz - 1
+       do j = 1, ly, ly - 1
+          do i = 1, lx
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G23(i, j, k, e) * dyt(j, j) * dzt(k, k)
+             end do
           end do
        end do
     end do
-
 
   end subroutine sx_update_lx5
 
@@ -1073,45 +1024,39 @@ contains
        end do
     end do
 
-    do j = 1, ly, ly-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(1, j, k, e) = d(1, j, k, e) &
-                  + G12(1, j, k, e) * dxt(1, 1)*dyt(j, j) &
-                  + G13(1, j, k, e) * dxt(1, 1)*dzt(k, k)
-             d(lx, j, k, e) = d(lx, j, k, e) &
-                  + G12(lx, j, k, e) * dxt(lx, lx)*dyt(j, j) &
-                  + G13(lx, j, k, e) * dxt(lx, lx)*dzt(k, k)
+    ! Cross terms, only on the edges, see sx_jacobi_update
+    do k = 1, lz
+       do j = 1, ly, ly - 1
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G12(i, j, k, e) * dxt(i, i) * dyt(j, j)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(i, 1, k, e) = d(i, 1, k, e) &
-                  + G12(i, 1, k, e) * dyt(1, 1)*dxt(i, i) &
-                  + G23(i, 1, k, e) * dyt(1, 1)*dzt(k, k)
-             d(i, ly, k, e) = d(i, ly, k, e) &
-                  + G12(i, ly, k, e) * dyt(ly, ly)*dxt(i, i) &
-                  + G23(i, ly, k, e) * dyt(ly, ly)*dzt(k, k)
+    do k = 1, lz, lz - 1
+       do j = 1, ly
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G13(i, j, k, e) * dxt(i, i) * dzt(k, k)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do j = 1, ly, ly-1
-          do e = 1, n
-             d(i, j, 1, e) = d(i, j, 1, e) &
-                  + G13(i, j, 1, e) * dzt(1, 1)*dxt(i, i) &
-                  + G23(i, j, 1, e) * dzt(1, 1)*dyt(j, j)
-             d(i, j, lz, e) = d(i, j, lz, e) &
-                  + G13(i, j, lz, e) * dzt(lz, lz)*dxt(i, i) &
-                  + G23(i, j, lz, e) * dzt(lz, lz)*dyt(j, j)
+    do k = 1, lz, lz - 1
+       do j = 1, ly, ly - 1
+          do i = 1, lx
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G23(i, j, k, e) * dyt(j, j) * dzt(k, k)
+             end do
           end do
        end do
     end do
-
 
   end subroutine sx_update_lx4
 
@@ -1153,41 +1098,36 @@ contains
        end do
     end do
 
-    do j = 1, ly, ly-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(1, j, k, e) = d(1, j, k, e) &
-                  + G12(1, j, k, e) * dxt(1, 1)*dyt(j, j) &
-                  + G13(1, j, k, e) * dxt(1, 1)*dzt(k, k)
-             d(lx, j, k, e) = d(lx, j, k, e) &
-                  + G12(lx, j, k, e) * dxt(lx, lx)*dyt(j, j) &
-                  + G13(lx, j, k, e) * dxt(lx, lx)*dzt(k, k)
+    ! Cross terms, only on the edges, see sx_jacobi_update
+    do k = 1, lz
+       do j = 1, ly, ly - 1
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G12(i, j, k, e) * dxt(i, i) * dyt(j, j)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(i, 1, k, e) = d(i, 1, k, e) &
-                  + G12(i, 1, k, e) * dyt(1, 1)*dxt(i, i) &
-                  + G23(i, 1, k, e) * dyt(1, 1)*dzt(k, k)
-             d(i, ly, k, e) = d(i, ly, k, e) &
-                  + G12(i, ly, k, e) * dyt(ly, ly)*dxt(i, i) &
-                  + G23(i, ly, k, e) * dyt(ly, ly)*dzt(k, k)
+    do k = 1, lz, lz - 1
+       do j = 1, ly
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G13(i, j, k, e) * dxt(i, i) * dzt(k, k)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do j = 1, ly, ly-1
-          do e = 1, n
-             d(i, j, 1, e) = d(i, j, 1, e) &
-                  + G13(i, j, 1, e) * dzt(1, 1)*dxt(i, i) &
-                  + G23(i, j, 1, e) * dzt(1, 1)*dyt(j, j)
-             d(i, j, lz, e) = d(i, j, lz, e) &
-                  + G13(i, j, lz, e) * dzt(lz, lz)*dxt(i, i) &
-                  + G23(i, j, lz, e) * dzt(lz, lz)*dyt(j, j)
+    do k = 1, lz, lz - 1
+       do j = 1, ly, ly - 1
+          do i = 1, lx
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G23(i, j, k, e) * dyt(j, j) * dzt(k, k)
+             end do
           end do
        end do
     end do
@@ -1232,41 +1172,36 @@ contains
        end do
     end do
 
-    do j = 1, ly, ly-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(1, j, k, e) = d(1, j, k, e) &
-                  + G12(1, j, k, e) * dxt(1, 1)*dyt(j, j) &
-                  + G13(1, j, k, e) * dxt(1, 1)*dzt(k, k)
-             d(lx, j, k, e) = d(lx, j, k, e) &
-                  + G12(lx, j, k, e) * dxt(lx, lx)*dyt(j, j) &
-                  + G13(lx, j, k, e) * dxt(lx, lx)*dzt(k, k)
+    ! Cross terms, only on the edges, see sx_jacobi_update
+    do k = 1, lz
+       do j = 1, ly, ly - 1
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G12(i, j, k, e) * dxt(i, i) * dyt(j, j)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do k = 1, lz, lz-1
-          do e = 1, n
-             d(i, 1, k, e) = d(i, 1, k, e) &
-                  + G12(i, 1, k, e) * dyt(1, 1)*dxt(i, i) &
-                  + G23(i, 1, k, e) * dyt(1, 1)*dzt(k, k)
-             d(i, ly, k, e) = d(i, ly, k, e) &
-                  + G12(i, ly, k, e) * dyt(ly, ly)*dxt(i, i) &
-                  + G23(i, ly, k, e) * dyt(ly, ly)*dzt(k, k)
+    do k = 1, lz, lz - 1
+       do j = 1, ly
+          do i = 1, lx, lx - 1
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G13(i, j, k, e) * dxt(i, i) * dzt(k, k)
+             end do
           end do
        end do
     end do
 
-    do i = 1, lx, lx-1
-       do j = 1, ly, ly-1
-          do e = 1, n
-             d(i, j, 1, e) = d(i, j, 1, e) &
-                  + G13(i, j, 1, e) * dzt(1, 1)*dxt(i, i) &
-                  + G23(i, j, 1, e) * dzt(1, 1)*dyt(j, j)
-             d(i, j, lz, e) = d(i, j, lz, e) &
-                  + G13(i, j, lz, e) * dzt(lz, lz)*dxt(i, i) &
-                  + G23(i, j, lz, e) * dzt(lz, lz)*dyt(j, j)
+    do k = 1, lz, lz - 1
+       do j = 1, ly, ly - 1
+          do i = 1, lx
+             do e = 1, n
+                d(i, j, k, e) = d(i, j, k, e) &
+                     + 2.0_rp * G23(i, j, k, e) * dyt(j, j) * dzt(k, k)
+             end do
           end do
        end do
     end do
