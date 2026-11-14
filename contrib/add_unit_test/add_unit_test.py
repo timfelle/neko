@@ -105,23 +105,30 @@ def insert_before_pattern_in_block(
     pattern: str,
     new_line: str,
 ) -> list[str]:
-    """Insert a line before an anchor that must appear within a specific block."""
+    """Insert a line before an anchor that must appear within a specific block.
 
-    # If the new line is already present, assume the change was made and do not insert
-    if new_line in lines:
-        return lines
+    Only the block is checked for the line being present already, as the same
+    line can belong in several blocks, e.g. the runner script of a parallel
+    suite is listed in both TESTS and EXTRA_DIST.
+    """
 
     # Go through lines, first search for the block_start, and then a line with
-    # the patter before the block_end.
+    # the pattern before the block_end. If the new line is already present in
+    # the block, assume the change was made and do not insert.
     in_block = False
+    anchor = None
     for index, line in enumerate(lines):
         if block_start in line:
             in_block = True
-        if in_block and pattern in line:
-            return lines[:index] + [new_line] + lines[index:]
+        if in_block and line == new_line:
+            return lines
+        if in_block and anchor is None and pattern in line:
+            anchor = index
         if in_block and block_end in line:
             in_block = False
-    raise ValueError(f"could not find anchor in block: {pattern}")
+    if anchor is None:
+        raise ValueError(f"could not find anchor in block: {pattern}")
+    return lines[:anchor] + [new_line] + lines[anchor:]
 
 
 def replace_all(path: Path, replacements: list[tuple[str, str]]) -> None:
@@ -374,10 +381,19 @@ def create_suite(test_name: str, is_parallel: bool) -> None:
             f"        tests/unit/{test_name}/Makefile\\\n",
         )
 
-        # Patch gitignore
+        # Patch gitignore. The root .gitignore ignores all files without an
+        # extension, so the runner script of a parallel suite must be
+        # un-ignored with a ! entry, like the one of the parallel template,
+        # for it to be committed.
         gitignore = unit_dir / ".gitignore"
         gitignore_original = gitignore.read_text(encoding="utf-8")
         gitignore_lines = gitignore_original.splitlines(keepends=True)
+        if is_parallel:
+            gitignore_lines = insert_before_pattern(
+                gitignore_lines,
+                "!templates/parallel/parallel_test",
+                f"!{test_name}/{test_program}\n",
+            )
         ignore_entry = (
             f"{test_name}/{suite_or_binary}\n"
             if is_parallel
