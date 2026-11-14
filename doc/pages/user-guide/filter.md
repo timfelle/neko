@@ -24,8 +24,8 @@ following input parameters:
 
 | Name | Description  | Admissible values | Default value |
 |------|--------------|-------------------|---------------|
-| `r` | \f$r\f$ is the above equation. | Real | - |
-| `tol`| The desired tolerance used when solving the system. | Real | `0.0000000001` |
+| `radius` | Filter radius \f$R\f$, giving \f$r = R / (2\sqrt{3})\f$ in the above equation. | Real | - |
+| `tolerance` | The desired absolute tolerance used when solving the system. | Real | `0.0000000001` |
 | `max_iter` | Maximum number of iterations when solving the system. | Integer | `200` |
 | `solver` | Numerical solver used to solve the system. | `cg`, `pipecg`, `fused_cg`, `cacg`, `gmres` | `cg` |
 | `preconditioner` | Pre-conditioner used to solve the system. | `ident`, `hsmg`, `jacobi` | `jacobi`  |
