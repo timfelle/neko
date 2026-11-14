@@ -302,4 +302,57 @@ contains
     call registry%free()
   end subroutine test_registry_expand
 
+  !> Entry names longer than 80 characters are stored in full, so a lookup
+  !! with the full name succeeds, and two names that only differ after the
+  !! 80th character are distinct entries.
+  @test
+  subroutine test_registry_long_names(this)
+    class(test_field_reg), intent(inout) :: this
+    type(space_t) :: Xh
+    type(mesh_t) :: msh
+    type(dofmap_t) :: dm
+    integer, parameter :: lx = 2
+    type(registry_t) :: registry
+    type(field_t), pointer :: field_a, field_b
+    type(vector_t), pointer :: vector_a, vector_b
+    character(len=120) :: name_a, name_b
+
+    ! Equal in the first 100 characters
+    name_a = repeat('n', 100) // repeat('a', 20)
+    name_b = repeat('n', 100) // repeat('b', 20)
+
+    call test_registry_gen_msh(msh)
+
+    call Xh%init(GLL, lx, lx, lx)
+    call dm%init(msh, Xh)
+
+    call registry%init()
+    call registry%add_field(dm, name_a)
+    call registry%add_field(dm, name_b)
+    call registry%add_vector(3, name_a)
+    call registry%add_vector(5, name_b)
+
+    @assertEqual(2, registry%n_fields())
+    @assertEqual(2, registry%n_vectors())
+    @assertTrue(registry%field_exists(name_a))
+    @assertTrue(registry%field_exists(name_b))
+    @assertFalse(registry%field_exists(name_a(1:80)))
+
+    field_a => registry%get_field(name_a)
+    field_b => registry%get_field(name_b)
+    @assertFalse(associated(field_a, field_b))
+    @assertEqual(name_a, field_a%name)
+    @assertEqual(name_b, field_b%name)
+
+    vector_a => registry%get_vector(name_a)
+    vector_b => registry%get_vector(name_b)
+    @assertEqual(3, vector_a%size())
+    @assertEqual(5, vector_b%size())
+
+    call registry%free()
+    call dm%free()
+    call Xh%free()
+    call msh%free()
+  end subroutine test_registry_long_names
+
 end module test_registry

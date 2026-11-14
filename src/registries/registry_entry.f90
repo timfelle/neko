@@ -50,9 +50,9 @@ module registry_entry
 
   type, public :: registry_entry_t
      !> Name of the registry entry
-     character(len=80), private :: name = ""
+     character(len=:), allocatable, private :: name
      !> Type of the registry entry; must be supported.
-     character(len=80), private :: type = ""
+     character(len=:), allocatable, private :: type
      !> Whether the entry is allocated
      logical, private :: allocated = .false.
 
@@ -347,24 +347,34 @@ contains
     this%real_scalar = 0.0_rp
     this%integer_scalar = 0
 
-    this%name = ""
-    this%type = ""
+    if (allocated(this%name)) deallocate(this%name)
+    if (allocated(this%type)) deallocate(this%type)
     this%allocated = .false.
 
   end subroutine free_register
 
-  !> Get the name of the registry entry
+  !> Get the name of the registry entry, empty if it has none.
   pure function get_name(this) result(name)
     class(registry_entry_t), intent(in) :: this
     character(len=:), allocatable :: name
-    name = trim(this%name)
+
+    if (allocated(this%name)) then
+       name = this%name
+    else
+       name = ""
+    end if
   end function get_name
 
-  !> Get the type of the registry entry
+  !> Get the type of the registry entry, empty if the entry is not allocated.
   pure function get_type(this) result(type)
     class(registry_entry_t), intent(in) :: this
     character(len=:), allocatable :: type
-    type = trim(this%type)
+
+    if (allocated(this%type)) then
+       type = this%type
+    else
+       type = ""
+    end if
   end function get_type
 
   !> Check if the registry entry is allocated
@@ -378,7 +388,7 @@ contains
   pure logical function is_type(this, type_str)
     class(registry_entry_t), intent(in) :: this
     character(len=*), intent(in) :: type_str
-    is_type = trim(this%type) .eq. trim(type_str)
+    is_type = this%get_type() .eq. trim(type_str)
   end function is_type
 
   !> Get the host array pointer of the registry entry
@@ -488,7 +498,8 @@ contains
     if (.not. source%is_allocated()) return
     call this%free()
 
-    this%name = source%name
+    ! An entry need not have a name, e.g. in the scratch registry.
+    if (allocated(source%name)) this%name = source%name
     this%type = source%type
     this%allocated = source%allocated
 
