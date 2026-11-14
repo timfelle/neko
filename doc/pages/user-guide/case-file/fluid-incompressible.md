@@ -936,10 +936,25 @@ The indicator function will be defined based on the object type. The following
 types are currently implemented.
 
 1. `boundary_mesh`, the indicator function for a boundary mesh is computed in
-   two steps. First, the signed distance function is computed for the boundary
-   mesh. Then, the indicator function is computed using the distance transform
-   function specified in the case file. This is currently not very well
-   optimized, it will scale by `O(log(M)*N)`, where `M` is the number of triangles in the
+   two steps. First, the signed distance function to the boundary mesh is
+   computed at every point: negative inside the closed surface and positive
+   outside it. "Inside" is set by the winding of the triangle vertices,
+   counter-clockwise when a triangle is seen from outside the surface; any
+   normals stored in the mesh file itself are ignored. Then, the indicator
+   function is computed from the signed distance by the distance transform
+   given by `distance_transform.type`, which applies to `boundary_mesh`
+   objects only.
+
+   - `step`: the indicator is 1 where the signed distance to the boundary
+     mesh is less than `distance_transform.value` (inside the closed surface
+     and within `value` of it), 0 elsewhere.
+   - `smooth_step`: the indicator is 1 where the signed distance to the
+     boundary mesh is at or below 0 (inside the closed surface), 0 where it
+     is at or beyond `distance_transform.value`, and ramps smoothly between
+     the two.
+
+   Computing the signed distance field is currently not very well optimized,
+   it will scale by `O(log(M)*N)`, where `M` is the number of triangles in the
    boundary mesh and `N` is the number of grid points in the simulation.
    To avoid recomputing the distance field for multiple simulations with the
    same boundary mesh and numerical discretization, the distance field can be
@@ -1007,8 +1022,8 @@ Additional keywords are available to modify the Brinkman force term.
 | `limits`                           | Brinkman factor at free-flow (\f$ \kappa_0 \f$) and solid domain (\f$ \kappa_1 \f$).          | Vector of 2 reals.                | -             |
 | `penalty`                          | Penalty parameter \f$ q \f$ when estimating Brinkman factor.                                  | Real                              | -             |
 | `objects`                          | Array of JSON objects, defining the objects to be immersed.                                   | Each object must specify a `type` | -             |
-| `distance_transform.type`          | How to map from distance field to indicator field.                                            | `step`, `smooth_step`             | -             |
-| `distance_transform.value`         | Values used to define the distance transform, such as cut-off distance for the step function. | Real                              | -             |
+| `distance_transform.type`          | How the signed distance is mapped to the indicator for a `boundary_mesh` object, see above.   | `step`, `smooth_step`             | -             |
+| `distance_transform.value`         | Cut-off distance of the distance transform (see above), in the units of the boundary mesh.    | Real                              | -             |
 | `filter.type`                      | Type of filtering applied to the indicator field, at the top level or for one object.         | `none`, `PDE`                     | `none`        |
 | `filter.radius`                    | Radius of a `PDE` filter, see the [PDE filter](@ref filter_pde) for its other keywords.       | Real                              | -             |
 | `mesh_transform.type`              | Apply a transformation to the boundary mesh.                                                  | `bounding_box`, `none`            | `none`        |

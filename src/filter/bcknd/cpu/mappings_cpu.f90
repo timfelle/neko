@@ -100,7 +100,7 @@ contains
     real(kind=rp), intent(in) :: x, x_step, value0, value1
     real(kind=rp) :: res
 
-    res = merge(value0, value1, x > x_step)
+    res = merge(value0, value1, x < x_step)
 
   end function step_function_kernel
 
