@@ -1,4 +1,4 @@
-! Copyright (c) 2021, The Neko Authors
+! Copyright (c) 2021-2026, The Neko Authors
 ! All rights reserved.
 !
 ! Redistribution and use in source and binary forms, with or without
@@ -115,8 +115,9 @@ contains
   !! derivative matrices, 2 * G12(i,j,k) * dxt(i,i) * dyt(j,j) for G12. These
   !! vanish except at the end points, so the cross terms only contribute on
   !! the edges of the element. They are added on every element; on an
-  !! undeformed one they are zero up to round-off. h1 is applied at the node,
-  !! which is exact when it is constant along the grid lines of each element.
+  !! undeformed one they are zero up to round-off. h1 is applied at the node.
+  !! That is exact for the cross terms whatever h1 is, and for the other
+  !! terms when h1 is constant on each element.
   subroutine sx_jacobi_update(this)
     class(sx_jacobi_t), intent(inout) :: this
     integer :: lz, ly, lx
@@ -162,6 +163,9 @@ contains
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, nelv)
       case (4)
          call sx_update_lx4(this%d, coef%Xh%dxt, coef%Xh%dyt, coef%Xh%dzt, &
+              coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, nelv)
+      case (3)
+         call sx_update_lx3(this%d, coef%Xh%dxt, coef%Xh%dyt, coef%Xh%dzt, &
               coef%G11, coef%G22, coef%G33, coef%G12, coef%G13, coef%G23, nelv)
       case (2)
          call sx_update_lx2(this%d, coef%Xh%dxt, coef%Xh%dyt, coef%Xh%dzt, &

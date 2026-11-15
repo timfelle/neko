@@ -115,8 +115,9 @@ contains
   !! derivative matrices, 2 * G12(i,j,k) * dxt(i,i) * dyt(j,j) for G12. These
   !! vanish except at the end points, so the cross terms only contribute on
   !! the edges of the element. They are added on every element; on an
-  !! undeformed one they are zero up to round-off. h1 is applied at the node,
-  !! which is exact when it is constant along the grid lines of each element.
+  !! undeformed one they are zero up to round-off. h1 is applied at the node.
+  !! That is exact for the cross terms whatever h1 is, and for the other
+  !! terms when h1 is constant on each element.
   subroutine jacobi_update(this)
     class(jacobi_t), intent(inout) :: this
     associate(dof => this%dof, coef => this%coef, gs_h => this%gs_h)

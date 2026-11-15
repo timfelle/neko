@@ -310,6 +310,8 @@ contains
   !! point (i, j, k) has the id 1 + i + (n + 1) * (j + (n + 1) * k). The mesh
   !! is finalized, so its deformed-element flags are set as for a mesh read
   !! from file.
+  !! @param msh Mesh to create.
+  !! @param n Number of elements in each direction.
   subroutine perturbed_hex_block_mesh(msh, n)
     type(mesh_t), intent(inout) :: msh
     integer, intent(in) :: n
@@ -356,6 +358,8 @@ contains
   !!            |  e1   |                    |  e1   |
   !!            |       |                    |       |
   !!           p1 ----- p2       y = 0.5:   p5 ----- p6
+  !!
+  !! @param msh Mesh to create.
   subroutine single_sheared_element_mesh(msh)
     type(mesh_t), intent(inout) :: msh
     real(kind=dp), parameter :: shift = 0.5_dp

@@ -162,6 +162,8 @@ contains
        call p%init_from_components(coef, dof, gs)
     type is (device_jacobi_t)
        call p%init_from_components(coef, dof, gs)
+    class default
+       @assertTrue(.false., message='Unexpected Jacobi preconditioner type')
     end select
     write(msg, '(A,I0)') 'Jacobi diagonal, lx = ', lx
     call check_inverse_diagonal(pc, d_exact, n, trim(msg))
@@ -182,7 +184,8 @@ contains
     call Xh%free()
   end subroutine check_jacobi_diagonal
 
-  !> Check that a preconditioner inverts a given diagonal.
+  !> Check that a preconditioner inverts a given diagonal to within the
+  !! relative tolerance at every node.
   !! The assertion is the last statement, as a failed one returns from the
   !! routine, so that a failure never skips the check of another
   !! preconditioner or the clean-up of the caller.
@@ -196,13 +199,14 @@ contains
     real(kind=rp), intent(in) :: d(n)
     character(len=*), intent(in) :: msg
     real(kind=rp), allocatable :: d_pc(:)
-    real(kind=rp) :: err
+    integer :: nbad
 
     allocate(d_pc(n))
     call preconditioner_diagonal(d_pc, pc, n)
-    err = maxval(abs(d_pc - d) / abs(d))
+    ! Counts the nodes that do not match, a NaN included
+    nbad = count(.not. (abs(d_pc - d) .le. tol * abs(d)))
     deallocate(d_pc)
-    @assertEqual(0.0_rp, err, tolerance=tol, message=msg)
+    @assertEqual(0, nbad, message=msg)
   end subroutine check_inverse_diagonal
 
   !> Assembled diagonal of the Helmholtz operator, from unit vectors.
