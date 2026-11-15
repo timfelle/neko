@@ -31,11 +31,23 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> @brief Module containing Signed Distance Functions.
+!! @details The sign of the distance to a triangle mesh follows the winding of
+!! its triangles: with every triangle wound counter-clockwise when seen from
+!! outside, the distance is negative inside the mesh and positive outside.
+!! The sign is taken from the angle-weighted pseudo-normal of the mesh feature
+!! (face, edge or vertex) that holds the closest point, which gives the right
+!! sign for every point when the mesh is closed and consistently oriented
+!! (J. A. Baerentzen and H. Aanaes, Signed distance computation using the
+!! angle weighted pseudonormal, IEEE TVCG 11(3), 2005). Edges and vertices are
+!! shared between triangles whose vertex coordinates are identical.
 module signed_distance
   use num_types, only : dp, rp
   use field, only : field_t
   use tri, only : tri_t
   use tri_mesh, only : tri_mesh_t
+  use point, only : point_t
+  use tuple, only : tuple_i4_t
+  use htable, only : htable_pt_t, htable_i4t2_t
   use aabb, only : aabb_t
   use aabb_tree, only : aabb_tree_t, aabb_node_t, AABB_NULL_NODE
   use device, only : device_memcpy, HOST_TO_DEVICE
@@ -47,6 +59,32 @@ module signed_distance
   implicit none
   private
   public :: signed_distance_field
+
+  !> Triangles with twice their area below this are degenerate and ignored.
+  real(kind=dp), parameter :: degenerate_tol = 1e-10_dp
+
+  !> Angle-weighted pseudo-normals of a triangle mesh.
+  !! @details A feature of a triangle is encoded as 0 for its face, k = 1..3
+  !! for its edge from vertex k to vertex mod(k, 3) + 1 and 3 + k for its
+  !! vertex k. The pseudo-normal of an edge is the sum of the unit normals of
+  !! the triangles sharing it, the one of a vertex the sum of the unit normals
+  !! of the triangles sharing it, weighted by their angle at the vertex.
+  type :: pseudo_normals_t
+     !> Unit normal of each triangle, zero for a degenerate one
+     real(kind=dp), allocatable :: face(:,:)
+     !> Pseudo-normal of each distinct edge
+     real(kind=dp), allocatable :: edge(:,:)
+     !> Pseudo-normal of each distinct vertex
+     real(kind=dp), allocatable :: vertex(:,:)
+     !> Distinct edge of each local edge of each triangle
+     integer, allocatable :: tri_edge(:,:)
+     !> Distinct vertex of each local vertex of each triangle
+     integer, allocatable :: tri_vertex(:,:)
+   contains
+     procedure, pass(this) :: init => pseudo_normals_init
+     procedure, pass(this) :: free => pseudo_normals_free
+     procedure, pass(this) :: get => pseudo_normals_get
+  end type pseudo_normals_t
 
 contains
 
@@ -87,8 +125,9 @@ contains
   !! @details This routine computes the signed distance field for a given
   !! triangular mesh. The algorithm utilizes an AABB tree to accelerate the
   !! earch for potential elements. The signed distance is computed using the
-  !! brute force approach, where we compute the signed distance to each element
-  !! found through the AABB tree, and return the minimum distance.
+  !! brute force approach, where we compute the distance to each element
+  !! found through the AABB tree, and return the minimum distance, signed by
+  !! the pseudo-normal at the closest point.
   !!
   !! @param[in,out] field_data Field data
   !! @param[in] mesh Triangular mesh
@@ -101,6 +140,7 @@ contains
     integer :: total_size
     integer :: id
     type(aabb_tree_t) :: search_tree
+    type(pseudo_normals_t) :: normals
     real(kind=dp), dimension(3) :: p
     real(kind=dp) :: distance
 
@@ -116,17 +156,22 @@ contains
             "Error building the search tree.")
     end if
 
+    call normals%init(mesh)
+
     !$omp parallel do private(id, p, distance)
     do id = 1, total_size
        p(1) = field_data%dof%x%x(id, 1, 1, 1)
        p(2) = field_data%dof%y%x(id, 1, 1, 1)
        p(3) = field_data%dof%z%x(id, 1, 1, 1)
 
-       distance = tri_mesh_aabb_tree(search_tree, mesh%el, p, max_distance)
+       distance = tri_mesh_aabb_tree(search_tree, mesh%el, normals, p, &
+            max_distance)
 
        field_data%x(id, 1, 1, 1) = real(distance, kind=rp)
     end do
     !$omp end parallel do
+
+    call normals%free()
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call neko_warning("signed_distance_field_tri_mesh:&
@@ -140,42 +185,50 @@ contains
   !> @brief Signed distance function
   !! @details This routine computes the signed distance function for the
   !! boundary mesh, to a given point (x, y, z). The algorithm is a
-  !! brute force approach, where we compute the signed distance to each
+  !! brute force approach, where we compute the distance to each
   !! element in the mesh, and return the minimum distance.
   !!
   !! @note This routine is here for completeness, and is not optimized for
-  !! performance. It is recommended to use the AABB tree version for large meshes.
+  !! performance. It is recommended to use the AABB tree version for large
+  !! meshes.
   !!
-  !! @param p Point
   !! @param mesh Boundary mesh
+  !! @param normals Pseudo-normals of the boundary mesh
+  !! @param p Point
+  !! @param max_distance Maximum distance outside the mesh
   !! @return Signed distance value
-  function tri_mesh_brute_force(mesh, p, max_distance) result(distance)
+  function tri_mesh_brute_force(mesh, normals, p, max_distance) &
+       result(distance)
     type(tri_mesh_t), intent(in) :: mesh
+    type(pseudo_normals_t), intent(in) :: normals
     real(kind=dp), intent(in) :: p(3)
     real(kind=dp), intent(in) :: max_distance
 
-    integer :: id
-    real(kind=dp) :: distance, weighted_sign
-    real(kind=dp) :: cd, cs
-    real(kind=dp) :: tol = 1e-6_dp
+    integer :: id, closest_id, closest_feature, cf
+    real(kind=dp) :: distance
+    real(kind=dp) :: cd, cp(3), closest_point(3)
 
     distance = huge(0.0_dp)
-    weighted_sign = 0.0_dp
+    closest_id = 0
+    closest_feature = 0
+    closest_point = p
 
     do id = 1, mesh%nelv
-       call element_distance(mesh%el(id), p, cd, cs)
+       call element_distance(mesh%el(id), p, cd, cp, cf)
 
-       ! Update the weighted sign, if the relative difference is small
-       if (abs(cd - distance) / distance .lt. tol) then
-          weighted_sign = weighted_sign + cs
-       else if (cd .lt. distance) then
-          weighted_sign = cs
+       if (cd .lt. distance) then
+          distance = cd
+          closest_id = id
+          closest_feature = cf
+          closest_point = cp
        end if
-
-       distance = min(cd, distance)
     end do
 
-    distance = sign(min(distance, max_distance), weighted_sign)
+    distance = min(distance, max_distance)
+    if (closest_id .gt. 0) then
+       distance = sign(distance, dot_product(p - closest_point, &
+            normals%get(closest_id, closest_feature)))
+    end if
 
   end function tri_mesh_brute_force
 
@@ -184,25 +237,24 @@ contains
   !! boundary mesh, to a given point (x, y, z). The algorithm utilizes an
   !! AABB tree to accelerate the search for potential elements. The signed
   !! distance is computed using the brute force approach, where we compute the
-  !! signed distance to each element found through the AABB tree, and return
-  !! the minimum distance.
+  !! distance to each element found through the AABB tree, and return the
+  !! minimum distance, signed by the pseudo-normal at the closest point.
   !!
   !! @param tree AABB tree
   !! @param object_list List of objects
+  !! @param normals Pseudo-normals of the objects
   !! @param p Point
   !! @param max_distance Maximum distance outside the mesh
   !! @return Signed distance value
-  function tri_mesh_aabb_tree(tree, object_list, p, max_distance) &
+  function tri_mesh_aabb_tree(tree, object_list, normals, p, max_distance) &
        result(distance)
     class(aabb_tree_t), intent(in) :: tree
     class(tri_t), contiguous, dimension(:), intent(in) :: object_list
+    type(pseudo_normals_t), intent(in) :: normals
     real(kind=dp), dimension(3), intent(in) :: p
     real(kind=dp), intent(in) :: max_distance
 
     real(kind=dp) :: distance
-    real(kind=dp) :: weighted_sign
-
-    real(kind=dp), parameter :: tol = 1.0e-6_dp
 
     type(stack_i4_t) :: simple_stack
     integer :: current_index
@@ -211,7 +263,12 @@ contains
     type(aabb_t) :: current_aabb
     integer :: current_object_index
     real(kind=dp) :: current_distance
-    real(kind=dp) :: current_sign
+    real(kind=dp), dimension(3) :: current_point
+    integer :: current_feature
+
+    integer :: closest_object_index
+    integer :: closest_feature
+    real(kind=dp), dimension(3) :: closest_point
 
     type(aabb_node_t) :: left_node
     type(aabb_node_t) :: right_node
@@ -233,7 +290,6 @@ contains
 
     if (.not. root_box%overlaps(search_box)) then
        distance = max_distance
-       weighted_sign = 1.0_dp
        return
     end if
 
@@ -241,14 +297,15 @@ contains
     call random_number(random_value)
     current_object_index = floor(random_value * size(object_list) + 1)
     call element_distance(object_list(current_object_index), p, distance, &
-         weighted_sign)
+         closest_point, closest_feature)
+    closest_object_index = current_object_index
     distance = distance + object_list(current_object_index)%diameter()
 
     ! Update the search box to the new distance and push the root node
     call search_box%init(p - distance, p + distance)
     call simple_stack%push(root_index)
 
-    ! Traverse the tree and compute the signed distance to the elements
+    ! Traverse the tree and compute the distance to the elements
     do while (.not. simple_stack%is_empty())
        current_index = simple_stack%pop()
        if (current_index .eq. AABB_NULL_NODE) cycle
@@ -263,16 +320,14 @@ contains
 
           current_object_index = current_node%get_object_index()
           call element_distance(object_list(current_object_index), p, &
-               current_distance, current_sign)
+               current_distance, current_point, current_feature)
 
-          ! Update the weighted sign, if the relative difference is small
-          if (abs(current_distance - distance) / distance .lt. tol) then
-             weighted_sign = weighted_sign + current_sign
-          else if (current_distance .lt. distance) then
-             weighted_sign = current_sign
+          if (current_distance .lt. distance) then
+             distance = current_distance
+             closest_object_index = current_object_index
+             closest_feature = current_feature
+             closest_point = current_point
           end if
-
-          distance = min(distance, current_distance)
 
           ! Update the search box to the new distance
           if (distance .gt. current_aabb%get_diameter()) then
@@ -301,24 +356,161 @@ contains
     if (distance .gt. max_distance) then
        distance = max_distance
     end if
-    distance = sign(distance, weighted_sign)
+    distance = sign(distance, dot_product(p - closest_point, &
+         normals%get(closest_object_index, closest_feature)))
 
   end function tri_mesh_aabb_tree
+
+  ! ========================================================================== !
+  ! Pseudo-normals
+  ! ========================================================================== !
+
+  !> Compute the pseudo-normals of a triangle mesh
+  !! @param this Pseudo-normals
+  !! @param mesh Triangular mesh
+  subroutine pseudo_normals_init(this, mesh)
+    class(pseudo_normals_t), intent(inout) :: this
+    type(tri_mesh_t), intent(in) :: mesh
+
+    type(htable_pt_t) :: vertex_table
+    type(htable_i4t2_t) :: edge_table
+    type(point_t) :: vertex_key
+    type(tuple_i4_t) :: edge_key
+    real(kind=dp) :: v(3, 3)
+    real(kind=dp), dimension(3) :: normal, e1, e2
+    real(kind=dp) :: normal_length, angle
+    integer :: i, k, id, a, b, n_vertices, n_edges
+
+    call this%free()
+
+    allocate(this%face(3, mesh%nelv))
+    allocate(this%tri_edge(3, mesh%nelv))
+    allocate(this%tri_vertex(3, mesh%nelv))
+
+    ! Number the distinct vertices. Adding zero turns -0 into +0, which the
+    ! hash of a point would otherwise tell apart.
+    id = 0
+    call vertex_table%init(3 * mesh%nelv, id)
+    n_vertices = 0
+    do i = 1, mesh%nelv
+       do k = 1, 3
+          call vertex_key%init(mesh%el(i)%pts(k)%p%x + 0.0_dp)
+          if (vertex_table%get(vertex_key, id) .gt. 0) then
+             n_vertices = n_vertices + 1
+             id = n_vertices
+             call vertex_table%set(vertex_key, id)
+          end if
+          this%tri_vertex(k, i) = id
+       end do
+    end do
+    call vertex_table%free()
+
+    ! Number the distinct edges by their pair of vertices
+    call edge_table%init(3 * mesh%nelv, id)
+    n_edges = 0
+    do i = 1, mesh%nelv
+       do k = 1, 3
+          a = this%tri_vertex(k, i)
+          b = this%tri_vertex(mod(k, 3) + 1, i)
+          edge_key%x = [min(a, b), max(a, b)]
+          if (edge_table%get(edge_key, id) .gt. 0) then
+             n_edges = n_edges + 1
+             id = n_edges
+             call edge_table%set(edge_key, id)
+          end if
+          this%tri_edge(k, i) = id
+       end do
+    end do
+    call edge_table%free()
+
+    allocate(this%edge(3, n_edges))
+    allocate(this%vertex(3, n_vertices))
+    this%edge = 0.0_dp
+    this%vertex = 0.0_dp
+
+    do i = 1, mesh%nelv
+       do k = 1, 3
+          v(:, k) = mesh%el(i)%pts(k)%p%x
+       end do
+
+       normal = cross(v(:, 2) - v(:, 1), v(:, 3) - v(:, 1))
+       normal_length = norm2(normal)
+       if (normal_length .lt. degenerate_tol) then
+          this%face(:, i) = 0.0_dp
+          cycle
+       end if
+       normal = normal / normal_length
+       this%face(:, i) = normal
+
+       do k = 1, 3
+          e1 = v(:, mod(k, 3) + 1) - v(:, k)
+          e2 = v(:, mod(k + 1, 3) + 1) - v(:, k)
+          angle = atan2(norm2(cross(e1, e2)), dot_product(e1, e2))
+
+          this%edge(:, this%tri_edge(k, i)) = &
+               this%edge(:, this%tri_edge(k, i)) + normal
+          this%vertex(:, this%tri_vertex(k, i)) = &
+               this%vertex(:, this%tri_vertex(k, i)) + angle * normal
+       end do
+    end do
+
+  end subroutine pseudo_normals_init
+
+  !> Deallocate pseudo-normals
+  !! @param this Pseudo-normals
+  subroutine pseudo_normals_free(this)
+    class(pseudo_normals_t), intent(inout) :: this
+
+    if (allocated(this%face)) deallocate(this%face)
+    if (allocated(this%edge)) deallocate(this%edge)
+    if (allocated(this%vertex)) deallocate(this%vertex)
+    if (allocated(this%tri_edge)) deallocate(this%tri_edge)
+    if (allocated(this%tri_vertex)) deallocate(this%tri_vertex)
+
+  end subroutine pseudo_normals_free
+
+  !> Pseudo-normal of a feature of a triangle
+  !! @param this Pseudo-normals
+  !! @param element Index of the triangle
+  !! @param feature Feature of the triangle, see pseudo_normals_t
+  !! @return Pseudo-normal, not normalised
+  pure function pseudo_normals_get(this, element, feature) result(normal)
+    class(pseudo_normals_t), intent(in) :: this
+    integer, intent(in) :: element
+    integer, intent(in) :: feature
+    real(kind=dp), dimension(3) :: normal
+
+    select case (feature)
+    case (1:3)
+       normal = this%edge(:, this%tri_edge(feature, element))
+    case (4:6)
+       normal = this%vertex(:, this%tri_vertex(feature - 3, element))
+    case default
+       normal = this%face(:, element)
+    end select
+
+  end function pseudo_normals_get
 
   ! ========================================================================== !
   ! Element distance functions
   ! ========================================================================== !
 
-  !> @brief Main interface for the signed distance function for an element.
-  subroutine element_distance(element, p, distance, weighted_sign)
+  !> @brief Main interface for the distance function for an element.
+  !! @param element Element
+  !! @param p Point
+  !! @param distance Distance from the point to the element
+  !! @param closest Closest point on the element
+  !! @param feature Feature of the element that holds the closest point
+  subroutine element_distance(element, p, distance, closest, feature)
     class(*), intent(in) :: element
     real(kind=dp), dimension(3), intent(in) :: p
     real(kind=dp), intent(out) :: distance
-    real(kind=dp), intent(out), optional :: weighted_sign
+    real(kind=dp), dimension(3), intent(out) :: closest
+    integer, intent(out) :: feature
 
     select type (element)
     type is (tri_t)
-       call element_distance_triangle(element, p, distance, weighted_sign)
+       call element_distance_triangle(element, p, distance, closest, feature)
 
     class default
        print *, "Error: Element type not supported."
@@ -329,92 +521,78 @@ contains
   ! -------------------------------------------------------------------------- !
   ! Specific element distance functions
 
-  !> @brief Signed distance function for a triangle
-  !! @details This routine computes the signed distance function for the current
-  !! triangle. We compute the barycentric coordinate of the point projected onto
-  !! the triangle. If the projection is inside the triangle, the distance is the
-  !! distance to the plane. If the projection is outside the triangle, the
-  !! distance is the distance to the nearest edge or vertex.
+  !> @brief Distance function for a triangle
+  !! @details This routine computes the closest point of the triangle to the
+  !! point and the feature of the triangle that holds it, by testing the
+  !! Voronoi regions of the vertices, the edges and the face in turn
+  !! (C. Ericson, Real-Time Collision Detection, 2005, section 5.1.5).
+  !! A degenerate triangle is reported at the largest representable distance.
   !!
-  !! In order to improve precision of the sign estimation, we also compute the
-  !! weighted sign, which is the perpendicular distance to the plane divided by
-  !! the distance to the nearest point.
-  !!
-  !! @Note The returned distance is signed if the weighted_sign is not present.
-  !!
-  !! @param this Triangle
+  !! @param triangle Triangle
   !! @param p Point
-  !! @return Distance value
-  !! @return[optional] Weighted sign
-  subroutine element_distance_triangle(triangle, p, distance, weighted_sign)
+  !! @param distance Distance from the point to the triangle
+  !! @param closest Closest point on the triangle
+  !! @param feature Feature of the triangle that holds the closest point,
+  !! encoded as in pseudo_normals_t
+  subroutine element_distance_triangle(triangle, p, distance, closest, &
+       feature)
     type(tri_t), intent(in) :: triangle
     real(kind=dp), dimension(3), intent(in) :: p
-
     real(kind=dp), intent(out) :: distance
-    real(kind=dp), intent(out), optional :: weighted_sign
+    real(kind=dp), dimension(3), intent(out) :: closest
+    integer, intent(out) :: feature
 
-    real(kind=dp), dimension(3) :: v1, v2, v3
-    real(kind=dp), dimension(3) :: normal
-    real(kind=dp) :: normal_length
-    real(kind=dp) :: b1, b2, b3
+    real(kind=dp), dimension(3) :: a, b, c, ab, ac
+    real(kind=dp) :: d1, d2, d3, d4, d5, d6, va, vb, vc
 
-    real(kind=dp), dimension(3) :: projection
-    real(kind=dp), dimension(3) :: edge
-    real(kind=dp) :: tol = 1e-10_dp
+    a = triangle%pts(1)%p%x
+    b = triangle%pts(2)%p%x
+    c = triangle%pts(3)%p%x
+    ab = b - a
+    ac = c - a
 
-    real(kind=dp) :: face_distance
-    real(kind=dp) :: t
-
-    ! Get vertices and the normal vector
-    v1 = triangle%pts(1)%p%x
-    v2 = triangle%pts(2)%p%x
-    v3 = triangle%pts(3)%p%x
-
-    normal = cross(v2 - v1, v3 - v1)
-    normal_length = norm2(normal)
-
-    if (normal_length .lt. tol) then
+    if (norm2(cross(ab, ac)) .lt. degenerate_tol) then
        distance = huge(1.0_dp)
-       weighted_sign = 0.0_dp
+       closest = a
+       feature = 0
        return
     end if
-    normal = normal / normal_length
 
-    ! Compute Barycentric coordinates to determine if the point is inside the
-    ! triangular prism, of along an edge or by a face.
-    face_distance = dot_product(p - v1, normal)
+    d1 = dot_product(ab, p - a)
+    d2 = dot_product(ac, p - a)
+    d3 = dot_product(ab, p - b)
+    d4 = dot_product(ac, p - b)
+    d5 = dot_product(ab, p - c)
+    d6 = dot_product(ac, p - c)
+    va = d3 * d6 - d5 * d4
+    vb = d5 * d2 - d1 * d6
+    vc = d1 * d4 - d3 * d2
 
-    projection = p - normal * face_distance
-    b1 = dot_product(normal, cross(v2 - v1, projection - v1)) / normal_length
-    b2 = dot_product(normal, cross(v3 - v2, projection - v2)) / normal_length
-    b3 = dot_product(normal, cross(v1 - v3, projection - v3)) / normal_length
-
-    if (b1 .le. tol) then
-       edge = v2 - v1
-       t = dot_product(p - v1, edge) / norm2(edge)
-       t = max(0.0_dp, min(1.0_dp, t))
-
-       projection = v1 + t * edge
-    else if (b2 .le. tol) then
-       edge = v3 - v2
-       t = dot_product(p - v2, edge) / norm2(edge)
-       t = max(0.0_dp, min(1.0_dp, t))
-
-       projection = v2 + t * edge
-    else if (b3 .le. tol) then
-       edge = v1 - v3
-       t = dot_product(p - v3, edge) / norm2(edge)
-       t = max(0.0_dp, min(1.0_dp, t))
-
-       projection = v3 + t * edge
-    end if
-
-    distance = norm2(projection - p)
-    if (present(weighted_sign)) then
-       weighted_sign = face_distance / distance
+    if (d1 .le. 0.0_dp .and. d2 .le. 0.0_dp) then
+       closest = a
+       feature = 4
+    else if (d3 .ge. 0.0_dp .and. d4 .le. d3) then
+       closest = b
+       feature = 5
+    else if (vc .le. 0.0_dp .and. d1 .ge. 0.0_dp .and. d3 .le. 0.0_dp) then
+       closest = a + d1 / (d1 - d3) * ab
+       feature = 1
+    else if (d6 .ge. 0.0_dp .and. d5 .le. d6) then
+       closest = c
+       feature = 6
+    else if (vb .le. 0.0_dp .and. d2 .ge. 0.0_dp .and. d6 .le. 0.0_dp) then
+       closest = a + d2 / (d2 - d6) * ac
+       feature = 3
+    else if (va .le. 0.0_dp .and. d4 - d3 .ge. 0.0_dp .and. &
+         d5 - d6 .ge. 0.0_dp) then
+       closest = b + (d4 - d3) / ((d4 - d3) + (d5 - d6)) * (c - b)
+       feature = 2
     else
-       distance = sign(distance, face_distance)
+       closest = a + (vb * ab + vc * ac) / (va + vb + vc)
+       feature = 0
     end if
+
+    distance = norm2(p - closest)
 
   end subroutine element_distance_triangle
 

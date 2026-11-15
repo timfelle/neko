@@ -1,0 +1,407 @@
+!> Tests of the signed distance from the GLL points of a unit hex to closed
+!! triangle meshes inside it. The meshes are wound counter-clockwise seen
+!! from outside, so the distance must be negative inside and positive
+!! outside. Most points outside are closest to an edge or a vertex.
+module test_signed_distance
+  use pfunit
+  use num_types, only : rp, dp
+  use pfunit_comm_utils, only : comm_init_test, comm_free_test
+  use device, only : device_init, device_finalize
+  use neko_config, only : NEKO_BCKND_DEVICE
+  use neko_mpi_types, only : neko_mpi_types_init, neko_mpi_types_free
+  use math, only : NEKO_EPS
+  use mesh_fixture, only : single_unit_hex_mesh
+  use mesh, only : mesh_t
+  use space, only : space_t, GLL
+  use dofmap, only : dofmap_t
+  use field, only : field_t
+  use point, only : point_t
+  use tri_mesh, only : tri_mesh_t
+  use signed_distance, only : signed_distance_field
+  implicit none
+
+  !> GLL points per direction of the hex the distance is sampled at
+  integer, parameter :: lx = 12
+  !> Points closer than this to a surface have no well-defined side
+  real(kind=dp), parameter :: margin = 1e-6_dp
+  real(kind=dp), parameter :: pi = 4.0_dp * atan(1.0_dp)
+  !> Every shape is centred in the unit hex
+  real(kind=dp), parameter :: centre(3) = 0.5_dp
+
+  @TestCase
+  type, extends(MPITestCase) :: test_signed_distance_case
+     type(mesh_t) :: msh
+     type(space_t) :: Xh
+     type(dofmap_t) :: dof
+     type(field_t) :: d
+     !> Coordinates of the GLL points, one column per point
+     real(kind=dp), allocatable :: x(:,:)
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_signed_distance_case
+
+contains
+
+  subroutine setUp(this)
+    class(test_signed_distance_case), intent(inout) :: this
+    integer :: n
+
+    call comm_init_test(this%getMpiCommunicator())
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_init
+    end if
+    call neko_mpi_types_init()
+
+    call single_unit_hex_mesh(this%msh)
+    call this%Xh%init(GLL, lx, lx, lx)
+    call this%dof%init(this%msh, this%Xh)
+    call this%d%init(this%dof, 'distance')
+    n = this%dof%size()
+    allocate(this%x(3, n))
+    this%x(1, :) = reshape(real(this%dof%x%x, dp), [n])
+    this%x(2, :) = reshape(real(this%dof%y%x, dp), [n])
+    this%x(3, :) = reshape(real(this%dof%z%x, dp), [n])
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_signed_distance_case), intent(inout) :: this
+
+    deallocate(this%x)
+    call this%d%free()
+    call this%dof%free()
+    call this%Xh%free()
+    call this%msh%free()
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_finalize
+    end if
+    call neko_mpi_types_free()
+    call comm_free_test()
+  end subroutine tearDown
+
+  !> The signed distance to an axis-aligned cube, two triangles per face,
+  !! is the exact distance at every GLL point, inside and outside next to a
+  !! face, an edge or a vertex, with and without a search radius.
+  @test(npes=[1])
+  subroutine test_cube_distance(this)
+    class(test_signed_distance_case), intent(inout) :: this
+    type(tri_mesh_t) :: cube
+    real(kind=dp), parameter :: h = 0.2_dp
+    real(kind=dp), parameter :: radius = 0.1_dp
+    real(kind=dp), allocatable :: exact(:), s(:)
+    real(kind=rp), allocatable :: d(:)
+    integer :: i, k, n, n_out(0:3)
+    real(kind=dp) :: excess(3)
+
+    call make_cube(cube, centre, h)
+    n = size(this%x, 2)
+    allocate(exact(n), s(n))
+    n_out = 0
+    do i = 1, n
+       excess = abs(this%x(:, i) - centre) - h
+       s(i) = maxval(excess)
+       if (s(i) .lt. 0.0_dp) then
+          exact(i) = s(i)
+       else
+          exact(i) = norm2(max(excess, 0.0_dp))
+       end if
+       ! The number of coordinates past the cube tells the closest feature
+       k = count(excess .gt. 0.0_dp)
+       n_out(k) = n_out(k) + 1
+    end do
+    @assertTrue(n_out(0) .gt. 0, message = 'no point inside')
+    @assertTrue(n_out(1) .gt. 0, message = 'no point closest to a face')
+    @assertTrue(n_out(2) .gt. 0, message = 'no point closest to an edge')
+    @assertTrue(n_out(3) .gt. 0, message = 'no point closest to a vertex')
+
+    call sample(this, cube, d)
+    @assertEqual(0, count_wrong_signs(d, s), message = 'wrong sign')
+    @assertEqual(real(exact, rp), d, tolerance = 10 * NEKO_EPS)
+
+    call sample(this, cube, d, radius)
+    @assertEqual(0, count_wrong_signs(d, s), message = 'wrong sign, radius')
+    @assertEqual(real(sign(min(abs(exact), radius), exact), rp), d, &
+         tolerance = 10 * NEKO_EPS)
+
+    call cube%free()
+  end subroutine test_cube_distance
+
+  !> Every GLL point gets the sign of its side of a regular octahedron, and
+  !! the points inside it their exact distance to the nearest face.
+  @test(npes=[1])
+  subroutine test_octahedron_sign(this)
+    class(test_signed_distance_case), intent(inout) :: this
+    type(tri_mesh_t) :: octahedron
+    real(kind=dp), parameter :: r = 0.3_dp
+    real(kind=dp), allocatable :: s(:)
+    real(kind=rp), allocatable :: d(:)
+
+    call make_octahedron(octahedron, centre, r)
+    call octahedron_side(this, r, s)
+    @assertTrue(count(s .lt. -margin) .gt. 0, message = 'no point inside')
+
+    call sample(this, octahedron, d)
+    @assertEqual(0, count_wrong_signs(d, s), message = 'wrong sign')
+    @assertEqual(real(pack(s, s .lt. 0.0_dp), rp), pack(d, s .lt. 0.0_dp), &
+         tolerance = 10 * NEKO_EPS)
+
+    call sample(this, octahedron, d, 0.1_dp)
+    @assertEqual(0, count_wrong_signs(d, s), message = 'wrong sign, radius')
+
+    call octahedron%free()
+  end subroutine test_octahedron_sign
+
+  !> Every GLL point gets the sign of its side of a coarse cylinder, an
+  !! eight-sided prism with fan-triangulated ends.
+  @test(npes=[1])
+  subroutine test_coarse_cylinder_sign(this)
+    class(test_signed_distance_case), intent(inout) :: this
+    type(tri_mesh_t) :: cylinder
+    real(kind=dp), parameter :: r = 0.3_dp, h = 0.2_dp
+    integer, parameter :: n_sides = 8
+    real(kind=dp), allocatable :: s(:)
+    real(kind=rp), allocatable :: d(:)
+    real(kind=dp) :: angle, apothem
+    integer :: i, k
+
+    call make_prism(cylinder, centre, r, h, n_sides)
+    apothem = r * cos(pi / n_sides)
+    allocate(s(size(this%x, 2)))
+    do i = 1, size(this%x, 2)
+       s(i) = abs(this%x(3, i) - centre(3)) - h
+       do k = 1, n_sides
+          angle = 2.0_dp * pi * (k - 0.5_dp) / n_sides
+          s(i) = max(s(i), (this%x(1, i) - centre(1)) * cos(angle) &
+               + (this%x(2, i) - centre(2)) * sin(angle) - apothem)
+       end do
+    end do
+    @assertTrue(count(s .lt. -margin) .gt. 0, message = 'no point inside')
+
+    call sample(this, cylinder, d)
+    @assertEqual(0, count_wrong_signs(d, s), message = 'wrong sign')
+
+    call sample(this, cylinder, d, 0.1_dp)
+    @assertEqual(0, count_wrong_signs(d, s), message = 'wrong sign, radius')
+
+    call cylinder%free()
+  end subroutine test_coarse_cylinder_sign
+
+  !> An octahedron whose two faces on one edge are fans of many thin
+  !! triangles is the same solid as the plain octahedron. Its signed
+  !! distance must have the right sign everywhere and equal the plain one,
+  !! even at the two vertices where the thin triangles meet, which an
+  !! unweighted sum of the face normals tilts towards the fanned faces.
+  @test(npes=[1])
+  subroutine test_fanned_octahedron_sign(this)
+    class(test_signed_distance_case), intent(inout) :: this
+    type(tri_mesh_t) :: octahedron, fanned
+    real(kind=dp), parameter :: r = 0.3_dp
+    integer, parameter :: n_fan = 8
+    real(kind=dp), allocatable :: s(:)
+    real(kind=rp), allocatable :: d(:), d_plain(:)
+
+    call make_octahedron(octahedron, centre, r)
+    call make_fanned_octahedron(fanned, centre, r, n_fan)
+    call octahedron_side(this, r, s)
+
+    call sample(this, octahedron, d_plain)
+    call sample(this, fanned, d)
+    @assertEqual(0, count_wrong_signs(d, s), message = 'wrong sign')
+    @assertEqual(d_plain, d, tolerance = 10 * NEKO_EPS)
+
+    call octahedron%free()
+    call fanned%free()
+  end subroutine test_fanned_octahedron_sign
+
+  ! -------------------------------------------------------------------------- !
+  ! Helpers
+
+  !> Sample the signed distance to a triangle mesh at the GLL points
+  !! @param this Test case
+  !! @param tri_msh Triangle mesh
+  !! @param d Signed distance, one value per GLL point
+  !! @param max_distance Search radius passed on to signed_distance_field
+  subroutine sample(this, tri_msh, d, max_distance)
+    class(test_signed_distance_case), intent(inout) :: this
+    type(tri_mesh_t), intent(in) :: tri_msh
+    real(kind=rp), allocatable, intent(inout) :: d(:)
+    real(kind=dp), intent(in), optional :: max_distance
+
+    call signed_distance_field(this%d, tri_msh, max_distance)
+    d = reshape(this%d%x, [this%d%size()])
+  end subroutine sample
+
+  !> Number of points clear of the surface whose sign is wrong
+  !! @param d Signed distance
+  !! @param s Side of the surface, negative inside and positive outside
+  function count_wrong_signs(d, s) result(n)
+    real(kind=rp), intent(in) :: d(:)
+    real(kind=dp), intent(in) :: s(:)
+    integer :: n
+
+    n = count(abs(s) .gt. margin .and. &
+         ((d .lt. 0.0_rp) .neqv. (s .lt. 0.0_dp)))
+  end function count_wrong_signs
+
+  !> Side of a regular octahedron around the centre, as the largest signed
+  !! distance to the planes of its faces
+  !! @param this Test case
+  !! @param r Distance from the centre to the vertices
+  !! @param s Largest signed distance to a face plane, one per GLL point
+  subroutine octahedron_side(this, r, s)
+    class(test_signed_distance_case), intent(in) :: this
+    real(kind=dp), intent(in) :: r
+    real(kind=dp), allocatable, intent(inout) :: s(:)
+    integer :: i
+
+    s = [(sum(abs(this%x(:, i) - centre)) - r, i = 1, size(this%x, 2))]
+    s = s / sqrt(3.0_dp)
+  end subroutine octahedron_side
+
+  !> Add the triangle with vertices a, b and c from v, wound so that its
+  !! normal points away from o
+  subroutine add_triangle(tri_msh, v, a, b, c, o, id)
+    type(tri_mesh_t), intent(inout) :: tri_msh
+    real(kind=dp), intent(in) :: v(:,:)
+    integer, intent(in) :: a, b, c
+    real(kind=dp), intent(in) :: o(3)
+    integer, intent(inout) :: id
+    type(point_t) :: p1, p2, p3
+    real(kind=dp) :: e1(3), e2(3), n(3)
+
+    e1 = v(:, b) - v(:, a)
+    e2 = v(:, c) - v(:, a)
+    n(1) = e1(2) * e2(3) - e1(3) * e2(2)
+    n(2) = e1(3) * e2(1) - e1(1) * e2(3)
+    n(3) = e1(1) * e2(2) - e1(2) * e2(1)
+    call p1%init(v(:, a), id + 1)
+    if (dot_product(n, (v(:, a) + v(:, b) + v(:, c)) / 3.0_dp - o) &
+         .gt. 0.0_dp) then
+       call p2%init(v(:, b), id + 2)
+       call p3%init(v(:, c), id + 3)
+    else
+       call p2%init(v(:, c), id + 2)
+       call p3%init(v(:, b), id + 3)
+    end if
+    id = id + 3
+    call tri_msh%add_element(p1, p2, p3)
+  end subroutine add_triangle
+
+  !> Axis-aligned cube with centre o and half side h, two triangles per face
+  subroutine make_cube(tri_msh, o, h)
+    type(tri_mesh_t), intent(inout) :: tri_msh
+    real(kind=dp), intent(in) :: o(3), h
+    real(kind=dp) :: v(3, 8)
+    integer :: i, id
+    integer, parameter :: faces(3, 12) = reshape([ &
+         1, 2, 4, 1, 4, 3, 5, 6, 8, 5, 8, 7, &
+         1, 2, 6, 1, 6, 5, 3, 4, 8, 3, 8, 7, &
+         1, 3, 7, 1, 7, 5, 2, 4, 8, 2, 8, 6], [3, 12])
+
+    do i = 1, 8
+       v(1, i) = o(1) + merge(h, -h, btest(i - 1, 0))
+       v(2, i) = o(2) + merge(h, -h, btest(i - 1, 1))
+       v(3, i) = o(3) + merge(h, -h, btest(i - 1, 2))
+    end do
+    call tri_msh%init(12)
+    id = 0
+    do i = 1, 12
+       call add_triangle(tri_msh, v, faces(1, i), faces(2, i), faces(3, i), &
+            o, id)
+    end do
+  end subroutine make_cube
+
+  !> Regular octahedron with centre o and its vertices at distance r along
+  !! the axes, vertices 1 to 6 at +x, -x, +y, -y, +z and -z
+  subroutine octahedron_vertices(o, r, v)
+    real(kind=dp), intent(in) :: o(3), r
+    real(kind=dp), intent(inout) :: v(:,:)
+    integer :: i
+
+    do i = 1, 3
+       v(:, 2 * i - 1) = o
+       v(:, 2 * i) = o
+       v(i, 2 * i - 1) = o(i) + r
+       v(i, 2 * i) = o(i) - r
+    end do
+  end subroutine octahedron_vertices
+
+  !> Regular octahedron with centre o and its vertices at distance r
+  subroutine make_octahedron(tri_msh, o, r)
+    type(tri_mesh_t), intent(inout) :: tri_msh
+    real(kind=dp), intent(in) :: o(3), r
+    real(kind=dp) :: v(3, 6)
+    integer :: i, id
+    integer, parameter :: faces(3, 8) = reshape([1, 3, 5, 3, 2, 5, &
+         2, 4, 5, 4, 1, 5, 3, 1, 6, 2, 3, 6, 4, 2, 6, 1, 4, 6], [3, 8])
+
+    call octahedron_vertices(o, r, v)
+    call tri_msh%init(8)
+    id = 0
+    do i = 1, 8
+       call add_triangle(tri_msh, v, faces(1, i), faces(2, i), faces(3, i), &
+            o, id)
+    end do
+  end subroutine make_octahedron
+
+  !> The octahedron of make_octahedron with the two faces on the edge from
+  !! +x to +y split into fans of m triangles from the +z and -z vertices
+  subroutine make_fanned_octahedron(tri_msh, o, r, m)
+    type(tri_mesh_t), intent(inout) :: tri_msh
+    real(kind=dp), intent(in) :: o(3), r
+    integer, intent(in) :: m
+    real(kind=dp) :: v(3, 5 + m)
+    integer :: i, j, id, edge(0:m)
+    integer, parameter :: faces(3, 6) = reshape([3, 2, 5, 2, 4, 5, &
+         4, 1, 5, 2, 3, 6, 4, 2, 6, 1, 4, 6], [3, 6])
+
+    call octahedron_vertices(o, r, v)
+    edge(0) = 1
+    edge(m) = 3
+    do j = 1, m - 1
+       v(:, 6 + j) = v(:, 1) + real(j, dp) / m * (v(:, 3) - v(:, 1))
+       edge(j) = 6 + j
+    end do
+    call tri_msh%init(6 + 2 * m)
+    id = 0
+    do i = 1, 6
+       call add_triangle(tri_msh, v, faces(1, i), faces(2, i), faces(3, i), &
+            o, id)
+    end do
+    do j = 1, m
+       call add_triangle(tri_msh, v, edge(j - 1), edge(j), 5, o, id)
+       call add_triangle(tri_msh, v, edge(j - 1), edge(j), 6, o, id)
+    end do
+  end subroutine make_fanned_octahedron
+
+  !> Prism with n sides around the vertical axis through o, its vertices at
+  !! distance r from that axis and its ends at o(3) - h and o(3) + h, each
+  !! end a fan of triangles from its centre
+  subroutine make_prism(tri_msh, o, r, h, n)
+    type(tri_mesh_t), intent(inout) :: tri_msh
+    real(kind=dp), intent(in) :: o(3), r, h
+    integer, intent(in) :: n
+    real(kind=dp) :: v(3, 2 * n + 2)
+    integer :: k, k1, id
+
+    do k = 1, n
+       v(1, k) = o(1) + r * cos(2.0_dp * pi * (k - 1) / n)
+       v(2, k) = o(2) + r * sin(2.0_dp * pi * (k - 1) / n)
+       v(3, k) = o(3) - h
+       v(1:2, n + k) = v(1:2, k)
+       v(3, n + k) = o(3) + h
+    end do
+    v(:, 2 * n + 1) = [o(1), o(2), o(3) - h]
+    v(:, 2 * n + 2) = [o(1), o(2), o(3) + h]
+    call tri_msh%init(4 * n)
+    id = 0
+    do k = 1, n
+       k1 = mod(k, n) + 1
+       call add_triangle(tri_msh, v, 2 * n + 1, k, k1, o, id)
+       call add_triangle(tri_msh, v, 2 * n + 2, n + k, n + k1, o, id)
+       call add_triangle(tri_msh, v, k, k1, n + k1, o, id)
+       call add_triangle(tri_msh, v, k, n + k1, n + k, o, id)
+    end do
+  end subroutine make_prism
+
+end module test_signed_distance

@@ -251,13 +251,16 @@ contains
   end function aabb_node_get_right_index
 
   !> @brief Get the minimum possible distance from the aabb to a point.
+  !! @details This is the distance from the point to the sphere around the
+  !! aabb, a lower bound on the distance to anything inside the aabb. It is
+  !! negative when the point lies inside that sphere.
   function aabb_node_min_distance(this, p) result(distance)
     class(aabb_node_t), intent(in) :: this
     real(kind=dp), dimension(3), intent(in) :: p
     real(kind=dp) :: distance
 
-    distance = 0.5_rp * this%aabb%get_diameter() &
-         - norm2(this%aabb%get_center() - p)
+    distance = norm2(this%aabb%get_center() - p) &
+         - 0.5_dp * this%aabb%get_diameter()
   end function aabb_node_min_distance
 
   ! -------------------------------------------------------------------------- !
