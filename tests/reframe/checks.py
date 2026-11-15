@@ -252,7 +252,10 @@ class NekoTestBase(rfm.RegressionTest):
                 time = timesteps[end] - timesteps[self.first_workrate_timestep]
                 dofs = 8**3 * 32**3
                 iters = end - self.first_workrate_timestep
-                return 1e-3 * dofs * iters / time / pes
+                # 1e-6 converts dofs/s to Mdofs/s, matching the 'Mdofs/s/pe'
+                # unit below. Was 1e-3 until 2026-11, making the reported
+                # value 1000x the Mdofs/s/pe it claimed to be.
+                return 1e-6 * dofs * iters / time / pes
 
             pf = sn.make_performance_function(workrate, 'Mdofs/s/pe')
             self.perf_variables['workrate'] = pf
