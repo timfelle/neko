@@ -34,7 +34,8 @@
 module gmres_device
   use neko_config, only : NEKO_BCKND_OPENCL, NEKO_BCKND_METAL
   use krylov, only : ksp_t, ksp_monitor_t
-  use gmres, only : GMRES_SPACE_SIZE
+  use gmres, only : GMRES_SPACE_SIZE, GMRES_BREAKDOWN_TOL, &
+       GMRES_SINGULAR_TOL
   use precon, only : pc_t
   use ax_product, only : ax_t
   use num_types, only : rp, c_rp
@@ -359,7 +360,7 @@ contains
     integer, optional, intent(in) :: niter
     integer :: iter, max_iter
     integer :: i, j, k
-    real(kind=rp) :: rnorm, alpha, temp, lr, alpha2, norm_fac
+    real(kind=rp) :: rnorm, alpha, temp, lr, alpha2, norm_fac, hnorm
     logical :: conv, singular
     type(c_ptr) :: f_d
 
@@ -455,8 +456,13 @@ contains
                h(i+1,j) = -s(i)*temp + c(i) * h(i+1,j)
             end do
 
+            ! Both breakdown tests are relative to the norm of the new
+            ! Hessenberg column, which the rotations preserve, so that they
+            ! do not depend on the scale of the operator. A zero column is
+            ! a breakdown of a singular operator.
+            hnorm = sqrt(sum(h(1:j,j)**2) + alpha2)
             rnorm = 0.0_rp
-            if (abscmp(alpha, 0.0_rp)) then
+            if (alpha .le. GMRES_BREAKDOWN_TOL * hnorm) then
                ! The Krylov space is invariant. It contains the solution only
                ! if the rotated Hessenberg matrix is nonsingular, i.e. its last
                ! diagonal entry is nonzero. Otherwise the last direction cannot
@@ -464,7 +470,7 @@ contains
                ! residual |gam(j)| of the previous directions, and stop. With a
                ! fixed preconditioner a restart would span the same space; with
                ! a varying one it might not, but stopping is the safe choice.
-               if (abscmp(h(j,j), 0.0_rp)) then
+               if (abs(h(j,j)) .le. GMRES_SINGULAR_TOL * hnorm) then
                   singular = .true.
                   rnorm = abs(gam(j)) * norm_fac
                else

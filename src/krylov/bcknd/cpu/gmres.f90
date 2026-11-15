@@ -45,7 +45,7 @@ module gmres
        vector_bc_projector_components
   use matrix, only : matrix_t
   use scratch_registry, only : neko_scratch_registry
-  use math, only : glsc3, rzero, copy, sub2, cmult2, abscmp
+  use math, only : glsc3, rzero, copy, sub2, cmult2, abscmp, NEKO_EPS
   use neko_config, only : NEKO_BLK_SIZE
   use comm, only : NEKO_COMM, MPI_EXTRA_PRECISION
   use mpi_f08, only : MPI_Allreduce, MPI_IN_PLACE, MPI_SUM
@@ -58,6 +58,24 @@ module gmres
 
   !> Default Krylov space size (restart length) of the GMRES solvers.
   integer, public, parameter :: GMRES_SPACE_SIZE = 30
+
+  !> Breakdown tolerance of the GMRES solvers. The Krylov space counts as
+  !! invariant when the norm of the new direction is at most this times the
+  !! norm of the new column of the Hessenberg matrix, so that the test does
+  !! not depend on the scale of the operator. When the operator maps a small
+  !! Krylov space into itself, the orthogonalisation leaves rounding errors
+  !! of a few NEKO_EPS times the norm of the column, which this covers.
+  real(kind=rp), public, parameter :: GMRES_BREAKDOWN_TOL = 10.0_rp * NEKO_EPS
+
+  !> Singularity tolerance of the GMRES solvers. At a breakdown, the operator
+  !! counts as singular on the Krylov space when the rotated diagonal entry
+  !! of the new column is at most this times the norm of the column. That
+  !! entry carries rounding errors as large as the new direction does, so
+  !! the tolerance exceeds the breakdown tolerance, or a breakdown of a
+  !! singular operator could pass as converged. The factor of ten between
+  !! them bounds the residual of a converged breakdown, which is reported as
+  !! zero, by a tenth of the residual before the last direction.
+  real(kind=rp), public, parameter :: GMRES_SINGULAR_TOL = 100.0_rp * NEKO_EPS
 
   !> CPU implementation of the preconditioned standard GMRES method.
   !!
@@ -224,7 +242,7 @@ contains
     integer :: i, j, k, l, ierr, tid, nthrds
     real(kind=xp) :: w_plus(NEKO_BLK_SIZE), x_plus(NEKO_BLK_SIZE)
     real(kind=xp) :: hl(this%lgmres)
-    real(kind=xp) :: alpha, lr, alpha2, norm_fac, tmp, acc
+    real(kind=xp) :: alpha, lr, alpha2, norm_fac, tmp, acc, hnorm
     real(kind=rp) :: temp, rnorm
     logical :: conv, singular
     integer :: temp_indices(4)
@@ -386,8 +404,13 @@ contains
                h(i+1,j) = -s(i)*temp + c(i) * h(i+1,j)
             end do
 
+            ! Both breakdown tests are relative to the norm of the new
+            ! Hessenberg column, which the rotations preserve, so that they
+            ! do not depend on the scale of the operator. A zero column is
+            ! a breakdown of a singular operator.
+            hnorm = sqrt(sum(h(1:j,j)**2) + alpha2)
             rnorm = 0.0_rp
-            if (abscmp(alpha, 0.0_xp)) then
+            if (alpha .le. GMRES_BREAKDOWN_TOL * hnorm) then
                ! The Krylov space is invariant. It contains the solution only
                ! if the rotated Hessenberg matrix is nonsingular, i.e. its last
                ! diagonal entry is nonzero. Otherwise the last direction cannot
@@ -395,7 +418,7 @@ contains
                ! residual |gam(j)| of the previous directions, and stop. With a
                ! fixed preconditioner a restart would span the same space; with
                ! a varying one it might not, but stopping is the safe choice.
-               if (abscmp(h(j,j), 0.0_xp)) then
+               if (abs(h(j,j)) .le. GMRES_SINGULAR_TOL * hnorm) then
                   singular = .true.
                   rnorm = abs(gam(j)) * norm_fac
                else

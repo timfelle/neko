@@ -1,7 +1,9 @@
 !> Breakdowns of GMRES on diagonal systems whose Krylov space becomes
-!! invariant after one or two iterations. A breakdown solves the system only
-!! if the operator is nonsingular on that space. Otherwise GMRES must return
-!! a finite solution and must not report convergence.
+!! invariant after one to three iterations. A breakdown solves the system
+!! only if the operator is nonsingular on that space. Otherwise GMRES must
+!! return a finite solution and must not report convergence. Every system is
+!! solved at several scales of the operator, which must not change the
+!! verdicts.
 module test_gmres_breakdown
   use pfunit
   use num_types, only : rp
@@ -38,6 +40,9 @@ module test_gmres_breakdown
   real(kind=rp), parameter :: abs_tol_test = 1.0e-6_rp
   !> Tolerance of the comparisons of solutions and residuals.
   real(kind=rp), parameter :: tol = 100.0_rp * NEKO_EPS
+  !> Scales of the operators. At the second the smallest entries of the
+  !! Hessenberg matrices fall below NEKO_EPS, at the third all of them do.
+  real(kind=rp), parameter :: scales(3) = [1.0_rp, 1.0e-14_rp, 1.0e-17_rp]
 
   !> Diagonal operator \f$ w = d u \f$.
   type, extends(ax_t) :: diag_ax_t
@@ -133,55 +138,66 @@ contains
     class(gmres_breakdown_case), intent(inout) :: this
     type(ksp_monitor_t) :: ksp_results
     real(kind=rp) :: x_expected(lx_test, lx_test, lx_test, 1)
-    real(kind=rp) :: err, res
+    real(kind=rp) :: err, res, res_expected
     character(len=80) :: msg
-
-    this%Ax%d%x = 1.0_rp
-    this%Ax%d%x(:,2,1,1) = 0.0_rp
-    ksp_results = solve_gmres(this)
-    msg = solve_summary(this, ksp_results)
-
-    @assertTrue(all(ieee_is_finite(this%x%x)), message=msg)
-    @assertFalse(ksp_results%converged, message=msg)
-    @assertEqual(2, ksp_results%iter, message=msg)
+    integer :: i
 
     ! The first iteration gives the multiple of f that minimises the
-    ! residual, which is f itself.
+    ! residual, which is f itself divided by the scale.
     x_expected = 0.0_rp
     x_expected(:,:,1,1) = 1.0_rp
-    err = maxval(abs(this%x%x - x_expected))
-    @assertEqual(0.0_rp, err, tolerance=tol, message=msg)
 
-    ! The residual is the part of f on the two null points, and the solver
-    ! reports it.
-    res = residual_norm(this)
-    @assertEqual(sqrt(2.0_rp / this%coef%volume), res, tolerance=tol)
-    @assertEqual(res, ksp_results%res_final, tolerance=tol, message=msg)
+    ! The residual is the part of f on the two null points.
+    res_expected = sqrt(2.0_rp / this%coef%volume)
+
+    do i = 1, size(scales)
+       this%Ax%d%x = scales(i)
+       this%Ax%d%x(:,2,1,1) = 0.0_rp
+       ksp_results = solve_gmres(this)
+       msg = solve_summary(this, ksp_results, scales(i))
+
+       @assertTrue(all(ieee_is_finite(this%x%x)), message=msg)
+       @assertFalse(ksp_results%converged, message=msg)
+       @assertEqual(2, ksp_results%iter, message=msg)
+
+       err = maxval(abs(scales(i) * this%x%x - x_expected))
+       @assertEqual(0.0_rp, err, tolerance=tol, message=msg)
+
+       ! The solver reports the residual.
+       res = residual_norm(this)
+       @assertEqual(res_expected, res, tolerance=tol, message=msg)
+       @assertEqual(res, ksp_results%res_final, tolerance=tol, message=msg)
+    end do
   end subroutine test_gmres_singular_breakdown
 
   !> A breakdown in the first iteration, with a right-hand side in the null
   !! space of the operator. No direction reduces the residual, so GMRES must
-  !! return the initial solution, zero, and must not converge.
+  !! return the initial solution, zero, and must not converge. The new column
+  !! of the Hessenberg matrix is zero at every scale, which must count as a
+  !! breakdown of a singular operator.
   @test(npes=[1])
   subroutine test_gmres_singular_first_iteration(this)
     class(gmres_breakdown_case), intent(inout) :: this
     type(ksp_monitor_t) :: ksp_results
     real(kind=rp) :: res
     character(len=80) :: msg
+    integer :: i
 
-    this%Ax%d%x = 1.0_rp
-    this%Ax%d%x(:,:,1,1) = 0.0_rp
-    ksp_results = solve_gmres(this)
-    msg = solve_summary(this, ksp_results)
+    do i = 1, size(scales)
+       this%Ax%d%x = scales(i)
+       this%Ax%d%x(:,:,1,1) = 0.0_rp
+       ksp_results = solve_gmres(this)
+       msg = solve_summary(this, ksp_results, scales(i))
 
-    @assertTrue(all(ieee_is_finite(this%x%x)), message=msg)
-    @assertFalse(ksp_results%converged, message=msg)
-    @assertEqual(1, ksp_results%iter, message=msg)
-    @assertEqual(0.0_rp, maxval(abs(this%x%x)), message=msg)
+       @assertTrue(all(ieee_is_finite(this%x%x)), message=msg)
+       @assertFalse(ksp_results%converged, message=msg)
+       @assertEqual(1, ksp_results%iter, message=msg)
+       @assertEqual(0.0_rp, maxval(abs(this%x%x)), message=msg)
 
-    res = residual_norm(this)
-    @assertEqual(ksp_results%res_start, res, tolerance=tol, message=msg)
-    @assertEqual(res, ksp_results%res_final, tolerance=tol, message=msg)
+       res = residual_norm(this)
+       @assertEqual(ksp_results%res_start, res, tolerance=tol, message=msg)
+       @assertEqual(res, ksp_results%res_final, tolerance=tol, message=msg)
+    end do
   end subroutine test_gmres_singular_first_iteration
 
   !> A breakdown with an operator that is nonsingular on the Krylov space.
@@ -194,23 +210,71 @@ contains
     real(kind=rp) :: x_expected(lx_test, lx_test, lx_test, 1)
     real(kind=rp) :: err
     character(len=80) :: msg
+    integer :: i
 
-    this%Ax%d%x = 1.0_rp
-    this%Ax%d%x(:,2,1,1) = 2.0_rp
-    ksp_results = solve_gmres(this)
-    msg = solve_summary(this, ksp_results)
-
-    @assertTrue(all(ieee_is_finite(this%x%x)), message=msg)
-    @assertTrue(ksp_results%converged, message=msg)
-    @assertEqual(2, ksp_results%iter, message=msg)
-
+    ! The solution divided by the scale.
     x_expected = 0.0_rp
     x_expected(:,1,1,1) = 1.0_rp
     x_expected(:,2,1,1) = 0.5_rp
-    err = maxval(abs(this%x%x - x_expected))
-    @assertEqual(0.0_rp, err, tolerance=tol, message=msg)
-    @assertEqual(0.0_rp, residual_norm(this), tolerance=tol, message=msg)
+
+    do i = 1, size(scales)
+       this%Ax%d%x = scales(i)
+       this%Ax%d%x(:,2,1,1) = 2.0_rp * scales(i)
+       ksp_results = solve_gmres(this)
+       msg = solve_summary(this, ksp_results, scales(i))
+
+       @assertTrue(all(ieee_is_finite(this%x%x)), message=msg)
+       @assertTrue(ksp_results%converged, message=msg)
+       @assertEqual(2, ksp_results%iter, message=msg)
+
+       err = maxval(abs(scales(i) * this%x%x - x_expected))
+       @assertEqual(0.0_rp, err, tolerance=tol, message=msg)
+       @assertEqual(0.0_rp, residual_norm(this), tolerance=tol, message=msg)
+    end do
   end subroutine test_gmres_happy_breakdown
+
+  !> A breakdown with an operator that is nonsingular on the Krylov space
+  !! but has one eigenvalue a thousand times smaller than the others. The
+  !! breakdown after three iterations solves the system, and the rotated
+  !! diagonal entry of the last column is then about a thousandth of the
+  !! norm of that column. At the smaller scales that entry, and at the
+  !! smallest one every entry, lies below NEKO_EPS, but GMRES must still
+  !! converge to the solution, which it can only find to within the
+  !! condition number of the operator times NEKO_EPS.
+  @test(npes=[1])
+  subroutine test_gmres_small_eigenvalue_breakdown(this)
+    class(gmres_breakdown_case), intent(inout) :: this
+    type(ksp_monitor_t) :: ksp_results
+    real(kind=rp) :: x_expected(lx_test, lx_test, lx_test, 1)
+    real(kind=rp) :: err, res, tol_cond
+    character(len=80) :: msg
+    integer :: i
+
+    ! The solution divided by the scale, and the tolerance scaled by the
+    ! condition number of the operator, 2000.
+    x_expected = 0.0_rp
+    x_expected(1,1,1,1) = 1.0e3_rp
+    x_expected(2,1,1,1) = 1.0_rp
+    x_expected(:,2,1,1) = 0.5_rp
+    tol_cond = 2000.0_rp * tol
+
+    do i = 1, size(scales)
+       this%Ax%d%x = scales(i)
+       this%Ax%d%x(1,1,1,1) = 1.0e-3_rp * scales(i)
+       this%Ax%d%x(:,2,1,1) = 2.0_rp * scales(i)
+       ksp_results = solve_gmres(this)
+       msg = solve_summary(this, ksp_results, scales(i))
+
+       @assertTrue(all(ieee_is_finite(this%x%x)), message=msg)
+       @assertTrue(ksp_results%converged, message=msg)
+       @assertEqual(3, ksp_results%iter, message=msg)
+
+       err = maxval(abs(scales(i) * this%x%x - x_expected)) / 1.0e3_rp
+       @assertEqual(0.0_rp, err, tolerance=tol_cond, message=msg)
+       res = residual_norm(this)
+       @assertEqual(0.0_rp, res, tolerance=tol_cond, message=msg)
+    end do
+  end subroutine test_gmres_small_eigenvalue_breakdown
 
   !> Solve the system of the test case with a new GMRES solver and the
   !! identity preconditioner, and return the solution on the host.
@@ -251,12 +315,15 @@ contains
 
   !> Summary of a solve for the messages of failed assertions.
   !! @param ksp_results Result of the solve.
-  function solve_summary(this, ksp_results) result(msg)
+  !! @param scale Scale of the operator.
+  function solve_summary(this, ksp_results, scale) result(msg)
     class(gmres_breakdown_case), intent(in) :: this
     type(ksp_monitor_t), intent(in) :: ksp_results
+    real(kind=rp), intent(in) :: scale
     character(len=80) :: msg
 
-    write(msg, '(A,L1,A,I0,A,L1)') 'converged = ', ksp_results%converged, &
+    write(msg, '(A,ES8.1,A,L1,A,I0,A,L1)') 'scale = ', scale, &
+         ', converged = ', ksp_results%converged, &
          ', iter = ', ksp_results%iter, ', finite solution = ', &
          all(ieee_is_finite(this%x%x))
   end function solve_summary
