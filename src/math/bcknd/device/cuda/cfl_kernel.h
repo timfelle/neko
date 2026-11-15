@@ -181,5 +181,100 @@ __global__ void cfl_kernel(const D dt,
     cfl_h[blockIdx.x] = cfl_tmp;
 }
 
+/**
+ * Device kernel for CFL, for large LX
+ *
+ * The computation of cfl_kernel, with u, v, w and jacinv read straight from
+ * global memory. Staged as in cfl_kernel they take 4 * LX^3 values of shared
+ * memory, more than the 48 kB a block can have statically from LX = 12 in
+ * double precision. The staging carries no reuse: each thread reads back only
+ * the values it staged itself.
+ */
+template< typename D, typename T, const int LX, const int CHUNKS >
+__global__ void cfl_kernel_large(const D dt,
+                                 const T * __restrict__ u,
+                                 const T * __restrict__ v,
+                                 const T * __restrict__ w,
+                                 const T * __restrict__ drdx,
+                                 const T * __restrict__ dsdx,
+                                 const T * __restrict__ dtdx,
+                                 const T * __restrict__ drdy,
+                                 const T * __restrict__ dsdy,
+                                 const T * __restrict__ dtdy,
+                                 const T * __restrict__ drdz,
+                                 const T * __restrict__ dsdz,
+                                 const T * __restrict__ dtdz,
+                                 const T * __restrict__ dr_inv,
+                                 const T * __restrict__ ds_inv,
+                                 const T * __restrict__ dt_inv,
+                                 const T * __restrict__ jacinv,
+                                 D * __restrict__ cfl_h) {
+
+  int i,j,k;
+
+  const int e = blockIdx.x;
+  const int ele = e * LX * LX * LX;
+  const int iii = threadIdx.x;
+  const int nchunks = (LX * LX * LX - 1) / CHUNKS + 1;
+  const unsigned int lane = threadIdx.x % warpSize;
+  const unsigned int wid = threadIdx.x / warpSize;
+
+  __shared__ T shdr_inv[LX];
+  __shared__ T shds_inv[LX];
+  __shared__ T shdt_inv[LX];
+
+  __shared__ D shared[32];
+
+  if (iii < LX) {
+    shdr_inv[iii] = dr_inv[iii];
+    shds_inv[iii] = ds_inv[iii];
+    shdt_inv[iii] = dt_inv[iii];
+  }
+
+  __syncthreads();
+
+  D cfl_tmp = 0.0;
+  for (int n = 0; n < nchunks; n++) {
+    const int ijk = iii + n * CHUNKS;
+    const int jk = ijk / LX;
+    i = ijk - jk * LX;
+    k = jk / LX;
+    j = jk - k * LX;
+    if ( i < LX && j < LX && k < LX) {
+      const T ue = u[ijk + ele];
+      const T ve = v[ijk + ele];
+      const T we = w[ijk + ele];
+      const T jinv = jacinv[ijk + ele];
+      const D cflr = fabs( dt * ( ( ue * drdx[ijk + ele]
+                                    + ve * drdy[ijk + ele]
+                                    + we * drdz[ijk + ele]
+                                    ) * jinv) * shdr_inv[i]);
+      const D cfls = fabs( dt * ( ( ue * dsdx[ijk + ele]
+                                    + ve * dsdy[ijk + ele]
+                                    + we * dsdz[ijk + ele]
+                                    ) * jinv) * shds_inv[j]);
+      const D cflt = fabs( dt * ( ( ue * dtdx[ijk + ele]
+                                    + ve * dtdy[ijk + ele]
+                                    + we * dtdz[ijk + ele]
+                                    ) * jinv) * shdt_inv[k]);
+
+      cfl_tmp = fmax(cflr + cfls + cflt, cfl_tmp);
+
+    }
+  }
+
+  cfl_tmp = cfl_reduce_warp<D>(cfl_tmp);
+  if (lane == 0)
+    shared[wid] = cfl_tmp;
+  __syncthreads();
+
+  cfl_tmp = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
+  if (wid == 0)
+    cfl_tmp = cfl_reduce_warp<D>(cfl_tmp);
+
+  if (threadIdx.x == 0)
+    cfl_h[blockIdx.x] = cfl_tmp;
+}
+
 
 #endif // __MATH_CFL_KERNEL_H__

@@ -490,6 +490,7 @@ AC_CONFIG_FILES([tests/unit/stack/Makefile\
         tests/unit/device_math/Makefile\
         tests/unit/mathops/Makefile\
         tests/unit/device_mathops/Makefile\
+        tests/unit/operators/Makefile\
         tests/unit/octree/Makefile\
         tests/unit/vector/Makefile\
         tests/unit/matrix/Makefile\

@@ -131,26 +131,48 @@ extern "C" {
         CASE_KSTEP_SEL(LX, autotune_eb[LX]);                                    \
       }                                                                         \
       break
-    
-    switch(*lx) {
-      CASE(2);
-      CASE(3);
-      CASE(4);
-      CASE(5);
-      CASE(6);
-      CASE(7);
-      CASE(8);
-      CASE(9);
-      CASE(10);
-      CASE(11);
-      CASE(12);
-    default:
-      {
-        fprintf(stderr, __FILE__ ": size not supported: %d\n", *lx);
-        exit(1);
+
+/* From LX = 13 the 1d kernel's 3 * LX^3 values no longer fit in static
+   shared memory in double precision, so only the kstep kernel is used */
+#define CASE_LARGE(LX)                                                          \
+    case LX:                                                                    \
+      CASE_KSTEP(LX, 0);                                                        \
+      break
+
+    if ((*lx) < 13) {
+      switch(*lx) {
+        CASE(2);
+        CASE(3);
+        CASE(4);
+        CASE(5);
+        CASE(6);
+        CASE(7);
+        CASE(8);
+        CASE(9);
+        CASE(10);
+        CASE(11);
+        CASE(12);
+      default:
+        {
+          fprintf(stderr, __FILE__ ": size not supported: %d\n", *lx);
+          exit(1);
+        }
       }
     }
-  } 
+    else {
+      switch(*lx) {
+        CASE_LARGE(13);
+        CASE_LARGE(14);
+        CASE_LARGE(15);
+        CASE_LARGE(16);
+      default:
+        {
+          fprintf(stderr, __FILE__ ": size not supported: %d\n", *lx);
+          exit(1);
+        }
+      }
+    }
+  }
 }
 
 template < const int LX >

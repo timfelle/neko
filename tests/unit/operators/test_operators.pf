@@ -1,0 +1,255 @@
+!> Tests of the CFL and lambda2 operators at every polynomial order the
+!! device backends support, lx = 2 to 16.
+!! The velocity is linear, so that lambda2 is known exactly, on two deformed
+!! elements, so that the geometric factors vary from point to point and
+!! between the elements.
+module test_operators
+  use pfunit
+  use num_types, only : rp, dp
+  use math, only : NEKO_EPS
+  use pfunit_comm_utils, only : comm_init_test, comm_free_test
+  use device, only : device_init, device_finalize, device_memcpy, &
+       HOST_TO_DEVICE, DEVICE_TO_HOST
+  use neko_config, only : NEKO_BCKND_DEVICE
+  use neko_mpi_types, only : neko_mpi_types_init, neko_mpi_types_free
+  use mesh, only : mesh_t
+  use point, only : point_t
+  use space, only : space_t, GLL
+  use dofmap, only : dofmap_t
+  use gather_scatter, only : gs_t
+  use coefs, only : coef_t
+  use field, only : field_t
+  use operators, only : cfl, lambda2op
+  use opr_cpu, only : opr_cpu_cfl
+  implicit none
+
+  !> Gradient of the test velocity, u_a = sum_b G(a, b) x_b
+  real(kind=rp), parameter :: G(3, 3) = reshape([ &
+       0.8_rp, -0.7_rp, -0.1_rp, &
+       0.3_rp, -0.3_rp, 0.2_rp, &
+       -0.8_rp, 0.2_rp, -1.0_rp], [3, 3])
+
+  !> Middle eigenvalue of S^2 + Omega^2 for the gradient G, from numpy's
+  !! eigvalsh. The three eigenvalues are -0.136177, 0.562011 and 1.124166.
+  real(kind=rp), parameter :: lambda2_exact = 0.56201077220684903_rp
+
+  !> Tolerance on lambda2, relative to the largest eigenvalue. The gradient
+  !! of a linear field is exact, up to the rounding the derivative matrices
+  !! amplify by about lx^2 at the highest order.
+  real(kind=rp), parameter :: lambda2_tol = 1.0e7_rp * NEKO_EPS
+  real(kind=rp), parameter :: lambda2_scale = 1.124166_rp
+
+  !> Relative tolerance between the CFL number of the backend and that of
+  !! the CPU, which sum the same terms, possibly with fused operations.
+  real(kind=rp), parameter :: cfl_tol = 1000.0_rp * NEKO_EPS
+
+  @TestCase
+  type, extends(MPITestCase) :: test_operators_case
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_operators_case
+
+contains
+
+  subroutine setUp(this)
+    class(test_operators_case), intent(inout) :: this
+    call comm_init_test(this%getMpiCommunicator())
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_init
+    end if
+    call neko_mpi_types_init()
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_operators_case), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_finalize
+    end if
+    call neko_mpi_types_free()
+    call comm_free_test()
+  end subroutine tearDown
+
+  !> The CFL number of the backend matches that of the CPU at every order.
+  !! On a build without a device the two are the same routine, and only the
+  !! positivity of the CFL number is a check there.
+  @test(npes=[1])
+  subroutine test_cfl(this)
+    class(test_operators_case), intent(inout) :: this
+    integer :: lx
+
+    do lx = 2, 16
+       call check_cfl(lx)
+    end do
+  end subroutine test_cfl
+
+  !> lambda2 of the backend is the exact value at every point and order.
+  @test(npes=[1])
+  subroutine test_lambda2(this)
+    class(test_operators_case), intent(inout) :: this
+    integer :: lx
+
+    do lx = 2, 16
+       call check_lambda2(lx)
+    end do
+  end subroutine test_lambda2
+
+  !> Check the CFL number of the backend against that of the CPU.
+  !! @param lx Number of GLL points in each direction.
+  subroutine check_cfl(lx)
+    integer, intent(in) :: lx
+    real(kind=dp), parameter :: dt = 1.0e-2_dp
+    type(mesh_t), target :: msh
+    type(space_t), target :: Xh
+    type(dofmap_t), target :: dof
+    type(gs_t), target :: gs
+    type(coef_t), target :: coef
+    type(field_t) :: u, v, w
+    real(kind=dp) :: c, c_cpu
+    character(len=80) :: msg
+
+    call init_case(msh, Xh, dof, gs, coef, u, v, w, lx)
+
+    c = cfl(dt, u, v, w, Xh, coef, msh%nelv, msh%gdim)
+    c_cpu = opr_cpu_cfl(dt, u%x, v%x, w%x, Xh, coef, msh%nelv, msh%gdim)
+
+    call free_case(msh, Xh, dof, gs, coef, u, v, w)
+
+    write(msg, '(A,I0,A,ES12.5,A,ES12.5)') 'CFL, lx = ', lx, &
+         ': backend ', c, ', CPU ', c_cpu
+    @assertTrue(c_cpu .gt. 0.0_dp, message=trim(msg))
+    @assertTrue(abs(c - c_cpu) .le. cfl_tol * c_cpu, message=trim(msg))
+  end subroutine check_cfl
+
+  !> Check lambda2 of the backend against the exact value.
+  !! @param lx Number of GLL points in each direction.
+  subroutine check_lambda2(lx)
+    integer, intent(in) :: lx
+    type(mesh_t), target :: msh
+    type(space_t), target :: Xh
+    type(dofmap_t), target :: dof
+    type(gs_t), target :: gs
+    type(coef_t), target :: coef
+    type(field_t) :: u, v, w, l2
+    real(kind=rp) :: err
+    character(len=80) :: msg
+    integer :: n, nbad
+
+    call init_case(msh, Xh, dof, gs, coef, u, v, w, lx)
+    call l2%init(dof, 'lambda2')
+    n = dof%size()
+
+    call lambda2op(l2, u, v, w, coef)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(l2%x, l2%x_d, n, DEVICE_TO_HOST, sync = .true.)
+    end if
+
+    ! Counts the points that do not match, a NaN included
+    nbad = count(.not. (abs(l2%x - lambda2_exact) .le. &
+         lambda2_tol * lambda2_scale))
+    err = maxval(abs(l2%x - lambda2_exact))
+
+    call l2%free()
+    call free_case(msh, Xh, dof, gs, coef, u, v, w)
+
+    write(msg, '(A,I0,A,ES12.5)') 'lambda2, lx = ', lx, &
+         ', largest error ', err
+    @assertEqual(0, nbad, message=trim(msg))
+  end subroutine check_lambda2
+
+  !> Set up the two deformed elements at order lx with the linear velocity.
+  !! @param msh Mesh.
+  !! @param Xh Function space.
+  !! @param dof Dofmap.
+  !! @param gs Gather-scatter.
+  !! @param coef Coefficients.
+  !! @param u The x component of the velocity.
+  !! @param v The y component of the velocity.
+  !! @param w The z component of the velocity.
+  !! @param lx Number of GLL points in each direction.
+  subroutine init_case(msh, Xh, dof, gs, coef, u, v, w, lx)
+    type(mesh_t), target, intent(inout) :: msh
+    type(space_t), target, intent(inout) :: Xh
+    type(dofmap_t), target, intent(inout) :: dof
+    type(gs_t), target, intent(inout) :: gs
+    type(coef_t), target, intent(inout) :: coef
+    type(field_t), intent(inout) :: u, v, w
+    integer, intent(in) :: lx
+    integer :: n
+
+    call perturbed_hex_pair_mesh(msh)
+    call Xh%init(GLL, lx, lx, lx)
+    call dof%init(msh, Xh)
+    call gs%init(dof)
+    call coef%init(gs)
+    call u%init(dof, 'u')
+    call v%init(dof, 'v')
+    call w%init(dof, 'w')
+    n = dof%size()
+
+    u%x = G(1, 1) * dof%x%x + G(1, 2) * dof%y%x + G(1, 3) * dof%z%x
+    v%x = G(2, 1) * dof%x%x + G(2, 2) * dof%y%x + G(2, 3) * dof%z%x
+    w%x = G(3, 1) * dof%x%x + G(3, 2) * dof%y%x + G(3, 3) * dof%z%x
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(u%x, u%x_d, n, HOST_TO_DEVICE, sync = .false.)
+       call device_memcpy(v%x, v%x_d, n, HOST_TO_DEVICE, sync = .false.)
+       call device_memcpy(w%x, w%x_d, n, HOST_TO_DEVICE, sync = .true.)
+    end if
+  end subroutine init_case
+
+  !> Free what init_case set up.
+  !! @param msh Mesh.
+  !! @param Xh Function space.
+  !! @param dof Dofmap.
+  !! @param gs Gather-scatter.
+  !! @param coef Coefficients.
+  !! @param u The x component of the velocity.
+  !! @param v The y component of the velocity.
+  !! @param w The z component of the velocity.
+  subroutine free_case(msh, Xh, dof, gs, coef, u, v, w)
+    type(mesh_t), intent(inout) :: msh
+    type(space_t), intent(inout) :: Xh
+    type(dofmap_t), intent(inout) :: dof
+    type(gs_t), intent(inout) :: gs
+    type(coef_t), intent(inout) :: coef
+    type(field_t), intent(inout) :: u, v, w
+
+    call u%free()
+    call v%free()
+    call w%free()
+    call coef%free()
+    call gs%free()
+    call dof%free()
+    call Xh%free()
+    call msh%free()
+  end subroutine free_case
+
+  !> Two trilinear elements side by side along x, with every vertex moved
+  !! off the unit lattice.
+  !! @param msh Mesh to create.
+  subroutine perturbed_hex_pair_mesh(msh)
+    type(mesh_t), intent(inout) :: msh
+    real(kind=dp), parameter :: amp = 0.15_dp
+    type(point_t) :: p(8)
+    integer :: e, l, ip, jp, kp, id
+
+    call msh%init(3, 2)
+    do e = 1, 2
+       ! The points in the NEKTON symmetric ordering of src/mesh/hex.f90,
+       ! i.e. x fastest, then y, then z.
+       do l = 1, 8
+          ip = e - 1 + mod(l - 1, 2)
+          jp = mod((l - 1) / 2, 2)
+          kp = (l - 1) / 4
+          id = 1 + ip + 3 * (jp + 2 * kp)
+          call p(l)%init(ip + amp * sin(1.7_dp * id + 0.3_dp), &
+               jp + amp * sin(2.3_dp * id + 1.1_dp), &
+               kp + amp * sin(3.1_dp * id + 2.7_dp), id)
+       end do
+       call msh%add_element(e, e, p(1), p(2), p(3), p(4), &
+            p(5), p(6), p(7), p(8))
+    end do
+    call msh%finalize()
+  end subroutine perturbed_hex_pair_mesh
+
+end module test_operators
