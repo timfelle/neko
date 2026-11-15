@@ -554,6 +554,7 @@ contains
 
     if (this%gdim .eq. 3) then
        call mesh_generate_face_lid(this)
+       call mesh_check_single_element_periodicity(this)
     end if
 
 
@@ -817,6 +818,41 @@ contains
     deallocate(head)
 
   end subroutine mesh_generate_face_lid
+
+  !> Warn if two or more periodic directions have a single element
+  !! @details An element that is alone in a periodic direction is its own
+  !! neighbour across it, and its two faces normal to that direction are the
+  !! same face, as in pseudo-2D meshes. With a single element in two or three
+  !! periodic directions, faces normal to different directions also have the
+  !! same points, and so the same id, as do the edges along these directions.
+  !! These faces and edges are then joined, which is only correct for fields
+  !! that are uniform in these directions and have no vector component along
+  !! them.
+  !! @attention Requires the local facet ids, @a face_lid
+  subroutine mesh_check_single_element_periodicity(this)
+    type(mesh_t), intent(in) :: this
+    integer :: el, i, j, joined, ierr
+
+    ! Faces 2 * d - 1 and 2 * d are the two faces normal to direction d
+    joined = 0
+    do el = 1, this%nelv
+       do i = 1, NEKO_HEX_NFCS
+          do j = i + 1, NEKO_HEX_NFCS
+             if ((j + 1) / 2 .eq. (i + 1) / 2) cycle
+             if (this%face_lid(i, el) .eq. this%face_lid(j, el)) joined = 1
+          end do
+       end do
+    end do
+
+    call MPI_Allreduce(MPI_IN_PLACE, joined, 1, &
+         MPI_INTEGER, MPI_MAX, NEKO_COMM, ierr)
+    if (joined .gt. 0 .and. pe_rank .eq. 0) then
+       call neko_warning('Two or more periodic directions with a single ' // &
+            'element: only fields uniform in those directions, and with ' // &
+            'no vector component along them, are handled correctly')
+    end if
+
+  end subroutine mesh_check_single_element_periodicity
 
   !> Generate element-element connectivity via facets between PEs
   subroutine mesh_generate_external_facet_conn(this)

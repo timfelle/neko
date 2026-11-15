@@ -48,6 +48,20 @@ can use some tricks, like setting the z-component velocity to zero at each time
 step in the user file. There are a few pseudo-2d examples available, one is
 `lid`.
 
+A single element can also be used in two or three periodic directions, which
+gives a pseudo-1D case, as in the `euler_1d_sod` and `scalar_mms` examples with
+one element in y and z. This only works for fields that are uniform in these
+directions, with the velocity, and any other vector field, along x. Neko
+identifies faces and edges by their vertices, and here the four faces of an
+element normal to y and z have the same vertices, as have its edges along y and
+z at either end. Neko therefore joins these faces, and these edges. This
+corrupts a field that varies in y or z, and also the divergence of a vector
+field with a component along y or z, even a uniform one: for an incompressible
+flow along y, for instance, the pressure solver does not converge. Neko prints a
+warning when it sets up such a mesh, and the number of unique points it reports
+is too low. A single element in only one periodic direction, as in the pseudo-2D
+case, is not affected.
+
 All elements of a Neko mesh must be hexahedral (or quadrilateral for the
 pseudo-2d case). The topology can be fully unstructured. A practical way of
 generating a hexahedral mesh of a complicated geometry is to first generate a
