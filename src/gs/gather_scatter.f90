@@ -1301,8 +1301,10 @@ contains
     end select
     call face_dof_local%free()
 
-    call gs_qsort_dofmap(gs%local_dof_gs, gs%local_gs_dof, &
-         gs%nlocal, 1, gs%nlocal)
+    if (gs%nlocal .gt. 0) then
+       call gs_qsort_dofmap(gs%local_dof_gs, gs%local_gs_dof, &
+            gs%nlocal, 1, gs%nlocal)
+    end if
 
     call gs_find_blks(gs%local_dof_gs, gs%local_blk_len, &
          gs%local_blk_off, gs%nlocal_blks, gs%nlocal, gs%local_facet_offset)
@@ -1380,11 +1382,13 @@ contains
     if (gs%nshared .gt. 0) then
        call gs_qsort_dofmap(gs%shared_dof_gs, gs%shared_gs_dof, &
             gs%nshared, 1, gs%nshared)
-
-       call gs_find_blks(gs%shared_dof_gs, gs%shared_blk_len, &
-            gs%shared_blk_off, gs%nshared_blks, gs%nshared, &
-            gs%shared_facet_offset)
     end if
+
+    ! Even without shared dofs: on more than one rank, a rank with elements
+    ! still runs the shared gather and scatter, which take the block arrays
+    call gs_find_blks(gs%shared_dof_gs, gs%shared_blk_len, &
+         gs%shared_blk_off, gs%nshared_blks, gs%nshared, &
+         gs%shared_facet_offset)
 
   contains
 
@@ -1489,7 +1493,9 @@ contains
             blk_len(i) = blk_array(i)
          end do
          allocate(blk_off(nblks))
-         blk_off(1) = 0
+         if (nblks .gt. 0) then
+            blk_off(1) = 0
+         end if
          do i = 2, nblks
             blk_off(i) = blk_off(i - 1) + blk_len(i - 1)
          end do

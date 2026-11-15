@@ -902,4 +902,106 @@ contains
 
   end subroutine test_dofmap_face14
 
+  !> Gather-scatter on two ranks that share no dofs
+  !! @details Each rank holds one element and the two elements are apart, so
+  !! neither rank shares a dof with the other. Both still run the shared
+  !! gather and scatter, which were handed block arrays only allocated when
+  !! a rank had shared dofs.
+  @test(npes=[2])
+  subroutine test_gs_no_shared_dofs(this)
+    class(test_gather_scatter), intent(inout) :: this
+    type(linear_dist_t) :: dist
+
+    dist = linear_dist_t(2, this%getProcessRank(), &
+         this%getNumProcesses(), NEKO_COMM)
+    call check_gs_isolated_elements(dist)
+
+  end subroutine test_gs_no_shared_dofs
+
+  !> Gather-scatter on two ranks, one of which holds no elements
+  !! @details The rank holding the element shares no dofs, as in
+  !! test_gs_no_shared_dofs, and the other rank has no dofs at all.
+  @test(npes=[2])
+  subroutine test_gs_empty_rank(this)
+    class(test_gather_scatter), intent(inout) :: this
+    type(linear_dist_t) :: dist
+
+    dist = linear_dist_t(1, this%getProcessRank(), &
+         this%getNumProcesses(), NEKO_COMM)
+    call check_gs_isolated_elements(dist)
+
+  end subroutine test_gs_empty_rank
+
+  !> Check that each gather-scatter operation leaves a field unchanged on
+  !! elements that share no points
+  !! @details Every rank adds at most one element, the unit cube moved along
+  !! x by twice the rank, with point ids of its own.
+  !! @param dist Distribution of the elements, at most one per rank
+  subroutine check_gs_isolated_elements(dist)
+    type(linear_dist_t), intent(in) :: dist
+    integer, parameter :: gdim = 3, lx = 4
+    integer, parameter :: ops(4) = [GS_OP_ADD, GS_OP_MUL, GS_OP_MIN, &
+         GS_OP_MAX]
+    type(mesh_t) :: m
+    type(space_t) :: Xh
+    type(dofmap_t) :: d
+    type(gs_t) :: gs_h
+    type(field_t) :: x
+    type(point_t) :: p(8)
+    real(kind=rp), allocatable :: x0(:)
+    integer :: i, k, n
+
+    call device_init
+
+    call m%init(gdim, dist)
+    if (m%nelv .eq. 1) then
+       do i = 1, 8
+          call p(i)%init(real(mod(i - 1, 2) + 2 * pe_rank, dp), &
+               real(mod((i - 1) / 2, 2), dp), real((i - 1) / 4, dp), &
+               8 * pe_rank + i)
+       end do
+       call m%add_element(1, m%offset_el + 1, p(1), p(2), p(3), p(4), &
+            p(5), p(6), p(7), p(8))
+    end if
+    call m%generate_conn()
+
+    call Xh%init(GLL, lx, lx, lx)
+    call d%init(m, Xh)
+    call gs_h%init(d)
+    call x%init(m, Xh, "x")
+    n = Xh%lx * Xh%ly * Xh%lz * m%nelv
+
+    allocate(x0(n))
+    do i = 1, n
+       x0(i) = real(i, rp)
+    end do
+
+    do k = 1, size(ops)
+       call copy(x%x, x0, n)
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(x%x, x%x_d, n, HOST_TO_DEVICE, sync = .false.)
+       end if
+
+       call gs_h%op(x%x, n, ops(k))
+
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(x%x, x%x_d, n, DEVICE_TO_HOST, sync = .true.)
+       end if
+
+       if (n .gt. 0) then
+          @assertEqual(x0, reshape(x%x, [n]), tolerance = 0.0_rp)
+       end if
+    end do
+
+    deallocate(x0)
+    call x%free()
+    call gs_h%free()
+    call d%free()
+    call Xh%free()
+    call m%free()
+
+    call device_finalize
+
+  end subroutine check_gs_isolated_elements
+
 end module test_gather_scatter_parallel

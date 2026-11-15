@@ -299,7 +299,7 @@ contains
     integer, dimension(m), intent(inout) :: gd
     integer, dimension(nb), intent(inout) :: b
     integer, dimension(nb), intent(inout) :: bo
-    integer :: i, j, k, blk_len
+    integer :: i, j, k, blk_len, facet_start
     real(kind=rp) :: tmp
 
     !$omp do
@@ -313,8 +313,14 @@ contains
     end do
     !$omp end do nowait
 
+    ! The facet dofs come after the blocks, or first without blocks
+    facet_start = 1
+    if (nb .gt. 0) then
+       facet_start = bo(nb) + b(nb) + 1
+    end if
+
     !$omp do
-    do i = (bo(nb) + b(nb) + 1), m
+    do i = facet_start, m
        u(gd(i)) = v(dg(i))
     end do
     !$omp end do
