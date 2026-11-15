@@ -953,10 +953,14 @@ types are currently implemented.
 3. `field`, the indicator function is directly taken from a field in the
    `neko_registry`. The field name should be specified in the `name`
    keyword.
-4. `file`, the indicator function is directly taken from a field file. The file
-   name should be specified in the `file_name` keyword. This requires the user
-   to specify the field name in the file, which should be done by setting the
-   `field_name` keyword.
+4. `file`, the indicator function is directly taken from a field file, named by
+   the `file_name` keyword, e.g. `indicator0.fld`. The `file_index` keyword
+   selects the sample in the file, by default `0`. The `field_name` keyword
+   selects the field: in an fld file, one of `p`, `u`, `v`, `w`, `t`, or `s`
+   followed by the index of a passive scalar, e.g. `s1`; in a VTKHDF file, the
+   name of the field. By default, the field is the indicator as written by the
+   `output` of this source term, i.e. `s1` in an fld file and
+   `brinkman_indicator` in a VTKHDF file.
 
 Each object are added to a common indicator field by means of a point-wise max
 operator. This means that the indicator field will be the union of all the

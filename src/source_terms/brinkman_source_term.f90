@@ -583,8 +583,15 @@ contains
     integer :: file_idx, temp_idx
 
     call json_get(json, 'file_name', file_name)
-    call json_get_or_default(json, 'field_name', field_name, &
-         'brinkman_indicator')
+    ! By default, read the indicator from where the Brinkman output writes it:
+    ! the first passive scalar of an fld file, or its name in a VTKHDF file
+    call filename_suffix(file_name, suffix)
+    if (trim(suffix) .eq. 'fld') then
+       call json_get_or_default(json, 'field_name', field_name, 's1')
+    else
+       call json_get_or_default(json, 'field_name', field_name, &
+            'brinkman_indicator')
+    end if
     call json_get_or_default(json, 'file_index', file_idx, 0)
 
     call neko_scratch_registry%request_field(temp_field, temp_idx, .true.)
@@ -592,7 +599,6 @@ contains
     call file%init(file_name)
     call file%set_counter(file_idx)
 
-    call filename_suffix(file_name, suffix)
     select case (trim(suffix))
     case ('fld')
        block

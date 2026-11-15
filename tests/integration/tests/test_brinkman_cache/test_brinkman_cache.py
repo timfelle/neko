@@ -9,6 +9,9 @@ The cache holds the indicator in the pressure slot of an fld file. Caches
 written by earlier versions of Neko hold it as the first passive scalar, so
 the cache is also re-read after relabelling it to that layout.
 
+A Brinkman file object without a field name must read the indicator back from
+the Brinkman output of a first run, which holds it as the first passive scalar.
+
 Finally, a Brinkman file object asking for a field that its fld file does not
 contain must stop with a clear error.
 """
@@ -162,6 +165,40 @@ def test_brinkman_cache(layout, launcher_script, log_file, tmp_path):
     # The bunny must cover some points, or two empty indicators would match
     assert computed.max() > 0.5 > computed.min()
     assert np.abs(cached - computed).max() <= TOLERANCE[conftest.RP]
+
+
+def test_brinkman_file_default_field(launcher_script, log_file, tmp_path):
+    """Read the Brinkman output of a first run without naming the field."""
+    nprocs = configure_nprocs(NPROCS)
+    mesh = _generate_mesh(tmp_path)
+    cache = tmp_path / "cache_"
+    write_dir = tmp_path / "write"
+    read_dir = tmp_path / "read"
+    write_log = log_file.replace(".log", "_write.log")
+    read_log = log_file.replace(".log", "_read.log")
+
+    result = _run(launcher_script, nprocs, _case(mesh, cache, write_dir),
+                  write_dir, write_log)
+    assert (
+        result.returncode == 0
+    ), f"Indicator-writing run failed with exit code {result.returncode}"
+    output = write_dir / "brinkman0.f00000"
+    written = _rdcode(output)
+    assert written == "XS02", f"Brinkman output written as {written}, not XS02"
+
+    config = _case(mesh, cache, read_dir)
+    config["case"]["fluid"]["source_terms"][0]["objects"] = [
+        {"type": "file", "file_name": str(write_dir / "brinkman0.fld")}
+    ]
+    result = _run(launcher_script, nprocs, config, read_dir, read_log)
+    assert (
+        result.returncode == 0
+    ), f"File-reading run failed with exit code {result.returncode}"
+
+    computed = _read_indicator(output)
+    imported = _read_indicator(read_dir / "brinkman0.f00000")
+    assert computed.max() > 0.5 > computed.min()
+    assert np.abs(imported - computed).max() <= TOLERANCE[conftest.RP]
 
 
 def test_brinkman_file_missing_field(launcher_script, log_file, tmp_path):
