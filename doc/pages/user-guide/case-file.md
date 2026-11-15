@@ -303,7 +303,7 @@ smallest of `timestep` and the value calculated from the target CFL number.
 | `cfl_running_avg_coeff`    | The running average coefficient `a` where `cfl_avg_new = a * cfl_new + (1-a) * cfl_avg_old` | Positive real between `0` and `1` | `0.5`         |
 | `exact_output_time`        | Whether to fit the variable `dt` so that the sampling and output times are reached exactly   | `true` or `false`                 | `false`       |
 
-### Restarts and joblimit
+### Restarts and joblimit {#case-file_restarts}
 Restarts will restart the simulation from the exact state at a given time that
 the checkpoint was written. This means that the flow field and potential scalars
 will be at the exact same values before as after restarts. However, derived
@@ -318,6 +318,17 @@ final time will be written as to avoid losing progress as far as possible.
 
 @attention For simulations requiring restarts, it is recommended to run each
 restart in a different output directory as a precaution to avoid potential overwritings of files.
+
+@note Neither checkpoint format restores the projection space used to
+accelerate the velocity and pressure solves (see `projection_space_size` in
+the [linear solver configuration](#case-file_fluid-linear-solvers)). The
+projection space is rebuilt empty after a restart rather than reloaded, so
+a restarted run with `projection_space_size` greater than `0` only matches
+the uninterrupted run to solver tolerance from the point where the
+projection space is first used again, not exactly. On the `tgv` example
+(`pressure_solver.projection_space_size: 20`), this was measured as a
+velocity RMSE of about `6e-7` and a pressure RMSE of about `5e-5`. Set
+`projection_space_size` to `0` if a bit-exact restart is required.
 
 ### Boundary type numbering in the "output_boundary" field
 

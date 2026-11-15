@@ -1708,7 +1708,7 @@ However, its output field can be loaded as an `initial_condition` for a
 subsequent ALE simulation. Saving that field in double precision is
 recommended.
 
-## Linear solver configuration
+## Linear solver configuration {#case-file_fluid-linear-solvers}
 The mandatory `velocity_solver` and `pressure_solver` objects are used to
 configure the solvers for the momentum and pressure-Poisson equation.
 The following keywords are used, with the corresponding options.
@@ -1753,6 +1753,11 @@ The following keywords are used, with the corresponding options.
    the projection basis at each time. This option works only for pressure projection.
 * `monitor`, monitoring of residuals. If set to true, the residuals will be
   printed for each iteration.
+
+@note The projection space built up by `projection_space_size` is not part of
+either checkpoint format, `chkp` or `hdf5`, and is rebuilt empty on a
+restart. See the note on [restarts](#case-file_restarts) for what this means
+in practice.
 
 In addition to the above settings, the solvers can be configured with strict
 convergence criteria. This is done by setting the
