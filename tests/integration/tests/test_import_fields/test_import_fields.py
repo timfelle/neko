@@ -341,3 +341,84 @@ def test_case_file_import_fields(component, mode, import_assets):
         float(value) for value in probe_file.read_text().splitlines()[-1].split(",")
     ]
     assert values[1:] == pytest.approx(expected, abs=VALUE_TOLERANCE[conftest.RP])
+
+
+def test_import_fields_fewer_elements_than_ranks(import_assets):
+    """Interpolate from a field file with fewer elements than ranks.
+
+    The file holds a single element, so one rank reads none of its elements
+    and still has to take part in building the interpolator.
+    """
+    nprocs = configure_nprocs(NPROCS)
+    if nprocs < 2:
+        pytest.skip("Needs a rank that reads no elements of the field file")
+
+    workdir = import_assets["workdir"] / "fewer_elements"
+    workdir.mkdir()
+    genmeshbox = Path(get_genmeshbox()).resolve()
+    mesh_checker = _resolve_mesh_checker(import_assets["neko"])
+    source_mesh = _generate_mesh(
+        genmeshbox, mesh_checker, workdir, "source.nmsh", (1, 1, 1)
+    )
+
+    # Write the one-element field on a single rank
+    source_case = workdir / "source.case"
+    source_case.write_text(
+        json.dumps(_source_case(source_mesh, workdir), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    source_log = workdir / "source.log"
+    result = run_neko(
+        str(import_assets["launcher"]),
+        1,
+        str(source_case),
+        str(import_assets["neko"]),
+        str(source_log),
+    )
+    assert result.returncode == 0, source_log.read_text(encoding="utf-8")
+    field = workdir / "source0.f00000"
+    assert field.is_file(), "The source run did not write source0.f00000"
+
+    assets = dict(
+        import_assets, source_mesh=source_mesh, field=field, mesh_field=field
+    )
+
+    # Import on a single rank as the reference, then on the rank count that
+    # leaves one rank without elements of the file
+    values = {}
+    for ranks in (1, nprocs):
+        run_dir = workdir / f"consumer_np{ranks}"
+        run_dir.mkdir()
+        config, probe_file, expected = _consumer_case(
+            "fluid", "embedded_mesh", assets, run_dir
+        )
+        case_file = run_dir / "consumer.case"
+        case_file.write_text(
+            json.dumps(config, indent=2) + "\n", encoding="utf-8"
+        )
+        log_file = run_dir / "consumer.log"
+
+        result = run_neko(
+            str(import_assets["launcher"]),
+            ranks,
+            str(case_file),
+            str(import_assets["neko"]),
+            str(log_file),
+        )
+        log = log_file.read_text(encoding="utf-8", errors="replace")
+        assert result.returncode == 0, log
+        assert "Interpolation : T" in log
+        values[ranks] = [
+            float(value)
+            for value in probe_file.read_text().splitlines()[-1].split(",")
+        ][1:]
+
+    # The probe sits inside the single source element rather than on one of
+    # its nodes, so the imported linear field is only as accurate as the
+    # point location; the rank count must not change the result
+    assert values[1] == pytest.approx(
+        expected, abs=10 * INTERPOLATION_TOLERANCE[conftest.RP]
+    )
+    assert values[nprocs] == pytest.approx(
+        values[1], abs=VALUE_TOLERANCE[conftest.RP]
+    )

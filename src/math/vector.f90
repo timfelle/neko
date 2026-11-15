@@ -112,12 +112,16 @@ contains
   end subroutine vector_init
 
   !> Vector allocation without initialisation.
+  !! @details Storage of the right size is reused. A vector of size zero is
+  !! allocated too, so that a rank holding no entries, e.g. no elements of a
+  !! distributed field, reports the vector as allocated like every other
+  !! rank.
   subroutine vector_allocate(a, n)
     class(vector_t), intent(inout) :: a
     integer, intent(in) :: n
 
 
-    if (a%n .eq. n) return
+    if (a%n .eq. n .and. allocated(a%x)) return
     call a%free()
 
     a%n = n

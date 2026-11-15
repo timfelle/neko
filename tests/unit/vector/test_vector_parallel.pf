@@ -77,6 +77,27 @@ contains
   end subroutine test_vector_free
 
   @test(npes=[1])
+  subroutine test_vector_init_zero_size(this)
+    class (test_vector), intent(inout) :: this
+    type(vector_t) :: v
+
+    ! As on a rank that holds no elements of a distributed field
+    call v%init(0)
+    @assertTrue(allocated(v%x))
+    @assertEqual(size(v%x), 0)
+    @assertEqual(v%size(), 0)
+    ! There is nothing to map to a device
+    @assertFalse(c_associated(v%x_d))
+
+    ! Initialising again keeps the storage, freeing releases it
+    call v%init(0)
+    @assertTrue(allocated(v%x))
+    call v%free()
+    @assertFalse(allocated(v%x))
+
+  end subroutine test_vector_init_zero_size
+
+  @test(npes=[1])
   subroutine test_vector_assign_vector(this)
     class (test_vector), intent(inout) :: this
     integer, parameter :: n = 42
