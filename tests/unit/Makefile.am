@@ -28,6 +28,7 @@ SUBDIRS = tuple\
 	  mathops\
 	  device_mathops\
 	  operators\
+	  schwarz\
 	  octree\
 	  vector\
 	  matrix\
@@ -89,6 +90,7 @@ TESTS = device/device_test\
 	mathops/mathops_test\
 	device_mathops/device_mathops_test\
 	operators/operators_test\
+	schwarz/schwarz_test\
 	octree/octree_test\
 	vector/vector_test\
 	matrix/matrix_test\
@@ -170,6 +172,8 @@ EXTRA_DIST = \
 	device_mathops/test_device_mathops.pf\
 	operators/test_operators.pf\
 	operators/operators_test\
+	schwarz/test_schwarz.pf\
+	schwarz/schwarz_test\
 	device_math/test_device_math_parallel.pf\
 	mesh/mesh_test\
 	gather_scatter/gather_scatter_test\

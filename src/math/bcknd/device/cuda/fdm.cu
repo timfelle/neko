@@ -51,6 +51,16 @@ extern "C" {
     CUDA_CHECK(cudaGetLastError());                                              \
     break;
 
+/* From NL = 15 the work arrays of fdm_do_fast_kernel no longer fit in static
+   shared memory, see fdm_do_fast_kernel_kstep */
+#define CASE_LARGE(NL)                                                           \
+    case NL:                                                                     \
+    fdm_do_fast_kernel_kstep<real,NL>                                            \
+      <<<nblcks, dim3(NL, NL, 1), 0, stream>>>((real *) e, (real *) r,           \
+                                              (real *) s,(real *) d);            \
+    CUDA_CHECK(cudaGetLastError());                                              \
+    break;
+
     switch(*nl) {
        CASE(2);
        CASE(3);
@@ -65,6 +75,10 @@ extern "C" {
        CASE(12);
        CASE(13);
        CASE(14);
+       CASE_LARGE(15);
+       CASE_LARGE(16);
+       CASE_LARGE(17);
+       CASE_LARGE(18);
      default:
       {
         fprintf(stderr, __FILE__ ": size not supported: %d\n", *nl);

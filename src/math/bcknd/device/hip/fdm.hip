@@ -53,6 +53,17 @@ extern "C" {
     HIP_CHECK(hipGetLastError());                                                \
     break;
 
+/* From NL = 16 the work arrays of fdm_do_fast_kernel no longer fit in LDS,
+   see fdm_do_fast_kernel_kstep */
+#define CASE_LARGE(NL)                                                           \
+    case NL:                                                                     \
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(fdm_do_fast_kernel_kstep<real,NL>),       \
+                       nblcks, dim3(NL, NL, 1), 0, stream,                       \
+                       (real *) e, (real *) r,                                   \
+                       (real *) s,(real *) d);                                   \
+    HIP_CHECK(hipGetLastError());                                                \
+    break;
+
     switch(*nl) {
        CASE(2);
        CASE(3);
@@ -68,6 +79,9 @@ extern "C" {
        CASE(13);
        CASE(14);
        CASE(15);
+       CASE_LARGE(16);
+       CASE_LARGE(17);
+       CASE_LARGE(18);
      default:
        {
          fprintf(stderr, __FILE__ ": size not supported: %d\n", *nl);

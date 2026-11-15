@@ -1,0 +1,249 @@
+!> Tests of the device kernels of the overlapping Schwarz smoother, the fast
+!! diagonalisation solve and the extrusion of the overlap, against the CPU.
+!! The extended elements of the polynomial orders the device backends
+!! support, lx = 2 to 16, have nl = lx + 2 = 4 to 18 points along each
+!! direction. The device results are checked against the CPU ones, so on a
+!! build without a device there is nothing to check.
+module test_schwarz
+  use pfunit
+  use num_types, only : rp
+  use math, only : NEKO_EPS
+  use pfunit_comm_utils, only : comm_init_test, comm_free_test
+  use device, only : device_init, device_finalize, device_map, device_unmap, &
+       device_memcpy, glb_cmd_queue, HOST_TO_DEVICE, DEVICE_TO_HOST
+  use neko_config, only : NEKO_BCKND_DEVICE
+  use neko_mpi_types, only : neko_mpi_types_init, neko_mpi_types_free
+  use fdm_cpu, only : fdm_do_fast_cpu
+  use fdm_device, only : fdm_do_fast_device
+  use device_schwarz, only : device_schwarz_extrude
+  use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
+  implicit none
+
+  !> Number of elements, so that the element offsets are exercised
+  integer, parameter :: nelv = 3
+
+  !> Tolerance relative to the largest value of the CPU result. The solve
+  !! sums the same terms in the same order on both, possibly with fused
+  !! operations, over six contractions of up to 18 terms.
+  real(kind=rp), parameter :: fdm_tol = 1.0e6_rp * NEKO_EPS
+
+  !> Tolerance relative to the largest value of the CPU result. The
+  !! extrusion is one multiply and add per point.
+  real(kind=rp), parameter :: extrude_tol = 100.0_rp * NEKO_EPS
+
+  @TestCase
+  type, extends(MPITestCase) :: test_schwarz_case
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_schwarz_case
+
+contains
+
+  subroutine setUp(this)
+    class(test_schwarz_case), intent(inout) :: this
+    call comm_init_test(this%getMpiCommunicator())
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_init
+    end if
+    call neko_mpi_types_init()
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_schwarz_case), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_finalize
+    end if
+    call neko_mpi_types_free()
+    call comm_free_test()
+  end subroutine tearDown
+
+  !> The fast diagonalisation solve of the device matches that of the CPU,
+  !! both the solution and the scaled intermediate result left in r.
+  @test(npes=[1])
+  subroutine test_fdm_do_fast(this)
+    class(test_schwarz_case), intent(inout) :: this
+    integer :: nl
+
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+    do nl = 4, 18
+       call check_fdm_do_fast(nl)
+    end do
+  end subroutine test_fdm_do_fast
+
+  !> The extrusion of the device matches that of the CPU, for the shell
+  !! offsets the Schwarz smoother uses and for weights other than one, so
+  !! that the order of the face updates on the edges matters.
+  @test(npes=[1])
+  subroutine test_extrude(this)
+    class(test_schwarz_case), intent(inout) :: this
+    integer :: nx
+
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+    do nx = 4, 18
+       call check_extrude(nx, 0, 0.5_rp, 2, -1.5_rp)
+       call check_extrude(nx, 2, 1.5_rp, 0, 0.5_rp)
+    end do
+  end subroutine test_extrude
+
+  !> Check the device fast diagonalisation solve against the CPU one.
+  !! @param nl Number of points along each direction.
+  subroutine check_fdm_do_fast(nl)
+    integer, intent(in) :: nl
+    real(kind=rp), allocatable :: e(:,:), r(:,:), s(:,:,:,:), d(:,:)
+    real(kind=rp), allocatable :: e_cpu(:,:), r_cpu(:,:)
+    type(c_ptr) :: e_d, r_d, s_d, d_d
+    character(len=80) :: msg
+    integer :: n, nbad_e, nbad_r
+
+    n = nl**3
+    allocate(e(n, nelv), r(n, nelv), s(nl * nl, 2, 3, nelv), d(n, nelv))
+    call fill(s, size(s), 0.7_rp)
+    call fill(r, size(r), 1.3_rp)
+    call fill(d, size(d), 2.9_rp)
+    d = 1.0_rp + 0.5_rp * d
+    e = 0.0_rp
+
+    allocate(e_cpu, source = e)
+    allocate(r_cpu, source = r)
+    call fdm_do_fast_cpu(e_cpu, r_cpu, s, d, nl, 3, nelv)
+
+    e_d = C_NULL_PTR
+    r_d = C_NULL_PTR
+    s_d = C_NULL_PTR
+    d_d = C_NULL_PTR
+    call device_map(e, e_d, size(e))
+    call device_map(r, r_d, size(r))
+    call device_map(s, s_d, size(s))
+    call device_map(d, d_d, size(d))
+    call device_memcpy(e, e_d, size(e), HOST_TO_DEVICE, sync = .false.)
+    call device_memcpy(r, r_d, size(r), HOST_TO_DEVICE, sync = .false.)
+    call device_memcpy(s, s_d, size(s), HOST_TO_DEVICE, sync = .false.)
+    call device_memcpy(d, d_d, size(d), HOST_TO_DEVICE, sync = .true.)
+
+    call fdm_do_fast_device(e, r, s, d, nl, 3, nelv, glb_cmd_queue)
+
+    call device_memcpy(e, e_d, size(e), DEVICE_TO_HOST, sync = .false.)
+    call device_memcpy(r, r_d, size(r), DEVICE_TO_HOST, sync = .true.)
+    call device_unmap(e, e_d)
+    call device_unmap(r, r_d)
+    call device_unmap(s, s_d)
+    call device_unmap(d, d_d)
+
+    ! Count the points that do not match, a NaN included
+    nbad_e = count(.not. (abs(e - e_cpu) .le. fdm_tol * maxval(abs(e_cpu))))
+    nbad_r = count(.not. (abs(r - r_cpu) .le. fdm_tol * maxval(abs(r_cpu))))
+    deallocate(e, r, s, d, e_cpu, r_cpu)
+
+    write(msg, '(A,I0)') 'fdm solve, nl = ', nl
+    @assertEqual(0, nbad_e, message=trim(msg) // ', e')
+    @assertEqual(0, nbad_r, message=trim(msg) // ', r')
+  end subroutine check_fdm_do_fast
+
+  !> Check the device extrusion against the CPU one, a1 = f1 a1 + f2 a2 on
+  !! the interior of each face shell, l1 and l2 points in from the faces.
+  !! @param nx Number of points along each direction.
+  !! @param l1 Offset of the shell of a1.
+  !! @param f1 Weight of a1.
+  !! @param l2 Offset of the shell of a2.
+  !! @param f2 Weight of a2.
+  subroutine check_extrude(nx, l1, f1, l2, f2)
+    integer, intent(in) :: nx, l1, l2
+    real(kind=rp), intent(in) :: f1, f2
+    real(kind=rp), allocatable :: a1(:,:,:,:), a2(:,:,:,:), a1_cpu(:,:,:,:)
+    type(c_ptr) :: a1_d, a2_d
+    character(len=80) :: msg
+    integer :: nbad
+
+    allocate(a1(nx, nx, nx, nelv), a2(nx, nx, nx, nelv))
+    call fill(a1, size(a1), 0.9_rp)
+    call fill(a2, size(a2), 1.7_rp)
+
+    allocate(a1_cpu, source = a1)
+    call extrude_cpu(a1_cpu, l1, f1, a2, l2, f2, nx)
+
+    a1_d = C_NULL_PTR
+    a2_d = C_NULL_PTR
+    call device_map(a1, a1_d, size(a1))
+    call device_map(a2, a2_d, size(a2))
+    call device_memcpy(a1, a1_d, size(a1), HOST_TO_DEVICE, sync = .false.)
+    call device_memcpy(a2, a2_d, size(a2), HOST_TO_DEVICE, sync = .true.)
+
+    call device_schwarz_extrude(a1_d, l1, f1, a2_d, l2, f2, nx, nx, nx, &
+         nelv, glb_cmd_queue)
+
+    call device_memcpy(a1, a1_d, size(a1), DEVICE_TO_HOST, sync = .true.)
+    call device_unmap(a1, a1_d)
+    call device_unmap(a2, a2_d)
+
+    ! Count the points that do not match, a NaN included
+    nbad = count(.not. (abs(a1 - a1_cpu) .le. &
+         extrude_tol * maxval(abs(a1_cpu))))
+    deallocate(a1, a2, a1_cpu)
+
+    write(msg, '(A,I0,A,I0,A,I0)') 'extrude, nx = ', nx, ', l1 = ', l1, &
+         ', l2 = ', l2
+    @assertEqual(0, nbad, message=trim(msg))
+  end subroutine check_extrude
+
+  !> The CPU extrusion of the Schwarz smoother, as in schwarz_extrude of
+  !! src/math/schwarz.f90, which is private to its module.
+  !! @param a1 Array to update.
+  !! @param l1 Offset of the shell of a1.
+  !! @param f1 Weight of a1.
+  !! @param a2 Array to add.
+  !! @param l2 Offset of the shell of a2.
+  !! @param f2 Weight of a2.
+  !! @param nx Number of points along each direction.
+  subroutine extrude_cpu(a1, l1, f1, a2, l2, f2, nx)
+    integer, intent(in) :: l1, l2, nx
+    real(kind=rp), intent(inout) :: a1(nx, nx, nx, nelv)
+    real(kind=rp), intent(in) :: a2(nx, nx, nx, nelv)
+    real(kind=rp), intent(in) :: f1, f2
+    integer :: i, j, k, ie
+
+    do ie = 1, nelv
+       do k = 2, nx - 1
+          do j = 2, nx - 1
+             a1(l1 + 1, j, k, ie) = f1 * a1(l1 + 1, j, k, ie) &
+                  + f2 * a2(l2 + 1, j, k, ie)
+             a1(nx - l1, j, k, ie) = f1 * a1(nx - l1, j, k, ie) &
+                  + f2 * a2(nx - l2, j, k, ie)
+          end do
+       end do
+       do k = 2, nx - 1
+          do i = 2, nx - 1
+             a1(i, l1 + 1, k, ie) = f1 * a1(i, l1 + 1, k, ie) &
+                  + f2 * a2(i, l2 + 1, k, ie)
+             a1(i, nx - l1, k, ie) = f1 * a1(i, nx - l1, k, ie) &
+                  + f2 * a2(i, nx - l2, k, ie)
+          end do
+       end do
+       do j = 2, nx - 1
+          do i = 2, nx - 1
+             a1(i, j, l1 + 1, ie) = f1 * a1(i, j, l1 + 1, ie) &
+                  + f2 * a2(i, j, l2 + 1, ie)
+             a1(i, j, nx - l1, ie) = f1 * a1(i, j, nx - l1, ie) &
+                  + f2 * a2(i, j, nx - l2, ie)
+          end do
+       end do
+    end do
+  end subroutine extrude_cpu
+
+  !> Fill an array with values in [-1, 1] that vary irregularly from one
+  !! entry to the next.
+  !! @param a Array to fill.
+  !! @param n Number of entries.
+  !! @param c Frequency, a different one for each array.
+  subroutine fill(a, n, c)
+    integer, intent(in) :: n
+    real(kind=rp), intent(inout) :: a(n)
+    real(kind=rp), intent(in) :: c
+    integer :: i
+
+    do i = 1, n
+       a(i) = sin(c * i + 0.1_rp * i**2 / n)
+    end do
+  end subroutine fill
+
+end module test_schwarz
