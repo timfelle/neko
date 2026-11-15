@@ -61,7 +61,7 @@
 module hsmg
   use neko_config, only : NEKO_BCKND_DEVICE
   use num_types, only : rp
-  use math, only : copy, col2, add2
+  use math, only : copy, col2, add2, cadd, glsc2, glsum
   use utils, only : neko_error
   use precon, only : pc_t, precon_allocator
   use ax_product, only : ax_t, ax_helm_allocator
@@ -78,7 +78,10 @@ module hsmg
   use device, only : device_map, device_event_create, device_unmap, &
        device_event_destroy, device_get_ptr, &
        device_event_record, glb_cmd_queue
-  use device_math, only : device_copy, device_col2, device_add2
+  use device_math, only : device_copy, device_col2, device_add2, &
+       device_cadd, device_glsc2
+  use comm, only : NEKO_COMM
+  use mpi_f08, only : MPI_Allreduce, MPI_IN_PLACE, MPI_LOGICAL, MPI_LOR
   use profiler, only : profiler_start_region, profiler_end_region
   use space, only : space_t, GLL
   use dofmap, only : dofmap_t
@@ -126,6 +129,11 @@ module hsmg
      class(ksp_t), allocatable :: crs_solver !< Solver for course problem
      type(tamg_solver_t), allocatable :: amg_solver
      integer :: niter !< Number of iter of crs iterations
+     !> Whether the coarse operator is singular, with the constants as its
+     !! null space, i.e. no rank has a Dirichlet dof
+     logical :: crs_singular = .false.
+     !> Global number of unique coarse grid points
+     real(kind=rp) :: crs_glb_unique_points = 0.0_rp
      class(pc_t), allocatable :: pc_crs !< Some basic precon for crs
      class(ax_t), allocatable :: ax !< Matrix for crs solve
      real(kind=rp), allocatable :: r(:)!< Residual work array
@@ -201,6 +209,7 @@ contains
     integer, intent(in) :: crs_tamg_lvls, crs_tamg_itrs, crs_tamg_cheby_degree
     integer :: n, i
     integer :: lx_crs, lx_mid
+    logical :: crs_dirichlet
     class(bc_t), pointer :: bc_i
 
     character(len=LOG_SIZE) :: log_buf
@@ -315,6 +324,18 @@ contains
     call this%bc_projector_reg%mark(this%bc_reg)
     call this%bc_projector_crs%mark(this%bc_crs)
     call this%bc_projector_mg%mark(this%bc_mg)
+
+    ! The coarse operator has no mass term (see hsmg_set_h), so it is
+    ! singular, with the constants as its null space, unless some rank has a
+    ! Dirichlet dof. Detected as for the pressure in the fluid scheme.
+    crs_dirichlet = this%bc_projector_crs%dof_mask%is_set()
+    call MPI_Allreduce(MPI_IN_PLACE, crs_dirichlet, 1, MPI_LOGICAL, &
+         MPI_LOR, NEKO_COMM)
+    this%crs_singular = .not. crs_dirichlet
+    this%crs_glb_unique_points = glsum(this%c_crs%mult, this%dm_crs%size())
+    if (this%crs_singular) then
+       call neko_log%message('Coarse null space   : constants')
+    end if
 
     call this%schwarz%init(coef%Xh, coef%dof, coef%gs_h, &
          this%bc_projector_reg, coef%msh)
@@ -558,6 +579,13 @@ contains
                this%grids(1)%dof%size(), GS_OP_ADD, this%gs_event)
           call this%grids(1)%bc_projector%apply(this%wf%x, &
                this%grids(1)%dof%size())
+          ! A singular coarse problem is solvable only for a right-hand
+          ! side orthogonal to the constants: remove its mean.
+          if (this%crs_singular) then
+             call device_cadd(this%wf%x_d, -device_glsc2(this%wf%x_d, &
+                  this%grids(1)%coef%mult_d, this%grids(1)%dof%size()) / &
+                  this%crs_glb_unique_points, this%grids(1)%dof%size())
+          end if
           call profiler_start_region('HSMG_coarse_solve', 11)
           if (allocated(this%amg_solver)) then
              call this%amg_solver%solve(this%grids(1)%e%x, this%wf%x, &
@@ -611,6 +639,13 @@ contains
 
        call this%grids(1)%gs_h%op(this%r, this%grids(1)%dof%size(), GS_OP_ADD)
        call this%grids(1)%bc_projector%apply(this%r, this%grids(1)%dof%size())
+       ! A singular coarse problem is solvable only for a right-hand side
+       ! orthogonal to the constants: remove its mean.
+       if (this%crs_singular) then
+          call cadd(this%r, -glsc2(this%r, this%grids(1)%coef%mult, &
+               this%grids(1)%dof%size()) / this%crs_glb_unique_points, &
+               this%grids(1)%dof%size())
+       end if
 
        call profiler_start_region('HSMG_coarse-solve', 11)
        if (allocated(this%amg_solver)) then
