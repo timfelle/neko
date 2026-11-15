@@ -277,6 +277,11 @@ contains
     end if
     this%coef%ifh2 = .true.
 
+    ! The preconditioner is built from the Helmholtz coefficients, so update
+    ! it for the ones just set: coef held others when the filter was set up,
+    ! and the radius or the geometry may have changed since the last apply.
+    call this%pc_filt%update()
+
     ! compute the A(F_in) component of the RHS
     ! (note, to be safe with the inout intent we first copy F_in to the
     !  temporary d_F_out)
@@ -311,8 +316,6 @@ contains
 
     ! add result
     call field_add3(F_out, F_in, d_F_out)
-    ! update preconditioner (needed?)
-    call this%pc_filt%update()
 
     ! write it all out
     call neko_log%section('PDE Filter')
