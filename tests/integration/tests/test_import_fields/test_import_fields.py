@@ -3,8 +3,12 @@
 Flow and scalar initial conditions, sponge baseflows, and non-normal boundary
 data all expose field import through the case file.  Exercise each pathway on
 the original mesh and through global interpolation.  Interpolation is checked
-both with coordinates embedded in the data file and with an explicitly named
-mesh field.
+both with coordinates embedded in the data file and with coordinates taken
+from an explicitly named mesh field, the data file having none.
+
+Only the coordinates may be taken from the mesh field: a field requested from
+a data file that does not contain it must stop the run, even if the mesh field
+contains it.
 
 ALE base-shape import is the only other production caller.  It does not expose
 interpolation and its same-mesh path is covered by ``test_ale.py``.
@@ -15,6 +19,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 import conftest
@@ -31,6 +36,12 @@ IMPORT_MODES = ("same_mesh", "embedded_mesh", "separate_mesh")
 NPROCS = 2
 INTERPOLATION_TOLERANCE = {"dp": 1.0e-8, "sp": 1.0e-4}
 VALUE_TOLERANCE = {"dp": 1.0e-8, "sp": 2.0e-4}
+# Position of the rdcode, which lists the fields of an fld file, in the
+# 132-byte header.
+RDCODE = slice(83, 93)
+# Pressure of the mesh field, which the data file of the missing-field test
+# does not contain.
+MESH_PRESSURE = 5.0
 
 
 def _solver(solver_type):
@@ -57,6 +68,43 @@ def _field_options(field_file, mode, mesh_field):
             "padding": 0.05,
         }
     return options
+
+
+def _write_fields(source, target, codes, pressure=None):
+    """Write some of the fields of an fld file to a new fld file.
+
+    `codes` lists the fields to keep in file order, e.g. "XU" for the
+    coordinates and the velocity. If `pressure` is given, the pressure field
+    takes that value everywhere. The bounding boxes at the end of the source
+    file, which Neko does not read, are not copied.
+    """
+    data = Path(source).read_bytes()
+    header = data[:132].decode("ascii")
+    word_size, lx, ly, lz, n_elements = map(int, header.split()[1:6])
+    rdcode = header[RDCODE].strip()
+    assert set(rdcode) <= set("XUPT"), f"Unexpected fields in {source}"
+
+    # The header is followed by a test pattern and the element ids
+    start = 132 + 4 + 4 * n_elements
+    scalar_size = lx * ly * lz * n_elements * word_size
+    vector_size = (3 if lz > 1 else 2) * scalar_size
+    fields = {}
+    for code in rdcode:
+        size = vector_size if code in "XU" else scalar_size
+        fields[code] = data[start:start + size]
+        start += size
+    if pressure is not None:
+        dtype = "<f8" if word_size == 8 else "<f4"
+        values = np.full(scalar_size // word_size, pressure, dtype=dtype)
+        fields["P"] = values.tobytes()
+
+    with open(target, "wb") as f:
+        f.write(header[:RDCODE.start].encode("ascii"))
+        f.write(codes.ljust(RDCODE.stop - RDCODE.start).encode("ascii"))
+        f.write(header[RDCODE.stop:].encode("ascii"))
+        f.write(data[132:132 + 4 + 4 * n_elements])
+        for code in codes:
+            f.write(fields[code])
 
 
 def _fluid(initial_condition, boundary_conditions, source_terms=None):
@@ -157,7 +205,11 @@ def _source_case(mesh, workdir):
 def _consumer_case(component, mode, assets, run_dir):
     """Create one consumer case and its expected probe values."""
     mesh = assets["source_mesh"] if mode == "same_mesh" else assets["target_mesh"]
-    options = _field_options(assets["field"], mode, assets["mesh_field"])
+    if mode == "separate_mesh":
+        field = assets["field_without_mesh"]
+    else:
+        field = assets["field"]
+    options = _field_options(field, mode, assets["mesh_field"])
     config = _base_case(mesh, run_dir)
     case = config["case"]
 
@@ -298,6 +350,9 @@ def import_assets(tmp_path_factory, request):
     assert field.is_file(), "The source run did not write source0.f00000"
     mesh_field = workdir / "source_mesh0.f00000"
     shutil.copyfile(field, mesh_field)
+    # A data file whose coordinates have to be taken from the mesh field
+    field_without_mesh = workdir / "source_data0.f00000"
+    _write_fields(field, field_without_mesh, "UPT")
 
     return {
         "workdir": workdir,
@@ -306,6 +361,7 @@ def import_assets(tmp_path_factory, request):
         "source_mesh": source_mesh,
         "target_mesh": target_mesh,
         "field": field,
+        "field_without_mesh": field_without_mesh,
         "mesh_field": mesh_field,
     }
 
@@ -341,3 +397,44 @@ def test_case_file_import_fields(component, mode, import_assets):
         float(value) for value in probe_file.read_text().splitlines()[-1].split(",")
     ]
     assert values[1:] == pytest.approx(expected, abs=VALUE_TOLERANCE[conftest.RP])
+
+
+def test_field_missing_from_data_file(import_assets):
+    """A field missing from the data file must not come from the mesh field."""
+    run_dir = import_assets["workdir"] / "missing_field"
+    run_dir.mkdir()
+    # The mesh field has a pressure, the data file has only the velocity
+    mesh_field = run_dir / "pressure_mesh0.f00000"
+    field = run_dir / "velocity0.f00000"
+    _write_fields(import_assets["field"], mesh_field, "XUP",
+                  pressure=MESH_PRESSURE)
+    _write_fields(import_assets["field"], field, "U")
+
+    config = _base_case(import_assets["target_mesh"], run_dir)
+    options = _field_options(field, "separate_mesh", mesh_field)
+    no_slip = {"type": "no_slip", "zone_indices": [1, 2, 3, 4, 5, 6]}
+    case = config["case"]
+    case["fluid"] = _fluid({"type": "field", **options}, [no_slip])
+    probe_file = run_dir / "probe_missing_field.csv"
+    case["simulation_components"] = [
+        _probe(["p"], probe_file.name, [0.5, 0.5, 0.5])
+    ]
+    case_file = run_dir / "consumer.case"
+    case_file.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    log_file = run_dir / "consumer.log"
+
+    result = run_neko(
+        str(import_assets["launcher"]),
+        configure_nprocs(NPROCS),
+        str(case_file),
+        str(import_assets["neko"]),
+        str(log_file),
+    )
+    if result.returncode == 0:
+        probe = probe_file.read_text().splitlines()[-1]
+        pytest.fail(
+            "Importing a pressure the data file does not contain did not fail,"
+            f" the pressure was taken from the mesh field (t, p: {probe})"
+        )
+    log = log_file.read_text(encoding="utf-8")
+    assert "Field p requested for import is not in the fld file" in log, log

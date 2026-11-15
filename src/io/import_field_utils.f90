@@ -162,6 +162,7 @@ contains
 
     type(file_t) :: f
     type(fld_file_data_t) :: fld_data
+    type(fld_file_data_t) :: mesh_data
 
     ! ---- Default values
     interpolate_ = .false.
@@ -183,12 +184,23 @@ contains
           ! For scalar IC. TODO: stop using the "none" fill info in scalar.
           if (trim(mesh_fname) .ne. "none") then
              call neko_log%message("Mesh file     : " // trim(mesh_fname))
-             call read_fld_file(mesh_fname, fld_data)
+             call read_fld_file(mesh_fname, mesh_data)
           end if
        end if
     end if
 
     call read_fld_file(fname, fld_data)
+
+    !
+    ! Only the coordinates are taken from the mesh file, and only if the field
+    ! file has none, so that every field is imported from the field file.
+    !
+    if (mesh_data%x%size() .gt. 0 .and. fld_data%x%size() .eq. 0) then
+       fld_data%x = mesh_data%x%x
+       fld_data%y = mesh_data%y%x
+       fld_data%z = mesh_data%z%x
+    end if
+    call mesh_data%free()
 
     !
     ! Copy all field data to device (GPU) since everything is read on the CPU
