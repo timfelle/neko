@@ -100,6 +100,7 @@ contains
   !! @note If interpolation is disabled, space-to-space interpolation is still
   !! performed within each element to allow for seamless change of polynomial
   !! order for the same given mesh.
+  !! @note An error is raised if a requested field is not in the fld file.
   !! @attention No data movement between CPU and GPU is done in this
   !! subroutine. The required data must be copied manually beforehand (see
   !! import_field_utils.f90).
@@ -182,6 +183,30 @@ contains
     else if (.not. mesh_mismatch .and. interpolate_) then
        call neko_log%warning("You have activated interpolation but you " // &
             "might still be using the same mesh.")
+    end if
+
+    !
+    ! Check that the requested fields were read from the fld file. A rank
+    ! holding no elements of the file allocates no data, not even for the
+    ! fields in the file, so only ranks with elements check the allocation.
+    !
+    if (this%nelv .gt. 0) then
+       if (present(u)) call fld_file_data_check_field(this%u, "u")
+       if (present(v)) call fld_file_data_check_field(this%v, "v")
+       if (present(w)) call fld_file_data_check_field(this%w, "w")
+       if (present(p)) call fld_file_data_check_field(this%p, "p")
+       if (present(t)) call fld_file_data_check_field(this%t, "t")
+       if (present(s_target_list) .and. present(s_index_list)) then
+          if (any(s_index_list .eq. 0)) then
+             call fld_file_data_check_field(this%t, "t")
+          end if
+       end if
+    end if
+    if (present(s_target_list) .and. .not. present(s_index_list)) then
+       if (s_target_list%size() .gt. this%n_scalars) then
+          call neko_error("More scalars requested for import than are " // &
+               "in the fld file")
+       end if
     end if
 
     !
@@ -295,6 +320,20 @@ contains
     nullify(msh)
 
   end subroutine fld_file_data_import_fields
+
+  !> Raise an error if a field requested for import was not read from file.
+  !! @param vec The data of the requested field.
+  !! @param name The name of the requested field, used in the error message.
+  subroutine fld_file_data_check_field(vec, name)
+    type(vector_t), intent(in) :: vec
+    character(len=*), intent(in) :: name
+
+    if (.not. allocated(vec%x)) then
+       call neko_error("Field " // name // " requested for import is " // &
+            "not in the fld file")
+    end if
+
+  end subroutine fld_file_data_check_field
 
   !> Initializes a fld_file_data object.
   !! @param nelv Number of elements (on this rank).

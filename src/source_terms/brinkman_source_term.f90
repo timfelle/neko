@@ -63,6 +63,7 @@ module brinkman_source_term
   use field_output, only : field_output_t
   use fld_file_output, only : fld_file_output_t
   use fld_file_data, only : fld_file_data_t
+  use fld_file, only : fld_file_t
   use time_state, only : time_state_t
 
   use global_interpolation, only: global_interpolation_t
@@ -353,6 +354,7 @@ contains
     type(file_t) :: cache_file
     type(fld_file_output_t) :: cache_output
     type(fld_file_data_t) :: cache_data
+    type(field_list_t) :: cache_fields
     type(global_interpolation_t) :: global_interp
     type(space_t) :: prev_Xh
     type(interpolator_t) :: space_interp
@@ -395,7 +397,20 @@ contains
           call cache_file%init(cache_filename // "0.fld")
           call cache_file%set_counter(0)
           call cache_file%read(cache_data)
-          call cache_data%import_fields(p = temp_field)
+
+          ! The cache holds the indicator in the pressure slot, but caches
+          ! written by earlier versions hold it as the first scalar. Ranks
+          ! without elements allocate no slots and import nothing either way.
+          if (.not. allocated(cache_data%p%x) .and. &
+               cache_data%n_scalars .gt. 0) then
+             call cache_fields%init(1)
+             call cache_fields%assign(1, temp_field)
+             call cache_data%import_fields(s_target_list = cache_fields, &
+                  s_index_list = [1])
+             call cache_fields%free()
+          else
+             call cache_data%import_fields(p = temp_field)
+          end if
 
           ! Update the global indicator field by max operator
           call field_pwmax2(this%indicator, temp_field)
@@ -503,7 +518,15 @@ contains
        call neko_log%message(log_msg, NEKO_LOG_DEBUG)
        call cache_output%init(dp, cache_filename, 1)
        call cache_output%fields%assign_to_field(1, temp_field)
+
+       ! Write the indicator to the pressure slot, which is read back above
+       select type (ft => cache_output%file_%file_type)
+       type is (fld_file_t)
+          ft%skip_pressure = .false.
+       end select
+
        call cache_output%sample(0.0_dp)
+       call cache_output%free()
     end if
 
     ! Update the global indicator field by max operator
