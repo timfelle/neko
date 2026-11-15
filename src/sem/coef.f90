@@ -236,6 +236,12 @@ module coefs
      !! True if geometric metrics have been initialized
      logical, private :: coef_metrics_initialized = .false.
 
+     !> True if Blag and Blaglag have storage of their own, see
+     !! enable_B_history(); otherwise both point at B.
+     !! @note Tracked explicitly since associated(Blag, B) is false for a
+     !! zero-sized B, i.e. on a rank without elements.
+     logical, private :: B_history_allocated = .false.
+
      !> Which coefficients this instance retains, COEF_FULL or COEF_OPERATOR.
      !! Anything not retained is deallocated at the end of init.
      integer :: scope = COEF_FULL
@@ -642,25 +648,24 @@ contains
        deallocate(this%mult)
     end if
 
-    if (associated(this%Blag) .and. &
-         .not. associated(this%Blag, this%B)) then
+    ! Unless enable_B_history() gave them storage, Blag and Blaglag point
+    ! at B, which is deallocated below
+    if (this%B_history_allocated) then
        if (c_associated(this%Blag_d) .and. &
             .not. c_associated(this%Blag_d, this%B_d)) then
           call device_unmap(this%Blag, this%Blag_d)
        end if
        deallocate(this%Blag)
-    end if
-    nullify(this%Blag)
 
-    if (associated(this%Blaglag) .and. &
-         .not. associated(this%Blaglag, this%B)) then
        if (c_associated(this%Blaglag_d) .and. &
             .not. c_associated(this%Blaglag_d, this%B_d)) then
           call device_unmap(this%Blaglag, this%Blaglag_d)
        end if
        deallocate(this%Blaglag)
     end if
+    nullify(this%Blag)
     nullify(this%Blaglag)
+    this%B_history_allocated = .false.
 
     if (c_associated(this%Blag_d) .and. &
          .not. c_associated(this%Blag_d, this%B_d)) then
@@ -2217,7 +2222,7 @@ contains
     integer :: n
 
     ! Return if already allocated distinctly
-    if (.not. associated(this%Blag, this%B)) return
+    if (this%B_history_allocated) return
 
     n = this%Xh%lx * this%Xh%ly * this%Xh%lz * this%msh%nelv
 
@@ -2227,6 +2232,7 @@ contains
 
     allocate(this%Blag(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
     allocate(this%Blaglag(this%Xh%lx, this%Xh%ly, this%Xh%lz, this%msh%nelv))
+    this%B_history_allocated = .true.
 
     this%Blag = this%B
     this%Blaglag = this%B
@@ -2254,7 +2260,7 @@ contains
     integer :: n
 
     ! If this%Blag does not have separate memory, we don't need to update it.
-    if (associated(this%Blag, this%B)) return
+    if (.not. this%B_history_allocated) return
     n = this%Xh%lx * this%Xh%ly * this%Xh%lz * this%msh%nelv
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%Blaglag_d, this%Blag_d, n)
