@@ -697,6 +697,9 @@ contains
        this%neigh_order = 1
     end if
 
+    ! Every element around each point, local or remote, is known from here
+    call mesh_check_two_element_periodicity(this)
+
     !
     ! Find all internal/extenral edge connections
     ! (Note it needs to be called after external point connections has
@@ -724,6 +727,71 @@ contains
     this%lconn = .true.
 
   end subroutine mesh_generate_conn
+
+  !> Stop with an error if a periodic direction has exactly 2 elements
+  !! @details Edges and faces are identified by the ids of their points. With
+  !! 2 elements in a periodic direction, the two elements of each periodic
+  !! column share both of their faces across that direction, so they have
+  !! the same points, and distinct edges and faces of theirs get the same
+  !! ids and are joined. This is detected as an element all of whose points
+  !! belong to one other element. A single element in a periodic direction,
+  !! the element then being its own neighbour, is not flagged. On a mesh
+  !! without periodic zones only duplicated elements, or a loop closed by 2
+  !! elements, can trip the check, and both are joined in the same way.
+  !! @attention Requires the point to element table, @a point_neigh, to list
+  !! every element around each point, also those on other ranks
+  subroutine mesh_check_two_element_periodicity(this)
+    type(mesh_t), target, intent(inout) :: this
+    integer, contiguous, pointer :: neigh(:), other(:)
+    integer :: el, i, j, k, n_neigh, el_glb, el_bad, el_other, glb_bad, ierr
+    logical :: same_points
+    character(len=160) :: error_msg
+
+    el_bad = 0
+    el_other = 0
+    do el = 1, this%nelv
+       el_glb = this%elements(el)%e%id()
+       n_neigh = this%point_neigh(this%pt_lid(1, el))%size()
+       neigh => this%point_neigh(this%pt_lid(1, el))%array()
+       ! Remote elements are listed with their global id negated. On a
+       ! periodic boundary an element can also come back from the exchange
+       ! with the other ranks as a remote one, hence the absolute value
+       do i = 1, n_neigh
+          if (abs(neigh(i)) .eq. el_glb) cycle
+          same_points = .true.
+          do j = 2, this%npts
+             k = this%pt_lid(j, el)
+             other => this%point_neigh(k)%array()
+             if (.not. any(other(1:this%point_neigh(k)%size()) .eq. &
+                  neigh(i))) then
+                same_points = .false.
+                exit
+             end if
+          end do
+          if (same_points) then
+             el_bad = el_glb
+             el_other = abs(neigh(i))
+             exit
+          end if
+       end do
+       if (el_bad .gt. 0) exit
+    end do
+
+    ! Report the same pair of elements on every rank
+    call MPI_Allreduce(el_bad, glb_bad, 1, &
+         MPI_INTEGER, MPI_MAX, NEKO_COMM, ierr)
+    if (glb_bad .eq. 0) return
+    if (el_bad .ne. glb_bad) el_other = 0
+    call MPI_Allreduce(MPI_IN_PLACE, el_other, 1, &
+         MPI_INTEGER, MPI_MAX, NEKO_COMM, ierr)
+
+    write(error_msg, '(A,A,I0,A,I0,A)') 'A periodic direction with 2 ', &
+         'elements is not supported, use at least 3: elements ', &
+         min(glb_bad, el_other), ' and ', max(glb_bad, el_other), &
+         ' have the same vertices'
+    call neko_error(trim(error_msg))
+
+  end subroutine mesh_check_two_element_periodicity
 
   !> Enumerate the unique edges of the local mesh
   !! @details Assigns a local id to each distinct edge, stored per element

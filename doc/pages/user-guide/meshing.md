@@ -71,6 +71,11 @@ boundary conditions are part of the mesh definition in Neko, and not something
 you specify in the case file. Baking in periodicity into the mesh is discussed
 below.
 
+A periodic direction must have either a single element or at least 3 elements.
+With exactly 2, the two elements of each periodic column share all their
+vertices, so their edges and faces cannot be told apart, and Neko stops with an
+error when it sets up the mesh.
+
 ## Constructing meshes {#constructing-meshes}
 
 ### Box meshes {#constructing-meshes-box}
