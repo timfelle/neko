@@ -61,14 +61,15 @@ contains
 
   !> A single trilinear element with all three cross terms of the metric
   !! non-zero, at every polynomial order with a specialised CPU kernel
-  !! (lx = 2 to 14) and at one that takes the generic kernel (lx = 15).
+  !! (lx = 2 to 14) and at the two larger ones the device backends support
+  !! (lx = 15 and 16), which take the generic CPU kernel.
   @test(npes=[1])
   subroutine test_jacobi_trilinear_element(this)
     class(test_pc_jacobi_case), intent(inout) :: this
     type(mesh_t) :: msh
     integer :: lx
 
-    do lx = 2, 15
+    do lx = 2, 16
        call perturbed_hex_block_mesh(msh, 1)
        call check_jacobi_diagonal(msh, lx)
        call msh%free()
