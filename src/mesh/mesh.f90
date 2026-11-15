@@ -97,6 +97,14 @@ module mesh
      !! @a allocated(htp) is therefore the test for "the mesh is still
      !! being built".
      type(htable_i4_t), private, allocatable :: htp
+
+     !> Entry in @a points of each element's points \f$ (point, element) \f$
+     !! @details Construction-only scratch, released together with @a htp.
+     !! The elements point into @a points, so a point whose id is changed by
+     !! @a apply_periodic_facet keeps its entry, and a new id is registered
+     !! against that entry.
+     integer, private, allocatable :: pt_slot(:,:)
+
      type(htable_i4_t) :: htel !< Table of unique elements (global->local)
 
      !> Local point id of each element's points \f$ (point, element) \f$
@@ -326,6 +334,7 @@ contains
 
     allocate(this%htp)
     call this%htp%init(this%npts*this%nelv, i)
+    allocate(this%pt_slot(this%npts, this%nelv))
     call this%htel%init(this%nelv, i)
 
     call this%periodic%init(this%nelv)
@@ -357,6 +366,11 @@ contains
        call this%htp%free()
        deallocate(this%htp)
     end if
+
+    if (allocated(this%pt_slot)) then
+       deallocate(this%pt_slot)
+    end if
+
     call this%htel%free()
     call this%ddata%free()
     call this%curve%free()
@@ -720,6 +734,7 @@ contains
     ! needed from here on is in pt_lid, edge_lid and face_lid
     call this%htp%free()
     deallocate(this%htp)
+    deallocate(this%pt_slot)
 
     this%lconn = .true.
 
@@ -1673,6 +1688,7 @@ contains
     class default
        call neko_error('Invalid element type')
     end select
+    this%pt_slot(:, el) = p
 
   end subroutine mesh_add_quad
 
@@ -1713,14 +1729,19 @@ contains
     class default
        call neko_error('Invalid element type')
     end select
+    this%pt_slot(:, el) = p
 
   end subroutine mesh_add_hex
 
   !> Add a unique point to the mesh
-  subroutine mesh_add_point(this, p, idx)
+  !! @details Returns the local id of @a p in @a idx. A point whose id has
+  !! not been seen before is stored as a new entry of @a points, unless it
+  !! already is the entry @a slot, in which case only its id is registered.
+  subroutine mesh_add_point(this, p, idx, slot)
     class(mesh_t), intent(inout) :: this
-    type(point_t), intent(inout) :: p
-    integer, intent(inout) :: idx
+    type(point_t), intent(inout) :: p !< Point to add
+    integer, intent(inout) :: idx !< Local id of the point
+    integer, optional, intent(in) :: slot !< Entry in points holding @a p
     integer :: tmp
 
     tmp = p%id()
@@ -1732,10 +1753,18 @@ contains
     end if
 
     if (this%htp%get(tmp, idx) .gt. 0) then
-       this%mpts = this%mpts + 1
-       call this%htp%set(tmp, this%mpts)
-       this%points(this%mpts) = p
-       idx = this%mpts
+       if (present(slot)) then
+          idx = slot
+       else
+          ! The elements point into points, so it cannot be enlarged
+          if (this%mpts .ge. size(this%points)) then
+             call neko_error("Too many unique points for the mesh")
+          end if
+          this%mpts = this%mpts + 1
+          this%points(this%mpts) = p
+          idx = this%mpts
+       end if
+       call this%htp%set(tmp, idx)
     end if
 
   end subroutine mesh_add_point
@@ -2058,9 +2087,12 @@ contains
           call pi%set_id(pids(i))
           ! Only register the point while the mesh is being built; once the
           ! connectivity is generated the periodic ids are already known and
-          ! the global->local table has been released
+          ! the global->local table has been released. The point stays the
+          ! entry of points that every element sharing it points to, so an
+          ! id new to this rank is registered against that entry: points
+          ! has no room for a copy
           if (allocated(this%htp)) then
-             call this%add_point(pi, id)
+             call this%add_point(pi, id, this%pt_slot(face_nodes(i,f), e))
           end if
        end do
     end select
