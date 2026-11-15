@@ -40,8 +40,8 @@ contains
     do i = 1, f%size()
        x = f%dof%x%x(i,1,1,1)
 
-       ! 0.01 is the viscosity
-       f%x(i,1,1,1) = cos(x) - 0.01 * sin(x) - 1.0_rp
+       ! 0.01 is the conductivity, lambda
+       f%x(i,1,1,1) = cos(x) + 0.01 * sin(x) - 1.0_rp
     end do
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
