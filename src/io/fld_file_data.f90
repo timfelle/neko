@@ -100,7 +100,8 @@ contains
   !! @note If interpolation is disabled, space-to-space interpolation is still
   !! performed within each element to allow for seamless change of polynomial
   !! order for the same given mesh.
-  !! @note An error is raised if a requested field is not in the fld file.
+  !! @note An error is raised if a requested field was not read into this
+  !! object, which is checked on the ranks that hold elements.
   !! @attention No data movement between CPU and GPU is done in this
   !! subroutine. The required data must be copied manually beforehand (see
   !! import_field_utils.f90).

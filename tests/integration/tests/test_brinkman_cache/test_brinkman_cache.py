@@ -8,6 +8,9 @@ Brinkman output of each run.
 The cache holds the indicator in the pressure slot of an fld file. Caches
 written by earlier versions of Neko hold it as the first passive scalar, so
 the cache is also re-read after relabelling it to that layout.
+
+Finally, a Brinkman file object asking for a field that its fld file does not
+contain must stop with a clear error.
 """
 
 import json
@@ -159,3 +162,38 @@ def test_brinkman_cache(layout, launcher_script, log_file, tmp_path):
     # The bunny must cover some points, or two empty indicators would match
     assert computed.max() > 0.5 > computed.min()
     assert np.abs(cached - computed).max() <= TOLERANCE[conftest.RP]
+
+
+def test_brinkman_file_missing_field(launcher_script, log_file, tmp_path):
+    """Request the pressure field from a file that only holds a scalar."""
+    nprocs = configure_nprocs(NPROCS)
+    mesh = _generate_mesh(tmp_path)
+    cache = tmp_path / "cache_"
+    cache_data = tmp_path / "cache_0.f00000"
+    write_dir = tmp_path / "write"
+    read_dir = tmp_path / "read"
+    write_log = log_file.replace(".log", "_write.log")
+    read_log = log_file.replace(".log", "_read.log")
+
+    result = _run(launcher_script, nprocs, _case(mesh, cache, write_dir),
+                  write_dir, write_log)
+    assert (
+        result.returncode == 0
+    ), f"Cache-writing run failed with exit code {result.returncode}"
+    assert cache_data.is_file(), "The first run did not write the cache"
+    _relabel(cache_data, "XS01")
+
+    config = _case(mesh, cache, read_dir)
+    config["case"]["fluid"]["source_terms"][0]["objects"] = [
+        {
+            "type": "file",
+            "file_name": str(tmp_path / "cache_0.fld"),
+            "field_name": "p",
+        }
+    ]
+    result = _run(launcher_script, nprocs, config, read_dir, read_log)
+    assert result.returncode != 0, "Importing a missing field did not fail"
+    with open(read_log, "r") as f:
+        assert (
+            "requested for import is not in the fld file" in f.read()
+        ), "Importing a missing field did not raise the expected error"
