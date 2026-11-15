@@ -144,13 +144,12 @@ contains
     type(cpr_t), intent(inout) :: cpr
     real(kind=rp) :: L(0:cpr%Xh%lx-1)
     real(kind=rp) :: delta(cpr%Xh%lx)
-    integer :: i, kj, j, j2, kk
+    integer :: i, j, j2, kk
 
     associate(Xh => cpr%Xh, v=> cpr%v, vt => cpr%vt, &
          vinv => cpr%vinv, vinvt => cpr%vinvt, w => cpr%w)
       ! Get the Legendre polynomials for each point
       ! Then proceed to compose the transform matrix
-      kj = 0
       do j = 1, Xh%lx
          L(0) = 1.
          L(1) = Xh%zg(j,1)
@@ -159,8 +158,7 @@ contains
                  - (j2-1) * L(j2-2) ) / j2
          end do
          do kk = 1, Xh%lx
-            kj = kj+1
-            v(kj,1) = L(KK-1)
+            v(kk, j) = L(kk-1)
          end do
       end do
 

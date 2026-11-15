@@ -476,7 +476,7 @@ contains
 
     real(kind=rp) :: L(0:Xh%lx-1)
     real(kind=rp) :: delta(Xh%lx)
-    integer :: i, kj, j, kk
+    integer :: i, j, kk
     type(matrix_t) :: m
     logical :: scaled = .false.
 
@@ -484,12 +484,10 @@ contains
          vinv => Xh%vinv, vinvt => Xh%vinvt, w => Xh%w)
       ! Get the Legendre polynomials for each point
       ! Then proceed to compose the transform matrix
-      kj = 0
       do j = 1, Xh%lx
          call legendre_poly(L, Xh%zg(j, 1), Xh%lx - 1)
          do kk = 1, Xh%lx
-            kj = kj+1
-            v(kj,1) = L(KK-1)
+            v(kk, j) = L(kk-1)
          end do
       end do
 
