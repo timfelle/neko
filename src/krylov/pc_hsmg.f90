@@ -61,7 +61,7 @@
 module hsmg
   use neko_config, only : NEKO_BCKND_DEVICE
   use num_types, only : rp
-  use math, only : copy, col2, add2, cadd, glsc2, glsum
+  use math, only : copy, col2, add2, cadd, glsc2, glsc3, glsum, NEKO_EPS
   use utils, only : neko_error
   use precon, only : pc_t, precon_allocator
   use ax_product, only : ax_t, ax_helm_allocator
@@ -79,7 +79,7 @@ module hsmg
        device_event_destroy, device_get_ptr, &
        device_event_record, glb_cmd_queue
   use device_math, only : device_copy, device_col2, device_add2, &
-       device_cadd, device_glsc2
+       device_cadd, device_glsc2, device_glsc3
   use comm, only : NEKO_COMM
   use mpi_f08, only : MPI_Allreduce, MPI_IN_PLACE, MPI_LOGICAL, MPI_LOR
   use profiler, only : profiler_start_region, profiler_end_region
@@ -90,7 +90,7 @@ module hsmg
   use mesh, only : mesh_t
   use json_module, only : json_file
   use json_utils, only : json_get_or_default
-  use krylov, only : ksp_t, ksp_monitor_t, KSP_MAX_ITER, &
+  use krylov, only : ksp_t, ksp_monitor_t, KSP_MAX_ITER, KSP_ABS_TOL, &
        krylov_solver_factory
   use tree_amg_multigrid, only : tamg_solver_t
   use zero_dirichlet, only : zero_dirichlet_t
@@ -99,6 +99,10 @@ module hsmg
   !$ use omp_lib
   implicit none
   private
+
+  !> Tolerance of a singular coarse solve, relative to the machine epsilon
+  !! times the norm of its right-hand side, see hsmg_set_crs_tol
+  real(kind=rp), parameter :: CRS_SINGULAR_TOL_FAC = 100.0_rp
 
   !Struct to arrange our multigridlevels
   type, private :: multigrid_t
@@ -406,6 +410,27 @@ contains
     end if
   end subroutine hsmg_set_h
 
+  !> Set the tolerance of a singular coarse Krylov solve.
+  !! @details Removing the mean of the right-hand side \f$ r \f$ leaves a
+  !! component in the null space that the coarse solve cannot reduce, of up
+  !! to about the machine epsilon times the norm \f$ \sqrt{r^T W r / V} \f$
+  !! of \f$ r \f$ before the removal, in which the Krylov solvers measure
+  !! the residual. Iterating towards that level puts the search direction
+  !! into the null space, and the solve breaks down. The tolerance is
+  !! therefore kept a factor `CRS_SINGULAR_TOL_FAC` above it, or at the
+  !! default where that is larger, as it is in double precision for any norm
+  !! below 4.5e4.
+  !! @param rtr \f$ r^T W r \f$ for the coarse right-hand side before its
+  !! mean is removed, with \f$ W \f$ the inverse multiplicity.
+  subroutine hsmg_set_crs_tol(this, rtr)
+    class(hsmg_t), intent(inout) :: this
+    real(kind=rp), intent(in) :: rtr
+
+    this%crs_solver%abs_tol = max(KSP_ABS_TOL, &
+         CRS_SINGULAR_TOL_FAC * NEKO_EPS * sqrt(rtr / this%c_crs%volume))
+
+  end subroutine hsmg_set_crs_tol
+
 
   subroutine hsmg_fill_grid(dof, gs_h, Xh, coef, bc_projector, schwarz, e, grids, l)
     type(dofmap_t), target, intent(in) :: dof
@@ -580,8 +605,14 @@ contains
           call this%grids(1)%bc_projector%apply(this%wf%x, &
                this%grids(1)%dof%size())
           ! A singular coarse problem is solvable only for a right-hand
-          ! side orthogonal to the constants: remove its mean.
+          ! side orthogonal to the constants: remove its mean, and stop the
+          ! coarse solve above the round-off that this leaves.
           if (this%crs_singular) then
+             if (allocated(this%crs_solver)) then
+                call hsmg_set_crs_tol(this, device_glsc3(this%wf%x_d, &
+                     this%grids(1)%coef%mult_d, this%wf%x_d, &
+                     this%grids(1)%dof%size()))
+             end if
              call device_cadd(this%wf%x_d, -device_glsc2(this%wf%x_d, &
                   this%grids(1)%coef%mult_d, this%grids(1)%dof%size()) / &
                   this%crs_glb_unique_points, this%grids(1)%dof%size())
@@ -640,8 +671,13 @@ contains
        call this%grids(1)%gs_h%op(this%r, this%grids(1)%dof%size(), GS_OP_ADD)
        call this%grids(1)%bc_projector%apply(this%r, this%grids(1)%dof%size())
        ! A singular coarse problem is solvable only for a right-hand side
-       ! orthogonal to the constants: remove its mean.
+       ! orthogonal to the constants: remove its mean, and stop the coarse
+       ! solve above the round-off that this leaves.
        if (this%crs_singular) then
+          if (allocated(this%crs_solver)) then
+             call hsmg_set_crs_tol(this, glsc3(this%r, &
+                  this%grids(1)%coef%mult, this%r, this%grids(1)%dof%size()))
+          end if
           call cadd(this%r, -glsc2(this%r, this%grids(1)%coef%mult, &
                this%grids(1)%dof%size()) / this%crs_glb_unique_points, &
                this%grids(1)%dof%size())

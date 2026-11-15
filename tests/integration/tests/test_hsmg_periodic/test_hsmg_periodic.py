@@ -4,6 +4,8 @@ Without a pressure Dirichlet condition the coarse problem of hsmg is singular,
 with the constants as its null space. Its right-hand side picks up a component
 in that null space from round-off in GMRES, and once that component is above
 the coarse CG tolerance, the coarse solve diverges and the pressure goes NaN.
+Removing the component leaves round-off of its own, which in single precision
+is above the default coarse CG tolerance, with the same outcome.
 """
 
 import json
@@ -18,8 +20,8 @@ from testlib import configure_nprocs, get_genmeshbox, get_neko, run_neko
 
 # The null space component grows with every GMRES iteration, so with a tight
 # pressure tolerance a coarse solve that does not remove it breaks down
-# already in step 1.
-PRESSURE_TOLERANCE = 1.0e-8
+# already in step 1. In single precision GMRES gets little below 1e-7 here.
+PRESSURE_TOLERANCE = {"dp": 1.0e-8, "sp": 1.0e-6}
 TWO_PI = "6.283185307179586"
 
 
@@ -62,7 +64,7 @@ def _case(mesh, output_directory, lx):
                     "type": "gmres",
                     "preconditioner": {"type": "hsmg"},
                     "projection_space_size": 0,
-                    "absolute_tolerance": PRESSURE_TOLERANCE,
+                    "absolute_tolerance": PRESSURE_TOLERANCE[conftest.RP],
                     "max_iterations": 100,
                 },
             },
@@ -79,10 +81,6 @@ def _pressure_solves(log):
 @pytest.mark.parametrize("lx", [8, 16])
 def test_hsmg_periodic(launcher_script, log_file, tmp_path, lx):
     """hsmg solves the pure-Neumann pressure problem of a periodic box."""
-    if conftest.RP == "sp":
-        pytest.skip("In single precision the coarse CG tolerance is at "
-                    "round-off, and the singular coarse solve can still "
-                    "break down")
     # A periodic direction needs at least 3 elements for a valid mesh.
     result = subprocess.run(
         [
