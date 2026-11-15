@@ -943,11 +943,11 @@ contains
           ! Total
           if (this%config%nbodies .gt. 1) then
              call neko_log%message("  phi_total.fld saved.")
+             call phi_file%init('phi_total.fld', precision = rp)
              select type (ft => phi_file%file_type)
              type is (fld_file_t)
                 ft%skip_pressure = .false.
              end select
-             call phi_file%init('phi_total.fld', precision = rp)
              call phi_file%write(this%phi_total)
              call phi_file%free()
           end if
