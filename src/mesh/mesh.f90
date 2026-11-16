@@ -197,7 +197,7 @@ module mesh
      end subroutine mesh_deform
   end interface
 
-  public :: mesh_deform, parallelepiped_signed_volume
+  public :: mesh_deform, parallelepiped_signed_volume, mesh_generate_flags
 
 
 contains

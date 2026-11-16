@@ -42,7 +42,7 @@ module case
   use output_controller, only : output_controller_t
   use file, only : file_t
   use utils, only : neko_error, mkdir, filename_split, NEKO_FNAME_LEN
-  use mesh, only : mesh_t
+  use mesh, only : mesh_t, mesh_generate_flags
   use checkpoint, only: chkp_t
   use time_scheme_controller, only : time_scheme_controller_t
   use logger, only : neko_log, NEKO_LOG_QUIET
@@ -274,6 +274,10 @@ contains
 
     ! Run user mesh motion routine
     call this%user%mesh_setup(this%msh, this%time)
+
+    ! The user routine may have moved the vertices, which the
+    ! deformed-element flags are made from when the mesh is finalised
+    call mesh_generate_flags(this%msh)
 
     !
     ! Time control

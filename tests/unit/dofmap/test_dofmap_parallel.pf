@@ -722,4 +722,59 @@ contains
     if (ierr .eq. 0) close(unit, status = "delete")
   end subroutine test_dofmap_2d_curve_extrusion
 
+  !> A deformation registered on the mesh moves the dofs of a box after the
+  !! deformed-element flags were made from its vertices, so the dofmap must
+  !! flag the element as deformed.
+  @test(npes=[1])
+  subroutine test_dofmap_apply_deform_flags(this)
+    class(test_dofmap), intent(inout) :: this
+    type(dofmap_t) :: d
+    type(mesh_t) :: m
+    type(space_t) :: Xh
+    type(point_t) :: p(8)
+    integer :: i
+
+    ! A unit cube, whose vertex i has the bits of i - 1 as its coordinates
+    do i = 1, 8
+       call p(i)%init(real([mod(i - 1, 2), mod((i - 1) / 2, 2), &
+            (i - 1) / 4], dp), i)
+    end do
+
+    call m%init(3, 1)
+    call m%add_element(1, 1, p(1), p(2), p(3), p(4), &
+         p(5), p(6), p(7), p(8))
+    call m%finalize()
+
+    @assertFalse(m%dfrmd_el(1), message = 'Unit cube flagged as deformed')
+
+    m%apply_deform => shear_dofs
+
+    call Xh%init(GLL, 3, 3, 3)
+    call d%init(m, Xh)
+
+    @assertTrue(m%dfrmd_el(1), message = 'Sheared dofs not flagged')
+
+    call d%free()
+    call Xh%free()
+    call m%free()
+  end subroutine test_dofmap_apply_deform_flags
+
+  !> Shear the dofs of a mesh, y in proportion to x.
+  !! @param msh Mesh of the dofs.
+  !! @param x x-coordinates of the dofs.
+  !! @param y y-coordinates of the dofs.
+  !! @param z z-coordinates of the dofs.
+  !! @param lx Number of dofs per element in the r-direction.
+  !! @param ly Number of dofs per element in the s-direction.
+  !! @param lz Number of dofs per element in the t-direction.
+  subroutine shear_dofs(msh, x, y, z, lx, ly, lz)
+    class(mesh_t) :: msh
+    integer, intent(in) :: lx, ly, lz
+    real(kind=rp), intent(inout) :: x(lx, ly, lz, msh%nelv)
+    real(kind=rp), intent(inout) :: y(lx, ly, lz, msh%nelv)
+    real(kind=rp), intent(inout) :: z(lx, ly, lz, msh%nelv)
+
+    y = y + 0.5_rp * x
+  end subroutine shear_dofs
+
 end module test_dofmap_parallel

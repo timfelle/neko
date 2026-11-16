@@ -791,6 +791,9 @@ contains
     end do
     if (associated(msh%apply_deform)) then
        call msh%apply_deform(this%x%x, this%y%x, this%z%x, Xh%lx, Xh%ly, Xh%lz)
+       ! The deformation moves the dofs, not the vertices which the
+       ! deformed-element flags are made from, so flag every element
+       call msh%all_deformed()
     end if
 
     call this%x%copy_from(HOST_TO_DEVICE, .false.)
