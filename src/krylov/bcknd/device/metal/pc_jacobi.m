@@ -79,6 +79,10 @@ void metal_jacobi_update(void *d_d, void *dxt_d, void *dyt_d, void *dzt_d,
                          void *G12_d, void *G13_d, void *G23_d,
                          int *nelv, int *lx) {
 
+  if (*nelv <= 0) {
+    return;
+  }
+
   int LX = *lx;
   if (LX < 2 || LX > 16) {
     fprintf(stderr, "%s: size not supported: %d\n", __FILE__, LX);

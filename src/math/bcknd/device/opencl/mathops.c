@@ -48,6 +48,10 @@
 
 /** Fortran wrapper for opchsign \f$ a = -a \f$ */
 void opencl_opchsign(void *a1, void *a2, void *a3, int *gdim, int *n) {    
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (mathops_program == NULL)
@@ -74,6 +78,10 @@ void opencl_opchsign(void *a1, void *a2, void *a3, int *gdim, int *n) {
 
 /** Fortran wrapper for opcolv \f$ a = a * c \f$ */
 void opencl_opcolv(void *a1, void *a2, void *a3, void *c, int *gdim, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (mathops_program == NULL)
@@ -103,6 +111,10 @@ void opencl_opcolv(void *a1, void *a2, void *a3, void *c, int *gdim, int *n) {
 void opencl_opcolv3c(void *a1, void *a2, void *a3,
 		     void *b1, void *b2, void *b3,
 		     void *c, real *d, int *gdim, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (mathops_program == NULL)
@@ -136,6 +148,10 @@ void opencl_opcolv3c(void *a1, void *a2, void *a3,
 void opencl_opadd2cm(void *a1, void *a2, void *a3, 
 		     void *b1, void *b2, void *b3,
 		     real *c, int *gdim, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (mathops_program == NULL)
@@ -168,6 +184,10 @@ void opencl_opadd2cm(void *a1, void *a2, void *a3,
 void opencl_opadd2col(void *a1, void *a2, void *a3, 
 		      void *b1, void *b2, void *b3,
 		      void *c, int *gdim, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (mathops_program == NULL)

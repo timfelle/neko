@@ -59,6 +59,10 @@ void opencl_ax_helm(void *w, void *u, void *dx, void *dy, void *dz,
                     void *g11, void *g22, void *g33, void *g12,
                     void *g13, void *g23, int *nelv, int *lx) {
 
+  if (*nelv <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (ax_helm_program == NULL)
@@ -262,6 +266,10 @@ void opencl_ax_helm_vector(void *au, void *av, void *aw,
                            void *g11, void *g22, void *g33, void *g12,
                            void *g13, void *g23, int *nelv, int *lx) {
 
+  if (*nelv <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (ax_helm_program == NULL)
@@ -341,6 +349,10 @@ void opencl_ax_helm_vector(void *au, void *av, void *aw,
 void opencl_ax_helm_vector_part2(void *au, void *av, void *aw,
                                  void *u, void *v, void *w,
                                  void *h2, void *B, int *n) {
+
+  if (*n <= 0) {
+    return;
+  }
 
   cl_int err;
 

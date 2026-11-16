@@ -84,6 +84,10 @@ void metal_conv1(void *du, void *u, void *vx, void *vy, void *vz,
                  void *drdz, void *dsdz, void *dtdz,
                  void *jacinv, int *nel, int *gdim, int *lx) {
 
+  if (*nel <= 0) {
+    return;
+  }
+
   (void)gdim;
 
   if (*lx < 2 || *lx > 16) {

@@ -42,6 +42,10 @@ extern "C" {
   /** Fortran wrapper for opchsign \f$ a = -a \f$ */
   void hip_opchsign(void *a1, void *a2, void *a3, int *gdim, int *n) {
     
+    if (*n <= 0) {
+      return;
+    }
+
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
     
@@ -54,6 +58,10 @@ extern "C" {
 
   /** Fortran wrapper for opcolv \f$ a = a * c \f$ */
   void hip_opcolv(void *a1, void *a2, void *a3, void *c, int *gdim, int *n) {
+
+    if (*n <= 0) {
+      return;
+    }
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
@@ -69,6 +77,10 @@ extern "C" {
   /** Fortran wrapper for opcolv3c \f$ a(i) = b(i) * c(i) * d \f$ */
   void hip_opcolv3c(void *a1, void *a2, void *a3, void *b1, void *b2, void *b3,
                     void *c, real *d, int *gdim, int *n) {
+
+    if (*n <= 0) {
+      return;
+    }
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
@@ -86,6 +98,10 @@ extern "C" {
   void hip_opadd2cm(void *a1, void *a2, void *a3, 
                     void *b1, void *b2, void *b3, real *c, int *gdim, int *n) {
 
+    if (*n <= 0) {
+      return;
+    }
+
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
     
@@ -101,6 +117,10 @@ extern "C" {
   /** Fortran wrapper for opadd2col \f$ a(i) = a + b(i) * c(i) \f$ */
   void hip_opadd2col(void *a1, void *a2, void *a3, 
                      void *b1, void *b2, void *b3, void *c, int *gdim, int *n) {
+
+    if (*n <= 0) {
+      return;
+    }
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);

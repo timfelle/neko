@@ -58,6 +58,10 @@ void opencl_dudxyz(void *du, void *u,
                    void *dr, void *ds, void *dt,
                    void *dx, void *dy, void *dz,
                    void *jacinv, int *nel, int *lx) {
+  if (*nel <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (dudxyz_program == NULL)

@@ -51,6 +51,10 @@ void rhs_maker_sumab_opencl(void *u, void *v, void *w,
                             void *ulag1, void *ulag2, void *vlag1,
                             void *vlag2, void *wlag1, void *wlag2,
                             real *ext1, real *ext2, real *ext3, int *nab, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (rhs_maker_program == NULL)
@@ -91,6 +95,10 @@ void rhs_maker_ext_opencl(void *abx1, void *aby1, void *abz1,
                           void *abx2, void *aby2, void *abz2,
                           void *bfx, void *bfy, void *bfz,
                           real *rho, real *ext1, real *ext2, real *ext3, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (rhs_maker_program == NULL)
@@ -127,6 +135,10 @@ void rhs_maker_ext_opencl(void *abx1, void *aby1, void *abz1,
 
 void scalar_rhs_maker_ext_opencl(void *fs_lag, void *fs_laglag, void *fs,
                                  real *ext1, real *ext2, real *ext3, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (rhs_maker_program == NULL)
@@ -160,6 +172,10 @@ void rhs_maker_bdf_opencl(void *ulag1, void *ulag2, void *vlag1,
                           void *u, void *v, void *w, void *B,
                           real *rho, real *dt, real *bd2,
                           real *bd3, real *bd4, int *nbd, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (rhs_maker_program == NULL)
@@ -204,6 +220,10 @@ void scalar_rhs_maker_bdf_opencl(void *s_lag, void *s_laglag, void *fs,
                                  void *s, void *B, void *rho_cp, real *dt,
                                  real *bd2, real *bd3, real *bd4,
                                  int *nbd, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (rhs_maker_program == NULL)
@@ -239,6 +259,10 @@ void scalar_rhs_maker_bdf_opencl(void *s_lag, void *s_laglag, void *fs,
 void rhs_maker_oifs_opencl(void *phi_x, void *phi_y, void *phi_z,
                           void *bf_x, void *bf_y, void *bf_z,
                           real *rho, real *dt, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (rhs_maker_program == NULL)
@@ -270,6 +294,10 @@ void rhs_maker_oifs_opencl(void *phi_x, void *phi_y, void *phi_z,
 
 void scalar_rhs_maker_oifs_opencl(void *phi_s, void *bf_s,
                                  void *rho_cp, real *dt, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (rhs_maker_program == NULL)

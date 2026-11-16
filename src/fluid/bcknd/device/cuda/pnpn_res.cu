@@ -46,6 +46,10 @@ extern "C" {
 			       void *B, void *h1, real *mu,
 			       real *rho, int *n) {
 
+    if (*n <= 0) {
+      return;
+    }
+
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     const cudaStream_t stream = (cudaStream_t) glb_cmd_queue;
@@ -63,6 +67,10 @@ extern "C" {
   void pnpn_prs_res_part2_cuda(void *p_res, void *wa1, void *wa2,
 			       void *wa3, int *n) {
 
+    if (*n <= 0) {
+      return;
+    }
+
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     const cudaStream_t stream = (cudaStream_t) glb_cmd_queue;
@@ -76,6 +84,10 @@ extern "C" {
 
   void pnpn_prs_res_part3_cuda(void *p_res, void *ta1, void *ta2,
 			       void *ta3, real *dtbd, int *n) {
+
+    if (*n <= 0) {
+      return;
+    }
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
@@ -92,6 +104,10 @@ extern "C" {
   void pnpn_vel_res_update_cuda(void *u_res, void *v_res, void *w_res,
 				void *ta1, void *ta2, void *ta3,
 				void *f_u, void *f_v, void *f_w, int *n) {
+
+    if (*n <= 0) {
+      return;
+    }
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);

@@ -933,7 +933,8 @@ extern "C" {
     const dim3 nblcks_red( (*j),1,1);
     const int nb = ((*n) + nt - 1)/nt;
 
-    hip_redbuf_check_alloc_xp((*j)*nb);
+    /* At least j slots: a rank without dofs still reduces j zeros below */
+    hip_redbuf_check_alloc_xp((*j) * (nb > 0 ? nb : 1));
 
     if (*n > 0) {
       hipLaunchKernelGGL(HIP_KERNEL_NAME(glsc3_many_kernel<real, real_xp>),

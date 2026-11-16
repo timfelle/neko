@@ -55,6 +55,11 @@ void opencl_jacobi_update(void *d,
 			  void *G11, void *G22, void *G33,
 			  void *G12, void *G13, void *G23,
 			  int *nel, int *lx) {
+
+  if (*nel <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (jacobi_program == NULL)

@@ -81,6 +81,10 @@ void metal_opgrad(void *ux, void *uy, void *uz, void *u,
                   void *drdz, void *dsdz, void *dtdz,
                   void *w3, int *nel, int *lx) {
 
+  if (*nel <= 0) {
+    return;
+  }
+
   if (*lx < 2 || *lx > 16) {
     fprintf(stderr, "%s: size not supported: %d\n", __FILE__, *lx);
     exit(1);

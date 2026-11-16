@@ -61,15 +61,22 @@ extern "C" {
     const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
     const int nb = ((*n) + 1024 - 1)/ 1024;
     
-    hip_buffer_reserve(&gmres_redbuf, nb*sizeof(real));
+    /*
+     * A rank without dofs launches no part2 kernel, but it still takes part
+     * in the global sum below (a collective with RCCL or device MPI): it
+     * reserves one slot, which the reduction sets to 0
+     */
+    hip_buffer_reserve(&gmres_redbuf, (nb > 0 ? nb : 1) * sizeof(real));
     real *gmres_bf1 = (real *) gmres_redbuf.host;
     real *gmres_bfd1 = (real *) gmres_redbuf.dev;
      
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(gmres_part2_kernel<real>),
-		       nblcks, nthrds, 0, (hipStream_t) glb_cmd_queue,
-                       (real *) w, (real **) v, (real *) mult,
-                       (real *) h, gmres_bfd1, *j, *n);
-    HIP_CHECK(hipGetLastError());
+    if ((*n) > 0) {
+      hipLaunchKernelGGL(HIP_KERNEL_NAME(gmres_part2_kernel<real>),
+                         nblcks, nthrds, 0, (hipStream_t) glb_cmd_queue,
+                         (real *) w, (real **) v, (real *) mult,
+                         (real *) h, gmres_bfd1, *j, *n);
+      HIP_CHECK(hipGetLastError());
+    }
     hipLaunchKernelGGL(HIP_KERNEL_NAME(reduce_kernel<real>),
                        1, 1024, 0, (hipStream_t) glb_cmd_queue, gmres_bfd1, nb);
     HIP_CHECK(hipGetLastError());

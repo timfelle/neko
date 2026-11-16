@@ -200,6 +200,10 @@ static void dispatch_ax_helm_vector(int lx, int nelv,
                      void *g11, void *g22, void *g33, void *g12,
                      void *g13, void *g23, int *nelv, int *lx) {
 
+    if (*nelv <= 0) {
+      return;
+    }
+
     if (*lx < 2 || *lx > 16) {
       fprintf(stderr, "%s: size not supported: %d\n", __FILE__, *lx);
       exit(1);
@@ -224,6 +228,10 @@ static void dispatch_ax_helm_vector(int lx, int nelv,
                             void *g33, void *g12, void *g13,
                             void *g23, int *nelv, int *lx) {
 
+    if (*nelv <= 0) {
+      return;
+    }
+
     if (*lx < 2 || *lx > 16) {
       fprintf(stderr, "%s: size not supported: %d\n", __FILE__, *lx);
       exit(1);
@@ -240,6 +248,10 @@ static void dispatch_ax_helm_vector(int lx, int nelv,
   void metal_ax_helm_vector_part2(void *au, void *av, void *aw,
                                   void *u, void *v, void *w,
                                   void *h2, void *B, int *n) {
+
+    if (*n <= 0) {
+      return;
+    }
 
     if (pso_vector_part2 == nil) {
       pso_vector_part2 = get_pipeline("ax_helm_kernel_vector_part2");

@@ -66,15 +66,22 @@ extern "C" {
     const int nb = ((*n) + 1024 - 1)/ 1024;
     const cudaStream_t stream = (cudaStream_t) glb_cmd_queue;
 
-    cuda_buffer_reserve(&gmres_redbuf, nb*sizeof(real));
+    /*
+     * A rank without dofs launches no part2 kernel, but it still takes part
+     * in the global sum below (a collective with NCCL, NVSHMEM or device
+     * MPI): it reserves one slot, which the reduction sets to 0
+     */
+    cuda_buffer_reserve(&gmres_redbuf, (nb > 0 ? nb : 1) * sizeof(real));
     real *gmres_bf1 = (real *) gmres_redbuf.host;
     real *gmres_bfd1 = (real *) gmres_redbuf.dev;
 
-    gmres_part2_kernel<real>
-      <<<nblcks, nthrds, 0, stream>>>((real *) w, (real **) v,
-                                      (real *) mult,(real *) h,
-                                      (real *) gmres_bfd1, *j, *n);
-    CUDA_CHECK(cudaGetLastError());
+    if ((*n) > 0) {
+      gmres_part2_kernel<real>
+        <<<nblcks, nthrds, 0, stream>>>((real *) w, (real **) v,
+                                        (real *) mult,(real *) h,
+                                        (real *) gmres_bfd1, *j, *n);
+      CUDA_CHECK(cudaGetLastError());
+    }
     reduce_kernel<real><<<1, 1024, 0, stream>>>((real *) gmres_bfd1, nb);
     CUDA_CHECK(cudaGetLastError());
 

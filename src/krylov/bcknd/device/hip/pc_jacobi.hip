@@ -111,6 +111,10 @@ extern "C" {
 			 void *G12, void *G13, void *G23,
 			 int *nel, int *lxp) {
 
+    if (*nel <= 0) {
+      return;
+    }
+
     const int lx = *lxp;
     const int threads = 1024;
     const int blocks = ((*nel * lx*lx*lx) + threads - 1) / threads;

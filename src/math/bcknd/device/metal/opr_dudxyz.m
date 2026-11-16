@@ -80,6 +80,10 @@ void metal_dudxyz(void *du, void *u,
                   void *dx, void *dy, void *dz,
                   void *jacinv, int *nel, int *lx) {
 
+  if (*nel <= 0) {
+    return;
+  }
+
   if (*lx < 2 || *lx > 16) {
     fprintf(stderr, "%s: size not supported: %d\n", __FILE__, *lx);
     exit(1);

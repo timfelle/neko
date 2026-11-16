@@ -51,6 +51,10 @@ extern "C" {
                              void *jacinv, void *w3, int *nel,
                              int *lx, int *gdim) {
 
+    if (*nel <= 0) {
+      return;
+    }
+
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks((*nel), 1, 1);
 
@@ -105,6 +109,10 @@ extern "C" {
 				  void *x, void *y, void *z,
 				  void *jacinv, void *jac,
 				  int *lx, int *nel)  {
+
+    if (*nel <= 0) {
+      return;
+    }
 
     const int n = (*nel) * (*lx) * (*lx) * (*lx);
     const dim3 nthrds(1024, 1, 1);
@@ -166,6 +174,10 @@ extern "C" {
   void hip_coef_generate_mass(void *B, void *Binv, void *jac,
 				  void *w3, int *lxyz, int *nel)  {
 
+    if (*nel <= 0) {
+      return;
+    }
+
     int n = (*lxyz) * (*nel);
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks((n + 1024 - 1)/ 1024, 1, 1);
@@ -189,6 +201,10 @@ extern "C" {
                                          void *dxdt, void *dydt, void *dzdt,
                                          void *wx, void *wy, void *wz,
                                          int *lx, int *nel, real eps) {
+
+    if (*nel <= 0) {
+      return;
+    }
 
     const dim3 nblcks((*nel), 1, 1);
     const dim3 nthrds(1024, 1, 1);

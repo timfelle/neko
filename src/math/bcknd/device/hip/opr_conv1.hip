@@ -68,6 +68,10 @@ extern "C" {
                  void *drdz, void *dsdz, void *dtdz,
                  void *jacinv, int *nel, int *gdim, int *lx) {
 
+    if (*nel <= 0) {
+      return;
+    }
+
     static int autotune[17] = { 0 };
     /* elements per block candidate chosen by the tuner */
     static int autotune_eb[17] = { 0 };

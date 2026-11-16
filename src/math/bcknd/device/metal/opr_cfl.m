@@ -82,6 +82,11 @@ real metal_cfl(real *dt, void *u, void *v, void *w,
                void *dr_inv, void *ds_inv, void *dt_inv,
                void *jacinv, int *nel, int *lx) {
 
+  /* No elements: 0 leaves the global max, taken by the caller, unchanged */
+  if (*nel <= 0) {
+    return 0.0;
+  }
+
   if (*lx < 2 || *lx > 12) {
     fprintf(stderr, "%s: size not supported: %d\n", __FILE__, *lx);
     exit(1);

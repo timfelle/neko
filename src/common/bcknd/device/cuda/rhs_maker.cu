@@ -47,6 +47,10 @@ extern "C" {
                         void *vlag2, void *wlag1, void *wlag2,
                         real *ab1, real *ab2, real *ab3, int *nab, int *n) {
 
+    if (*n <= 0) {
+      return;
+    }
+
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     const cudaStream_t stream = (cudaStream_t) glb_cmd_queue;
@@ -65,6 +69,10 @@ extern "C" {
                           void *bfx, void *bfy, void *bfz,
                           real *rho, real *ab1, real *ab2, real *ab3, int *n) {
 
+    if (*n <= 0) {
+      return;
+    }
+
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     const cudaStream_t stream = (cudaStream_t) glb_cmd_queue;
@@ -81,6 +89,10 @@ extern "C" {
 
   void scalar_rhs_maker_ext_cuda(void *fs_lag, void *fs_laglag, void *fs,
                                  real *ext1, real *ext2, real *ext3, int *n) {
+
+    if (*n <= 0) {
+      return;
+    }
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
@@ -101,6 +113,10 @@ extern "C" {
                           void *Blag, void *Blaglag,
                           real *rho, real *dt, real *bd2,
                           real *bd3, real *bd4, int *nbd, int *n) {
+
+    if (*n <= 0) {
+      return;
+    }
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
@@ -123,6 +139,10 @@ extern "C" {
                           void *rho_cp, real *dt, real *bd2,
                           real *bd3, real *bd4, int *nbd, int *n) {
 
+    if (*n <= 0) {
+      return;
+    }
+
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     const cudaStream_t stream = (cudaStream_t) glb_cmd_queue;
@@ -142,6 +162,10 @@ extern "C" {
                            void *bf_x, void *bf_y, void *bf_z,
                            real *rho, real *dt, int *n) {
 
+    if (*n <= 0) {
+      return;
+    }
+
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     const cudaStream_t stream = (cudaStream_t) glb_cmd_queue;
@@ -157,6 +181,10 @@ extern "C" {
 
   void scalar_rhs_maker_oifs_cuda(void *phi_s, void *bf_s,
                                   void *rho_cp, real *dt, int *n) {
+
+    if (*n <= 0) {
+      return;
+    }
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);

@@ -51,6 +51,10 @@ void pnpn_prs_res_part1_opencl(void *ta1, void *ta2, void *ta3,
                                void *f_u, void *f_v, void *f_w,
                                void *B, void *h1, real *mu,
                                real *rho, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
   
   if (pnpn_res_program == NULL)
@@ -87,6 +91,10 @@ void pnpn_prs_res_part1_opencl(void *ta1, void *ta2, void *ta3,
 
 void pnpn_prs_res_part2_opencl(void *p_res, void *wa1, void *wa2,
                                void *wa3, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
   
   if (pnpn_res_program == NULL)
@@ -114,6 +122,10 @@ void pnpn_prs_res_part2_opencl(void *p_res, void *wa1, void *wa2,
 
 void pnpn_prs_res_part3_opencl(void *p_res, void *ta1, void *ta2,
                                void *ta3, real *dtbd, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
     
   if (pnpn_res_program == NULL)
@@ -143,6 +155,10 @@ void pnpn_prs_res_part3_opencl(void *p_res, void *ta1, void *ta2,
 void pnpn_vel_res_update_opencl(void *u_res, void *v_res, void *w_res,
                                 void *ta1, void *ta2, void *ta3,
                                 void *f_u, void *f_v, void *f_w, int *n) {
+  if (*n <= 0) {
+    return;
+  }
+
   cl_int err;
   
   if (pnpn_res_program == NULL)

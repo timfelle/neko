@@ -942,7 +942,8 @@ extern "C" {
     const dim3 nblcks(((*n)+nt - 1)/nt, 1, 1);
     const int nb = ((*n) + nt - 1)/nt;
 
-    cuda_redbuf_check_alloc_xp((*j)*nb);
+    /* At least j slots: a rank without dofs still reduces j zeros below */
+    cuda_redbuf_check_alloc_xp((*j) * (nb > 0 ? nb : 1));
 
     if ( *n > 0) {
       glsc3_many_kernel<real, real_xp><<<nblcks, nthrds, 0, stream>>>

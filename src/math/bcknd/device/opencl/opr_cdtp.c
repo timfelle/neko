@@ -58,6 +58,10 @@ void opencl_cdtp(void *dtx, void *x,
                  void *dr, void *ds, void *dt,
                  void *dxt, void *dyt, void *dzt,
                  void *w3, int *nel, int *lx) {
+  if (*nel <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (cdtp_program == NULL)

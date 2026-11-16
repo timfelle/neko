@@ -94,6 +94,10 @@ void metal_coef_generate_geo(void *G11, void *G12, void *G13,
                              void *jacinv, void *w3,
                              int *nel, int *lx, int *gdim) {
 
+  if (*nel <= 0) {
+    return;
+  }
+
   int LX = *lx;
   if (LX < 2 || LX > 16) {
     fprintf(stderr, "%s: size not supported: %d\n", __FILE__, LX);
@@ -156,6 +160,10 @@ void metal_coef_generate_dxyzdrst(void *drdx, void *drdy, void *drdz,
                                   void *x, void *y, void *z,
                                   void *jacinv, void *jac,
                                   int *lx, int *nel) {
+
+  if (*nel <= 0) {
+    return;
+  }
 
   int LX = *lx;
   int n = (*nel) * LX * LX * LX;
@@ -266,6 +274,10 @@ static id<MTLComputePipelineState> pso_area[17] = { nil };
 void metal_coef_generate_mass(void *B, void *Binv, void *jac, void *w3,
                               int *lxyz, int *nel) {
 
+  if (*nel <= 0) {
+    return;
+  }
+
   if (pso_mass == nil) {
     pso_mass = get_coef_pipeline("coef_generate_mass_kernel");
   }
@@ -306,6 +318,10 @@ void metal_coef_generate_area_and_normal(void *area, void *nx, void *ny,
                                          void *dzdt, void *wx, void *wy,
                                          void *wz, int *lx, int *nel,
                                          real eps) {
+
+  if (*nel <= 0) {
+    return;
+  }
 
   int LX = *lx;
   if (LX < 2 || LX > 16) {

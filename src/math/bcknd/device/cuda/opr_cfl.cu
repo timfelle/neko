@@ -84,7 +84,12 @@ extern "C" {
     const dim3 nblcks((*nel), 1, 1);
     const cudaStream_t stream = (cudaStream_t) glb_cmd_queue;
 
-    cuda_buffer_reserve(&cfl_buf, (*nel) * sizeof(double));
+    /*
+     * A rank without elements launches no CFL kernel, but it still takes
+     * part in the global max below (a collective with NCCL, NVSHMEM or
+     * device MPI): it reserves one slot, which the reduction sets to 0
+     */
+    cuda_buffer_reserve(&cfl_buf, ((*nel) > 0 ? (*nel) : 1) * sizeof(double));
     double *cfl_d = (double *) cfl_buf.dev;
 #ifdef HAVE_NVSHMEM
     cuda_buffer_reserve(&cfl_red_buf, sizeof(double));
@@ -104,20 +109,22 @@ extern "C" {
       CUDA_CHECK(cudaGetLastError());                                         \
       break
 
-    switch(*lx) {
-      CASE(2);
-      CASE(3);
-      CASE(4);
-      CASE(5);
-      CASE(6);
-      CASE(7);
-      CASE(8);
-      CASE(9);
-      CASE(10);
-    default:
-      {
-        fprintf(stderr, __FILE__ ": size not supported: %d\n", *lx);
-        exit(1);
+    if ((*nel) > 0) {
+      switch(*lx) {
+        CASE(2);
+        CASE(3);
+        CASE(4);
+        CASE(5);
+        CASE(6);
+        CASE(7);
+        CASE(8);
+        CASE(9);
+        CASE(10);
+      default:
+        {
+          fprintf(stderr, __FILE__ ": size not supported: %d\n", *lx);
+          exit(1);
+        }
       }
     }
 

@@ -79,6 +79,10 @@ void metal_cdtp(void *dtx, void *x,
                 void *dxt, void *dyt, void *dzt,
                 void *w3, int *nel, int *lx) {
 
+  if (*nel <= 0) {
+    return;
+  }
+
   if (*lx < 2 || *lx > 16) {
     fprintf(stderr, "%s: size not supported: %d\n", __FILE__, *lx);
     exit(1);

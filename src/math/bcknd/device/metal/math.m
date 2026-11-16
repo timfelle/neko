@@ -1001,6 +1001,13 @@ real metal_glmin(void *a_ptr, real *pinf, int *n, void *strm) {
 
 void metal_glsc3_many(real *h, void *w_ptr, void *v_d_d_ptr,
                       void *mult_ptr, int *j, int *n, void *strm) {
+    if (*n < 1) {
+        for (int col = 0; col < *j; col++) {
+            h[col] = 0.0;
+        }
+        return;
+    }
+
     @autoreleasepool {
         id<MTLCommandQueue> q = (__bridge id<MTLCommandQueue>)(strm);
         NSUInteger nn = (NSUInteger)*n;

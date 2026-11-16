@@ -57,6 +57,12 @@ real_xp opencl_cfl(real_xp *dt, void *u, void *v, void *w,
 		void *drdz, void *dsdz, void *dtdz,
 		void *dr_inv, void *ds_inv, void *dt_inv,
 		void *jacinv, int *nel, int *lx) {
+
+  /* No elements: 0 leaves the global max, taken by the caller, unchanged */
+  if (*nel <= 0) {
+    return 0.0;
+  }
+
   cl_int err;
   cl_event kern_wait;
   int i;

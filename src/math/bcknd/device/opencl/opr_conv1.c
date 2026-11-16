@@ -61,6 +61,10 @@ void opencl_conv1(void *du, void *u,
                   void *drdy, void *dsdy, void *dtdy,
                   void *drdz, void *dsdz, void *dtdz,
                   void *jacinv, int *nel, int *gdim, int *lx) {
+  if (*nel <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (conv1_program == NULL)

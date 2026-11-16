@@ -60,6 +60,10 @@ void opencl_coef_generate_geo(void *G11, void *G12, void *G13,
                               void *jacinv, void *w3, int *nel, 
                               int *lx, int *gdim) {
 
+  if (*nel <= 0) {
+    return;
+  }
+
   cl_int err;
   int i;
   if (coef_program == NULL)
@@ -139,6 +143,10 @@ void opencl_coef_generate_dxyzdrst(void *drdx, void *drdy, void *drdz,
                                    void *x, void *y, void *z,
                                    void *jacinv, void *jac,
                                    int *lx, int *nel)  {
+
+  if (*nel <= 0) {
+    return;
+  }
 
   cl_int err;
   int i;
@@ -241,6 +249,11 @@ void opencl_coef_generate_dxyzdrst(void *drdx, void *drdy, void *drdz,
  */
 void opencl_coef_generate_mass(void *B, void *Binv, void *jac, 
                                void *w3, int *lxyz, int *nel)  {
+
+  if (*nel <= 0) {
+    return;
+  }
+
   cl_int err;
   int i;
   if (coef_program == NULL)
@@ -276,6 +289,10 @@ void opencl_coef_generate_area_and_normal(void *area,
                                           void *dxdt, void *dydt, void *dzdt,
                                           void *wx, void *wy, void *wz,
                                           int *lx, int *nel, real eps) {
+
+  if (*nel <= 0) {
+    return;
+  }
 
   cl_int err;
   if (coef_program == NULL)

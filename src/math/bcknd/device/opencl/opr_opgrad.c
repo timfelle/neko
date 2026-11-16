@@ -60,6 +60,10 @@ void opencl_opgrad(void *ux, void *uy, void *uz, void *u,
                    void *drdy, void *dsdy, void *dtdy,
                    void *drdz, void *dsdz, void *dtdz,
                    void *w3, int *nel, int *lx) {
+  if (*nel <= 0) {
+    return;
+  }
+
   cl_int err;
 
   if (opgrad_program == NULL)

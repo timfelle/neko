@@ -84,6 +84,10 @@ extern "C" {
                     void *g11, void *g22, void *g33, void *g12,
                     void *g13, void *g23, int *nelv, int *lx) {
 
+    if (*nelv <= 0) {
+      return;
+    }
+
     static int autotune[17] = { 0 };
     /* Elements per block candidate chosen by the autotuner, see
        elem_block<> in elem_block.h */
@@ -293,6 +297,10 @@ extern "C" {
                            void *g33, void *g12, void *g13,
                            void *g23, int *nelv, int *lx) {
 
+    if (*nelv <= 0) {
+      return;
+    }
+
     /* Strategy chosen by the autotuner: 2 kstep, 3 dmma */
     static int autotune_vec[17] = { 0 };
     /* elements per block candidate chosen for the kstep variant */
@@ -497,6 +505,10 @@ extern "C" {
   void cuda_ax_helm_vector_part2(void *au, void *av, void *aw,
                                  void *u, void *v, void *w,
                                  void *h2, void *B, int *n) {
+
+    if (*n <= 0) {
+      return;
+    }
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);

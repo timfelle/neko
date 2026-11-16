@@ -62,6 +62,10 @@ extern "C" {
                 void *dxt, void *dyt, void *dzt,
                 void *w3, int *nel, int *lx) {
 
+    if (*nel <= 0) {
+      return;
+    }
+
     static int autotune[17] = { 0 };
     /* elements per block candidate chosen by the tuner */
     static int autotune_eb[17] = { 0 };
