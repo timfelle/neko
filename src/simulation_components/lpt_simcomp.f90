@@ -54,6 +54,8 @@ module lpt_simcomp
      procedure, pass(this) :: preprocess_ => lpt_simcomp_preprocess
      !> Main compute hook.
      procedure, pass(this) :: compute_ => lpt_simcomp_compute
+     !> Restart hook, re-anchoring the output schedule of the tracker.
+     procedure, pass(this) :: restart_ => lpt_simcomp_restart
      !> The time until the next scheduled execution, output included.
      procedure, pass(this) :: time_to_next => lpt_simcomp_time_to_next
   end type lpt_simcomp_t
@@ -112,5 +114,22 @@ contains
 
     call this%lpt%compute(time)
   end subroutine lpt_simcomp_compute
+
+  !> Re-anchor the output schedule of the particle tracker on a restart.
+  !! @param time The time state the simulation is restarted from.
+  !! @details The tracker writes its output with a controller of its own, a
+  !! copy of the output controller of the component made at initialisation.
+  !! The restart of the base class only re-anchors the controllers of the
+  !! component, so without this the copy would carry on with the schedule
+  !! of the run before the restart. After a restart from a checkpoint it
+  !! would write an extra output at the first step, and after a restart at
+  !! an earlier time, as when the same case is run again, none until the
+  !! run gets past the point the run before had reached.
+  subroutine lpt_simcomp_restart(this, time)
+    class(lpt_simcomp_t), intent(inout) :: this
+    type(time_state_t), intent(in) :: time
+
+    call this%lpt%output_controller%set_counter(time)
+  end subroutine lpt_simcomp_restart
 
 end module lpt_simcomp
