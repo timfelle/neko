@@ -59,7 +59,9 @@ void opencl_gather_kernel(void *v, int *m, int *o, void *dg,
                           void *u, int *n, void *gd, int *nb,
                           void *b, void *bo, int *op, void *cmd_queue) {
   cl_int err;
-  
+
+  if ((*m) == 0) return;
+
   if (gs_program == NULL)
     opencl_kernel_jit(gs_kernels, (cl_program *) &gs_program);
   
@@ -171,6 +173,8 @@ void opencl_scatter_kernel(void *v, int *m, void *dg,
                            void *u, int *n, void *gd,
                            int *nb, void *b, void *bo, void *cmd_queue) {
   cl_int err;
+
+  if ((*m) == 0) return;
 
   if (gs_program == NULL)
     opencl_kernel_jit(gs_kernels, (cl_program *) &gs_program);
