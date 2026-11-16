@@ -88,7 +88,8 @@ module mesh
 
      type(point_t), allocatable :: points(:) !< list of points
      type(mesh_element_t), allocatable :: elements(:) !< List of elements
-     logical, allocatable :: dfrmd_el(:) !< List of elements
+     !> Whether each element is deformed, i.e. has cross terms in its metric
+     logical, allocatable :: dfrmd_el(:)
 
      !> Table of unique points (global->local)
      !! @details Construction-only scratch: it is what deduplicates points as
@@ -449,6 +450,9 @@ contains
     class(mesh_t), target, intent(inout) :: this
     integer :: i
 
+    ! The flags need the curved elements, which are only listed once the
+    ! curve data is finalized
+    call this%curve%finalize()
     call mesh_generate_flags(this)
     call mesh_generate_conn(this)
 
@@ -456,17 +460,23 @@ contains
     do i = 1, NEKO_MSH_MAX_ZLBLS
        call this%labeled_zones(i)%finalize()
     end do
-    call this%curve%finalize()
 
     ! Due to a bug, right handedness check disabled for the time being.
     !call this%check_right_handedness()
 
   end subroutine mesh_finalize
 
+  !> Flag the elements whose metric has cross terms as deformed
+  !! @details The cross terms G12, G13 and G23 of the metric of a hex vanish
+  !! everywhere only if its tangent vectors are mutually orthogonal
+  !! everywhere, which for a trilinear hex means that it is a rectangular
+  !! box, in any orientation. A hex is such a box exactly when the three
+  !! edges at each of its eight vertices are mutually orthogonal, so every
+  !! vertex is checked. Curved elements are flagged whatever their vertices.
   subroutine mesh_generate_flags(this)
     type(mesh_t), intent(inout) :: this
-    real(kind=dp) :: u(3), v(3), w(3), temp
-    integer :: e
+    real(kind=dp) :: u(3), v(3), w(3), temp, x(3, NEKO_HEX_NPTS)
+    integer :: e, i, c
 
     do e = 1, this%nelv
        if (this%gdim .eq. 2) then
@@ -476,23 +486,30 @@ contains
           temp = u(1)*v(1) + u(2)*v(2)
           if(.not. abscmp(temp, 0d0)) this%dfrmd_el(e) = .true.
        else
+          do i = 1, NEKO_HEX_NPTS
+             x(:, i) = this%elements(e)%e%pts(i)%p%x
+          end do
+
+          ! Vertex c + 1 has the bits of c as its r, s and t indices, so its
+          ! neighbours along r, s and t are those of the flipped bits
           this%dfrmd_el(e) = .false.
-          u = this%elements(e)%e%pts(2)%p%x - this%elements(e)%e%pts(1)%p%x
-          v = this%elements(e)%e%pts(3)%p%x - this%elements(e)%e%pts(1)%p%x
-          w = this%elements(e)%e%pts(5)%p%x - this%elements(e)%e%pts(1)%p%x
-          temp = u(1)*v(1) + u(2)*v(2) + u(3)*v(3)
-          if(.not. abscmp(temp, 0d0)) this%dfrmd_el(e) = .true.
-          temp = u(1)*w(1) + u(2)*w(2) + u(3)*w(3)
-          if(.not. abscmp(temp, 0d0)) this%dfrmd_el(e) = .true.
-          u = this%elements(e)%e%pts(7)%p%x - this%elements(e)%e%pts(8)%p%x
-          v = this%elements(e)%e%pts(6)%p%x - this%elements(e)%e%pts(8)%p%x
-          w = this%elements(e)%e%pts(4)%p%x - this%elements(e)%e%pts(8)%p%x
-          temp = u(1)*v(1) + u(2)*v(2) + u(3)*v(3)
-          if(.not. abscmp(temp, 0d0)) this%dfrmd_el(e) = .true.
-          temp = u(1)*w(1) + u(2)*w(2) + u(3)*w(3)
-          if(.not. abscmp(temp, 0d0)) this%dfrmd_el(e) = .true.
+          do c = 0, NEKO_HEX_NPTS - 1
+             u = x(:, ieor(c, 1) + 1) - x(:, c + 1)
+             v = x(:, ieor(c, 2) + 1) - x(:, c + 1)
+             w = x(:, ieor(c, 4) + 1) - x(:, c + 1)
+             if (.not. (abscmp(dot_product(u, v), 0.0_dp) .and. &
+                  abscmp(dot_product(u, w), 0.0_dp) .and. &
+                  abscmp(dot_product(v, w), 0.0_dp))) then
+                this%dfrmd_el(e) = .true.
+             end if
+          end do
        end if
     end do
+
+    do i = 1, this%curve%size
+       this%dfrmd_el(this%curve%curve_el(i)%el_idx) = .true.
+    end do
+
   end subroutine mesh_generate_flags
 
   !> Set all elements as if they are deformed

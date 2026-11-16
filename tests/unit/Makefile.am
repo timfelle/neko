@@ -121,6 +121,7 @@ TESTS = device/device_test\
 # Note we need to list .pf and runner scripts manually
 EXTRA_DIST = \
 	mesh/test_mesh_parallel.pf\
+	mesh/test_mesh_deformed.pf\
 	quad/test_quad.pf\
 	gather_scatter/test_gather_scatter_parallel.pf\
 	ax/test_ax_factory.pf\
