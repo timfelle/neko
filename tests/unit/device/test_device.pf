@@ -260,6 +260,83 @@ subroutine test_device_memcpy
 end subroutine test_device_memcpy
 
 @test
+subroutine test_device_memset
+  use neko_config
+  use pfunit
+  use device
+  use, intrinsic :: iso_c_binding
+  implicit none
+  type(c_ptr) :: x_d
+  integer(c_size_t) :: size_
+  integer :: x(42), i
+
+  if (NEKO_BCKND_DEVICE .eq. 1) then
+
+     x_d = C_NULL_PTR
+
+     call device_map(x, x_d, size(x))
+
+     do i = 1, size(x)
+        x(i) = i
+     end do
+
+     call device_memcpy(x, x_d, size(x), HOST_TO_DEVICE, sync=.true.)
+
+     ! Zero the first half only
+     size_ = (size(x) / 2) * 4
+     call device_memset(x_d, 0, size_, sync=.true.)
+
+     x = -1
+
+     call device_memcpy(x, x_d, size(x), DEVICE_TO_HOST, sync=.true.)
+
+     do i = 1, size(x) / 2
+        @assertEqual(0, x(i))
+     end do
+
+     do i = size(x) / 2 + 1, size(x)
+        @assertEqual(i, x(i))
+     end do
+
+     call device_unmap(x, x_d)
+
+  end if
+
+end subroutine test_device_memset
+
+!> A zero-size memset is a no-op, also on the null pointer that a
+!! zero-size allocation gives, as on a rank without gather-scatter dofs
+@test
+subroutine test_device_memset_zero_size
+  use neko_config
+  use pfunit
+  use device
+  use, intrinsic :: iso_c_binding
+  implicit none
+  type(c_ptr) :: x_d
+  integer(c_size_t) :: size_
+
+  if (NEKO_BCKND_DEVICE .eq. 1) then
+
+     size_ = 0
+     x_d = C_NULL_PTR
+
+     call device_alloc(x_d, size_)
+
+     @assertFalse(c_associated(x_d))
+
+     call device_memset(x_d, 0, size_)
+     call device_memset(x_d, 0, size_, sync=.true.)
+     call device_memset(x_d, 0, size_, strm=glb_cmd_queue)
+     call device_memset(x_d, 0, size_, sync=.true., strm=glb_cmd_queue)
+
+     @assertFalse(c_associated(x_d))
+
+  end if
+
+end subroutine test_device_memset_zero_size
+
+@test
 subroutine test_device_stream_create
   use neko_config
   use pfunit

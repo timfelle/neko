@@ -323,6 +323,15 @@ contains
        stream = glb_cmd_queue
     end if
 
+    ! Nothing to set, and a zero-size mapping has no device buffer (its
+    ! pointer is null), which a memset on OpenCL rejects
+    if (s .eq. 0) then
+       if (sync_device) then
+          call device_sync_stream(stream)
+       end if
+       return
+    end if
+
 #ifdef HAVE_HIP
     ! Memset via the mapping layer, which handles zero-copy pointers
     ! aliasing host memory (unified memory architectures)
