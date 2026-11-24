@@ -159,8 +159,8 @@ file documentation.
    so on, whatever their names. Scalars with `enabled` set to `false` are not
    counted. When initialising from a file written with a different set of
    enabled scalars, set `target_index` explicitly, otherwise the fields are
-   read shifted. The keywords `interpolation.tolerance` and `interpolation.padding` must be given as
-   literal reals.
+   read shifted. The keywords `interpolation.tolerance` and
+   `interpolation.padding` must be given as literal reals.
 
 ## Source terms
 

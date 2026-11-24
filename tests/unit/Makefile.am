@@ -185,6 +185,7 @@ EXTRA_DIST = \
 	case_file_utils/test_case_file_utils.pf\
 	registry/test_registry.pf\
 	registry/test_field_registry.pf\
+	registry/test_scalar_registry.pf\
 	registry/test_vector_registry.pf\
 	registry/test_matrix_registry.pf\
 	registry/test_point_zone_registry.pf\
