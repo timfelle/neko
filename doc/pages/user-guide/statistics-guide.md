@@ -82,7 +82,7 @@ Statistics are enabled in the case file as a simcomp with the added argument
 | `start_time`      | Time at which to start gathering statistics.                                                                          | Positive real        | 0                                        |
 | `avg_direction`   | Directions to compute spatial average.                                                                                | x,y,z,xy,xz,yz       | No spatial average                       |
 | `set_of_stats`    | What set of stats to compute.                                                                                         | basic, full          | full                                     |
-| `compute_value`   | Interval, in timesteps or simulationtime, depending on compute\_control, for sampling the flow fields for statistics. | Positive real or int | - (recommended every 50 timesteps or so) |
+| `compute_value`   | Interval, in timesteps or simulationtime, depending on compute\_control, for sampling the flow fields for statistics. | Positive real or int | `1` timestep, i.e. every timestep (every 50 timesteps or so is recommended) |
 | `output_filename` | User-specified base filename for the output.                                                                           | filename             | `fluid_stats`                            |
 
 The run and per-run counters are appended according to
@@ -254,7 +254,7 @@ field to be averaged, which will be appended to the default prefix of the
 | `start_time`      | Time at which to start gathering statistics.                                                                          | Positive real        | 0                                        |
 | `avg_direction`   | Directions to compute spatial average.                                                                                | x,y,z,xy,xz,yz       | No spatial average                       |
 | `set_of_stats`    | What set of stats to compute.                                                                                         | basic, full          | full                                     |
-| `compute_value`   | Interval, in timesteps or simulationtime, depending on compute\_control, for sampling the flow fields for statistics. | Positive real or int | - (recommended every 50 timesteps or so) |
+| `compute_value`   | Interval, in timesteps or simulationtime, depending on compute\_control, for sampling the flow fields for statistics. | Positive real or int | `1` timestep, i.e. every timestep (every 50 timesteps or so is recommended) |
 | `output_filename` | User-specified base filename for the output.                                                                           | filename             | `scalar_stats_{field}`                   |
 
 
@@ -363,7 +363,7 @@ viscosity field:
 | `nut_field`        | Name of the eddy viscosity field.                       | String  |  `nut`        |
 | `start_time`        | Time at which to start gathering statistics.                        | Positive real     | 0             |
 | `avg_direction`        | Directions to compute spatial average.                         | x,y,z,xy,xz,yz  |  No spatial average           |
-| `compute_value` | Interval, in timesteps or simulationtime, depending on compute\_control, for sampling the flow fields for statistics. | Positive real or int  | Not set (but recommended with every 50 timesteps or so)  |
+| `compute_value` | Interval, in timesteps or simulationtime, depending on compute\_control, for sampling the flow fields for statistics. | Positive real or int  | `1` timestep, i.e. every timestep (every 50 timesteps or so is recommended)  |
 | `output_filename`        | User-specified base filename for the output.                       | filename  | `fluid_sgs_stats`         |
 
 The run and per-run counters are appended according to
@@ -412,12 +412,12 @@ latter is a JSON sub-dictionary:
 | ------------------- | -------------------------------------------------------------------- | ----------------- | ------------- |
 | `field`        | Name of the scalar field.                       | String  |  `s`        |
 | `alphat.nut_dependency`                    | Whether the eddy diffusivity depends on the eddy kinematic viscosity.                  | `true` or `false`                                      | -  |
-| `alphat.alphat_field`                    | Name of the turbulent diffusivity field.                  | String                                      | Empty string  |
-| `alphat.nut_field`                    | Name of the turbulent kinematic viscosity field.                  | String                                      | Empty string  |
+| `alphat.alphat_field`                    | Name of the turbulent diffusivity field. Required if `nut_dependency` is `false`.                  | String                                      | -  |
+| `alphat.nut_field`                    | Name of the turbulent kinematic viscosity field. Required if `nut_dependency` is `true`.                  | String                                      | -  |
 | `alphat.Pr_t`                         | Turbulent Prandtl number                                          | Positive real                               | -             |
 | `start_time`        | Time at which to start gathering statistics.                        | Positive real     | 0             |
 | `avg_direction`        | Directions to compute spatial average.                         | x,y,z,xy,xz,yz  |  No spatial average           |
-| `compute_value` | Interval, in timesteps or simulationtime, depending on compute\_control, for sampling the flow fields for statistics. | Positive real or int  | Not set (but recommended with every 50 timesteps or so)  |
+| `compute_value` | Interval, in timesteps or simulationtime, depending on compute\_control, for sampling the flow fields for statistics. | Positive real or int  | `1` timestep, i.e. every timestep (every 50 timesteps or so is recommended)  |
 | `output_filename`        | User-specified base filename for the output.                       | filename  | `scalar_sgs_stats_{field}` |
 
 The scalar field name is part of the default output stem. The run and per-run

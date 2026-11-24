@@ -442,3 +442,133 @@ def test_all_builtin_factory_types_have_schemas(
         schema_types = collect_const_values(schema_data, property_name)
 
     assert schema_types == runtime_types
+
+
+def _validate_modified(tmp_path, example, property_path, value):
+    """Validate EXAMPLES_DIR/example with the entry at property_path
+    replaced by value (a missing last key is added)."""
+    with (EXAMPLES_DIR / example).open(encoding="utf-8") as handle:
+        data = json5.load(handle)
+
+    target = data
+    for key in property_path[:-1]:
+        target = target[key]
+    target[property_path[-1]] = value
+
+    case_file = tmp_path / "modified.case"
+    case_file.write_text(json.dumps(data), encoding="utf-8")
+    return subprocess.run(
+        [sys.executable, str(VALIDATOR), str(case_file)],
+        capture_output=True,
+        text=True,
+    )
+
+
+# Keys that Neko reads without resolving constants. A schema that accepts a
+# constants reference there lets a case through that the solver then rejects.
+# Each entry is (id, example, path, literal value, constants reference).
+LITERAL_ONLY_KEYS = [
+    ("schwarz_iterations", "tgv/tgv.case",
+     ("case", "fluid", "schwarz_iterations"), 1, "n_iter"),
+    ("mesh2mesh_tolerance", "tgv/tgv.case",
+     ("case", "mesh2mesh_tolerance"), 1e-6, "tol"),
+    ("compressible_gamma", "euler_tgv/euler_tgv.case",
+     ("case", "fluid", "gamma"), 1.4, "gamma"),
+    ("compressible_zone_indices", "euler_tgv/euler_tgv.case",
+     ("case", "fluid", "boundary_conditions"),
+     [{"type": "no_slip", "zone_indices": [1]}],
+     [{"type": "no_slip", "zone_indices": "zones"}]),
+    ("hsmg_coarse_grid_iterations", "cylinder/cylinder.case",
+     ("case", "fluid", "pressure_solver", "preconditioner"),
+     {"type": "hsmg", "coarse_grid": {"iterations": 5}},
+     {"type": "hsmg", "coarse_grid": {"iterations": "n_iter"}}),
+    ("dong_delta", "cylinder/cylinder.case",
+     ("case", "fluid", "boundary_conditions", 1),
+     {"type": "outflow+dong", "zone_indices": [2], "delta": 0.01},
+     {"type": "outflow+dong", "zone_indices": [2], "delta": "delta"}),
+    ("source_term_start_time", "tgv/tgv.case",
+     ("case", "fluid", "source_terms"),
+     [{"type": "constant", "values": [1.0, 0.0, 0.0], "start_time": 1.0}],
+     [{"type": "constant", "values": [1.0, 0.0, 0.0],
+       "start_time": "t_on"}]),
+    ("gradient_jump_penalty_tau", "tgv/tgv.case",
+     ("case", "fluid", "source_terms"),
+     [{"type": "gradient_jump_penalty", "tau": 0.02}],
+     [{"type": "gradient_jump_penalty", "tau": "tau"}]),
+    ("scalar_bc_zone_indices", "scalar_mms/scalar_mms.case",
+     ("case", "scalar", "boundary_conditions", 0),
+     {"type": "dirichlet", "zone_indices": [1], "value": 1.0},
+     {"type": "dirichlet", "zone_indices": "zones", "value": 1.0}),
+]
+
+
+@pytest.mark.parametrize(
+    "example, property_path, good, bad",
+    [entry[1:] for entry in LITERAL_ONLY_KEYS],
+    ids=[entry[0] for entry in LITERAL_ONLY_KEYS],
+)
+def test_literal_only_keys_reject_constant_references(
+    tmp_path, example, property_path, good, bad
+):
+    accepted = _validate_modified(tmp_path, example, property_path, good)
+    assert accepted.returncode == 0, accepted.stdout + accepted.stderr
+
+    rejected = _validate_modified(tmp_path, example, property_path, bad)
+    assert rejected.returncode != 0
+
+
+def test_allows_split_velocity_pressure_boundary_condition(tmp_path):
+    path = ("case", "fluid", "boundary_conditions", 1)
+    split = {
+        "zone_indices": [2],
+        "velocity": {"type": "non_normal", "value": [1.0, 0.0, 0.0]},
+        "pressure": {"type": "expression", "value": "sin(t)"},
+    }
+    result = _validate_modified(tmp_path, "cylinder/cylinder.case", path, split)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    # A joint type cannot be combined with the split form.
+    split["type"] = "outflow"
+    result = _validate_modified(tmp_path, "cylinder/cylinder.case", path, split)
+    assert result.returncode != 0
+
+
+def test_allows_compressible_slip_boundary_condition(tmp_path):
+    result = _validate_modified(
+        tmp_path, "euler_tgv/euler_tgv.case",
+        ("case", "fluid", "boundary_conditions"),
+        [{"type": "slip", "zone_indices": [1]}])
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_requires_dealias_for_pnpn(tmp_path):
+    with (EXAMPLES_DIR / "tgv" / "tgv.case").open(encoding="utf-8") as handle:
+        data = json5.load(handle)
+    del data["case"]["numerics"]["dealias"]
+    case_file = tmp_path / "no_dealias.case"
+    case_file.write_text(json.dumps(data), encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(VALIDATOR), str(case_file)],
+        capture_output=True, text=True)
+    assert result.returncode != 0
+
+
+def test_requires_output_checkpoints(tmp_path):
+    with (EXAMPLES_DIR / "tgv" / "tgv.case").open(encoding="utf-8") as handle:
+        data = json5.load(handle)
+    del data["case"]["output_checkpoints"]
+    case_file = tmp_path / "no_checkpoints.case"
+    case_file.write_text(json.dumps(data), encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(VALIDATOR), str(case_file)],
+        capture_output=True, text=True)
+    assert result.returncode != 0
+
+
+def test_time_order_four_only_for_compressible(tmp_path):
+    path = ("case", "numerics", "time_order")
+    result = _validate_modified(tmp_path, "tgv/tgv.case", path, 4)
+    assert result.returncode != 0
+
+    result = _validate_modified(tmp_path, "euler_tgv/euler_tgv.case", path, 4)
+    assert result.returncode == 0, result.stdout + result.stderr

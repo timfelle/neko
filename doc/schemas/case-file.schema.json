@@ -46,7 +46,8 @@
         "mesh_file",
         "time",
         "numerics",
-        "fluid"
+        "fluid",
+        "output_checkpoints"
       ],
       "properties": {
         "load_balance": false,
@@ -115,7 +116,7 @@
           "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
         },
         "mesh2mesh_tolerance": {
-          "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/realNumber"
         },
         "job_timelimit": {
           "type": "string",
@@ -180,6 +181,20 @@
         }
       },
       "allOf": [
+        {
+          "if": {
+            "not": {
+              "required": ["restart_file"]
+            }
+          },
+          "then": {
+            "properties": {
+              "fluid": {
+                "required": ["initial_condition"]
+              }
+            }
+          }
+        },
         {
           "if": {
             "properties": {
@@ -254,12 +269,45 @@
           "then": {
             "properties": {
               "numerics": {
+                "required": ["time_order", "dealias"],
                 "properties": {
                   "polynomial_order": {
                     "oneOf": [
                       {"type": "integer", "minimum": 3},
                       {"$ref": "urn:neko:schema:common#/$defs/constRef"}
                     ]
+                  },
+                  "time_order": {
+                    "oneOf": [
+                      {"type": "integer", "minimum": 1, "maximum": 3},
+                      {"$ref": "urn:neko:schema:common#/$defs/constRef"}
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "fluid": {
+                "properties": {
+                  "scheme": {"const": "compressible"}
+                },
+                "required": ["scheme"]
+              }
+            },
+            "required": ["fluid"]
+          },
+          "then": {
+            "properties": {
+              "numerics": {
+                "properties": {
+                  "time_order": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 4
                   }
                 }
               }

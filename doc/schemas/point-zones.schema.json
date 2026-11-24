@@ -123,7 +123,13 @@
               "items": {
                 "oneOf": [
                   {
-                    "$ref": "#/$defs/pointZone"
+                    "$ref": "#/$defs/pointZone",
+                    "not": {
+                      "required": ["geometry"],
+                      "properties": {
+                        "geometry": {"const": "combine"}
+                      }
+                    }
                   },
                   {
                     "type": "object",

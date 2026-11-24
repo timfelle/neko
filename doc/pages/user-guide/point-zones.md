@@ -182,9 +182,16 @@ Useful to perform full element operation on just certain parts of the domain.
 
 ## User-defined geometrical shapes
 
-The current version of Neko does not support user-defined shapes from the case
-file. That said, shapes can be defined manually into new types by extending
-`point_zone_t` and implementing the abstract `criterion` interface.
+Shapes can be defined manually into new types by extending `point_zone_t` and
+implementing the abstract `criterion` interface. The new type is made available
+to the case file by registering an allocator for it with the
+`register_point_zone` routine, called from a user module's
+`module_name_register_types` routine. The `geometry` keyword of a point zone in
+the case file can then take the name given in the registration, and it is also
+accepted for the zones listed in the `subsets` of a `combine` zone. The
+JSON schema in `doc/schemas/point-zones.schema.json`, however, only describes
+the built-in geometries, so a case file using a custom geometry is not accepted
+by the schema validator.
 
 
 ## Using point zones {#point-zones_using-point-zones}

@@ -165,10 +165,10 @@
               "type": "object",
               "properties": {
                 "tolerance": {
-                  "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+                  "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
                 },
                 "padding": {
-                  "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+                  "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
                 }
               },
               "additionalProperties": false
@@ -185,7 +185,7 @@
           "required": ["type", "zone_indices", "value"],
           "properties": {
             "type": {"const": "velocity_value"},
-            "zone_indices": {"$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"},
+            "zone_indices": {"$ref": "urn:neko:schema:common#/$defs/integerArray"},
             "name": {"$ref": "urn:neko:schema:common#/$defs/nonEmptyString"},
             "value": {"$ref": "urn:neko:schema:common#/$defs/vector3OrRef"}
           },
@@ -196,7 +196,7 @@
           "required": ["type", "zone_indices", "value"],
           "properties": {
             "type": {"enum": ["density_value", "pressure_value"]},
-            "zone_indices": {"$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"},
+            "zone_indices": {"$ref": "urn:neko:schema:common#/$defs/integerArray"},
             "name": {"$ref": "urn:neko:schema:common#/$defs/nonEmptyString"},
             "value": {"$ref": "urn:neko:schema:common#/$defs/numberOrRef"}
           },
@@ -206,13 +206,43 @@
           "type": "object",
           "required": ["type", "zone_indices"],
           "properties": {
-            "type": {"enum": ["no_slip", "symmetry", "outflow", "normal_outflow"]},
-            "zone_indices": {"$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"},
+            "type": {"enum": ["no_slip", "slip", "symmetry", "outflow", "normal_outflow"]},
+            "zone_indices": {"$ref": "urn:neko:schema:common#/$defs/integerArray"},
             "name": {"$ref": "urn:neko:schema:common#/$defs/nonEmptyString"}
           },
           "additionalProperties": false
         }
       ]
+    },
+    "viscousRegularization": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "artificial_viscosity"
+          ]
+        },
+        "reg_coeff_name": {
+          "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {"const": "artificial_viscosity"}
+            }
+          },
+          "then": {
+            "required": ["reg_coeff_name"]
+          }
+        }
+      ],
+      "additionalProperties": true
     },
     "ale": {
       "type": "object",
@@ -479,7 +509,7 @@
           "then": {
             "properties": {
               "mesh_preview": {
-                "required": ["start_time", "end_time", "output_freq", "dt"]
+                "required": ["end_time", "output_freq", "dt"]
               }
             }
           }
@@ -491,7 +521,6 @@
       "type": "object",
       "required": [
         "scheme",
-        "initial_condition",
         "output_control"
       ],
       "properties": {
@@ -519,10 +548,13 @@
           "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
         },
         "gamma": {
-          "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
         },
         "freeze": {
           "type": "boolean"
+        },
+        "viscous_regularization": {
+          "$ref": "#/$defs/viscousRegularization"
         },
         "full_stress_formulation": {
           "type": "boolean"
@@ -543,7 +575,7 @@
           "$ref": "urn:neko:schema:common#/$defs/svv"
         },
         "schwarz_iterations": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeIntegerOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeInteger"
         },
         "nut_field": {
           "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
@@ -661,6 +693,13 @@
               "velocity_solver",
               "pressure_solver"
             ],
+            "not": {
+              "required": ["Re"],
+              "anyOf": [
+                {"required": ["mu"]},
+                {"required": ["rho"]}
+              ]
+            },
             "properties": {
               "boundary_conditions": {
                 "type": "array",

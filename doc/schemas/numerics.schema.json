@@ -5,7 +5,6 @@
     "numerics": {
       "type": "object",
       "required": [
-        "time_order",
         "polynomial_order"
       ],
       "properties": {

@@ -5,7 +5,7 @@
     "scalarConstantValues": {
       "oneOf": [
         {
-          "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/constRef"
         },
         {
           "type": "array",
@@ -161,10 +161,10 @@
           "$ref": "#/$defs/scalarConstantValues"
         },
         "start_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         },
         "end_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         }
       },
       "additionalProperties": false
@@ -183,10 +183,10 @@
           "$ref": "#/$defs/fluidConstantValues"
         },
         "start_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         },
         "end_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         }
       },
       "additionalProperties": false
@@ -201,10 +201,10 @@
           "const": "user"
         },
         "start_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         },
         "end_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         }
       },
       "additionalProperties": true
@@ -223,10 +223,10 @@
           "$ref": "#/$defs/scalarFieldNames"
         },
         "start_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         },
         "end_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         }
       },
       "additionalProperties": false
@@ -245,10 +245,10 @@
           "$ref": "#/$defs/fluidFieldNames"
         },
         "start_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         },
         "end_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         }
       },
       "additionalProperties": false
@@ -263,19 +263,19 @@
           "const": "gradient_jump_penalty"
         },
         "tau": {
-          "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
         },
         "scaling_factor": {
-          "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
         },
         "scaling_exponent": {
-          "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/realNumber"
         },
         "start_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         },
         "end_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         }
       },
       "additionalProperties": false
@@ -306,10 +306,10 @@
           ]
         },
         "start_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         },
         "end_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         }
       },
       "additionalProperties": false
@@ -351,10 +351,10 @@
           "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
         },
         "start_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         },
         "end_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         }
       },
       "additionalProperties": false
@@ -449,13 +449,13 @@
               "enum": ["none", "PDE"]
             },
             "radius": {
-              "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
             },
             "tolerance": {
-              "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
             },
             "max_iter": {
-              "$ref": "urn:neko:schema:common#/$defs/positiveIntegerOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/positiveInteger"
             },
             "solver": {
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
@@ -500,7 +500,8 @@
               "enum": [
                 "constant",
                 "field",
-                "user"
+                "user",
+                "no-op"
               ]
             },
             "value": {
@@ -519,10 +520,10 @@
               "type": "object",
               "properties": {
                 "tolerance": {
-                  "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
+                  "$ref": "urn:neko:schema:common#/$defs/realNumber"
                 },
                 "padding": {
-                  "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
+                  "$ref": "urn:neko:schema:common#/$defs/realNumber"
                 }
               },
               "additionalProperties": false
@@ -559,10 +560,10 @@
           "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
         },
         "start_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         },
         "end_time": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeRealNumber"
         }
       },
       "additionalProperties": false

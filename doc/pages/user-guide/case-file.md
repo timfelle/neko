@@ -97,7 +97,7 @@ The current high-level structure of the case file is shown below.
         "time": {},
         "numerics": {},
         "fluid": {},
-        "scalars": {},
+        "scalars": [],
         "simulation_components" : [],
         "point_zones" : [],
         "runtime_statistics": {}
@@ -124,19 +124,19 @@ but also defines several parameters that pertain to the simulation as a whole.
 | `no_defaults`         | Prevents filling in default values to case file entries.                                              | `true` or `false`                               | `false`       |
 | `mesh_file`           | The name of the mesh file.                                                                            | Strings ending with `.nmsh`                     | -             |
 | `output_boundary`     | Whether to write a `bdry0.f0000` file with boundary labels. Can be used to check boundary conditions. | `true` or `false`                               | `false`       |
-| `output_directory`    | Folder for redirecting solver output. Note that the folder has to exist!                              | Path to an existing directory                   | `.`           |
+| `output_directory`    | Folder for redirecting solver output. A trailing `/` is added if missing, and the folder is created by the first MPI rank if it does not exist. | Path to a directory | Empty, i.e. the working directory |
 | `output_precision`    | Whether to output snapshots in single or double precision                                             | `single` or `double`                            | `single`      |
 | `output_layout`       | Data layout for `adios2` files. (Choose `2` or `3` for ADIOS2 supported compressors BigWhoop or ZFP.) | Positive integer `1`, `2`, `3`                  | `1`           |
 | `load_balancing`      | Whether to apply load balancing.                                                                      | `true` or `false`                               | `false`       |
 | `output_partitions`   | Whether to write a `partitions.vtk` file with domain partitioning.                                    | `true` or `false`                               | `false`       |
-| `output_checkpoints`  | Whether to output checkpoints, i.e. restart files.                                                    | `true` or `false`                               | -             |
+| `output_checkpoints`  | Whether to output checkpoints, i.e. restart files. Required.                                          | `true` or `false`                               | -             |
 | `checkpoint_control`  | Defines the interpretation of `checkpoint_value` to define the frequency of writing checkpoint files. | `nsamples`, `simulationtime`, `tsteps`, `never` | -             |
 | `checkpoint_value`    | The frequency of sampling in terms of `checkpoint_control`.                                           | Positive real or integer                        | -             |
 | `checkpoint_filename` | The filename of written checkpoint.                                                                   | Strings such as `my_name`                       | `fluid`       |
 | `checkpoint_format`   | The file format of checkpoints                                                                        | `chkp` or `hdf5`                                | `chkp`        |
 | `restart_file`        | Checkpoint to use for a restart from previous data                                                    | Strings ending with `.chkp`, `.h5`, or `.hdf5`  | -             |
 | `restart_mesh_file`   | If the restart file is on a different mesh, specify the .nmsh file used to generate it here           | Strings ending with `.nmsh`                     | -             |
-| `mesh2mesh_tolerance` | Tolerance for the restart when restarting from another mesh                                           | Positive reals                                  | 1e-6          |
+| `mesh2mesh_tolerance` | Tolerance for the restart when restarting from another mesh. Must be given as a literal, it cannot refer to a constant. | Positive reals                  | 1e-6          |
 | `job_timelimit`       | The maximum wall clock duration of the simulation.                                                    | String formatted as [[[DD-]HH:]MM:]SS           | No limit      |
 | `output_at_end`       | Whether to always write all enabled output at the end of the run.                                     | `true` or `false`                               | `true`        |
 | `output_at_start`     | Whether to write the initial state of the simulation. Checkpoints and statistics never do.            | `true` or `false`                               | `true`        |
@@ -349,9 +349,9 @@ Used to define the properties of the numerical discretization.
 | Name                         | Description                                                                                                     | Admissible values          | Default value                   |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------- |
 | `polynomial_order`           | The order of the polynomial basis.                                                                              | Integers >= 3 for `pnpn`; integers >= 1 for `compressible` (typically 5 to 9) | -                               |
-| `time_order`                 | The order of the time integration scheme. Refer to the `time_scheme_controller` type documentation for details. | 1, 2, 3                    | -                               |
-| `dealias`                    | Whether to apply dealiasing to advection terms.                                                                 | `true` or `false`          | `false`                         |
-| `dealiased_polynomial order` | The polynomial order in the higher-order space used in the dealising.                                           | Integer                    | `3/2(polynomial_order + 1) - 1` |
+| `time_order`                 | The order of the time integration scheme. For `pnpn` this is required, see the `time_scheme_controller` type documentation for details. For `compressible` it is the order of the Runge-Kutta scheme. | 1, 2, 3 for `pnpn`; 1, 2, 3, 4 for `compressible` | Required for `pnpn`; `4` for `compressible` |
+| `dealias`                    | Whether to apply dealiasing to advection terms. Required for `pnpn`.                                            | `true` or `false`          | -                               |
+| `dealiased_polynomial_order` | The number of points (i.e. the polynomial order plus one) in the higher-order space used in the dealiasing.      | Integer                    | `3(polynomial_order + 1)/2`, with integer division |
 | `oifs`                       | Whether to apply the Operator-Integration-Factor-Splitting (OIFS).                                              | `true` or `false`          | `false`                         |
 | `oifs_target_cfl`            | The desired OIFS-CFL number. Requires variable_timestep = true in the time control object.                      | Positive real              | `1.9`                           |
 | `compress_geometric_factors` | Whether the standard Helmholtz operators of the fluid, the scalars and the multigrid levels read the geometric factors from one copy per distinct element shape, which cuts their memory traffic on meshes of repeated shapes. The copies are held on top of the full factors. CPU, SX and device backends, not XSMM. | `true` or `false` | `false` |

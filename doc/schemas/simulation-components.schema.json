@@ -355,6 +355,9 @@
           "$ref": "#/$defs/nonEmptyString"
         }
       },
+      "dependentRequired": {
+        "point_zone": ["output_filename"]
+      },
       "additionalProperties": true
     },
     "simcompProbesPoint": {
@@ -373,7 +376,12 @@
           "required": ["type", "coordinates"],
           "properties": {
             "type": {"const": "points"},
-            "coordinates": {"$ref": "#/$defs/numberArray"}
+            "coordinates": {
+              "oneOf": [
+                {"$ref": "#/$defs/numberArray"},
+                {"$ref": "#/$defs/constRef"}
+              ]
+            }
           },
           "additionalProperties": false
         },
@@ -397,7 +405,7 @@
             "normal": {"$ref": "#/$defs/vector3OrRef"},
             "radius": {"$ref": "#/$defs/numberOrRef"},
             "amount": {"$ref": "#/$defs/integerOrRef"},
-            "axis": {"$ref": "#/$defs/nonEmptyString"}
+            "axis": {"enum": ["x", "y", "z"]}
           },
           "additionalProperties": false
         },
@@ -518,9 +526,7 @@
             "nonBoyd"
           ]
         },
-        "transfer_function": {
-          "$ref": "#/$defs/numberArray"
-        }
+        "transfer_function": false
       },
       "additionalProperties": false
     },

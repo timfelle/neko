@@ -132,16 +132,16 @@
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
             },
             "target_index": {
-              "$ref": "urn:neko:schema:common#/$defs/nonNegativeIntegerOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/nonNegativeInteger"
             },
             "interpolation": {
               "type": "object",
               "properties": {
                 "tolerance": {
-                  "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+                  "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
                 },
                 "padding": {
-                  "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+                  "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
                 }
               },
               "additionalProperties": false
@@ -165,7 +165,7 @@
               "const": "dirichlet"
             },
             "zone_indices": {
-              "$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/integerArray"
             },
             "name": {
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
@@ -188,7 +188,7 @@
               "const": "expression_dirichlet"
             },
             "zone_indices": {
-              "$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/integerArray"
             },
             "name": {
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
@@ -210,14 +210,12 @@
               "const": "user_dirichlet"
             },
             "zone_indices": {
-              "$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/integerArray"
             },
             "name": {
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
             },
-            "value": {
-              "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
-            }
+            "value": false
           },
           "additionalProperties": true
         },
@@ -233,7 +231,7 @@
               "const": "neumann"
             },
             "zone_indices": {
-              "$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/integerArray"
             },
             "name": {
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
@@ -258,14 +256,12 @@
               "const": "user_neumann"
             },
             "zone_indices": {
-              "$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/integerArray"
             },
             "name": {
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
             },
-            "flux": {
-              "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
-            }
+            "flux": false
           },
           "additionalProperties": true
         },
@@ -280,7 +276,7 @@
               "const": "overset_interface"
             },
             "zone_indices": {
-              "$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/integerArray"
             },
             "name": {
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
@@ -289,10 +285,10 @@
               "type": "object",
               "properties": {
                 "tolerance": {
-                  "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
+                  "$ref": "urn:neko:schema:common#/$defs/realNumber"
                 },
                 "padding": {
-                  "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
+                  "$ref": "urn:neko:schema:common#/$defs/realNumber"
                 }
               },
               "additionalProperties": false
@@ -325,7 +321,7 @@
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
             },
             "zone_indices": {
-              "$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/integerArray"
             },
             "name": {
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"

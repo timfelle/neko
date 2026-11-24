@@ -19,11 +19,32 @@ of objects called `simulation_components`, which resides directly under the
 `case` object.
 
 All simcomps support a `name` keyword in their JSON object. When ommitted, a
-default `name`, which as a rule coincided with its `type`. For completness,
-these default names are provided for each simcomp in the documentation below.
-However, each simcomp's name must be unique, so if two or more simcomps of the
-same type are present in case, a unique `name` for each must be provided
-manually.
+default `name` is used, which as a rule coincides with its `type`. There are
+exceptions: the default name of `lagrangian_particles` is `lpt`, that of
+`data_streamer` is `data_streamer_simcomp`, and the default names of the scalar
+statistics simcomps include the field name, see the
+[statistics guide](@ref statistics-guide). However, each simcomp's name must be
+unique, so if two or more simcomps of the same type are present in case, a
+unique `name` for each must be provided manually.
+
+Besides `type` and `name`, all simcomps accept the following keywords, in
+addition to the `compute_` and `output_` ones described
+[below](@ref simcomps_execution):
+
+- `order`: An integer setting the position of the simcomp in the execution
+  order. When given, the values of all simcomps must be unique and contiguous,
+  starting at 1. Simcomps without `order` are placed after those that have it,
+  in their order of appearance in the case file. By default, the order of
+  appearance is used.
+- `preprocess_control` and `preprocess_value`: Control when the preprocessing
+  step of the simcomp is executed. They follow the same rules as the `compute_`
+  keywords, including `fluid_output`, and default to `tsteps` and `1`.
+- `is_user`: If `true`, no built-in simcomp is created for the entry, i.e. the
+  factory returns without allocating one, and `type` can be any non-empty
+  string. The executor then stops with the error "Simulation component not
+  initialized" at the end of the setup, unless the simcomp has been set up by
+  the user code. Defaults to `false`.
+- `comment`: A free-form string.
 
 ## List of simulation components
 
@@ -49,18 +70,20 @@ in Neko. The list will be updated as new simcomps are added.
 - Lagrangian particle tracking \ref simcomp_lagrangian_particles
 - Computation of subgrid-scale (SGS) eddy viscosity via a SGS model \ref
   simcomp_les_model
-- User defined components \ref user-file_simcomps
+- User defined components, see the `is_user` keyword above
 - Fluid statistics simcomp, "fluid_stats", for more details see the
   [statistics guide](@ref statistics-guide)
 - Fluid SGS statistics simcomp, "fluid_sgs_stats", for more details see the
   [statistics guide](@ref statistics-guide)
 - Scalar statistics simcomp, "scalar_stats", for more details see the
-  [statistics guide](@ref statistics-guide). If a `field` is specified in the
-  case file without `name` being specified, the field name is appended to the
-  default simcomp name as `scalar_stats_{field}`.
+  [statistics guide](@ref statistics-guide). Unless `name` is specified, the
+  default simcomp name is `scalar_stats_{field}`, where `field` defaults to `s`,
+  so `scalar_stats_s` if no `field` is given.
 - Scalar SGS statistics simcomp, "scalar_sgs_stats", for more details see the
-  [statistics guide](@ref statistics-guide)
+  [statistics guide](@ref statistics-guide). Unless `name` is specified, the
+  default simcomp name is `scalar_sgs_stats_{field}`.
 - User statistics simcomp, "user_stats" \ref user_stats
+- Spatial averages of fields \ref simcomp_spatial_average
 - Computation of the spectral error indicator \ref simcomp_speri
 - Streaming of data for in-situ field manipulation \ref simcomp_data_streamer
 - Sub-sampling of fields by changing polynomial order and masking by point
@@ -68,7 +91,7 @@ in Neko. The list will be updated as new simcomps are added.
 - Computation of the viscous coefficient in artificial viscosity method (AVM)
   via a particular model \ref simcomp_avm
 
-## Controlling execution and file output
+## Controlling execution and file output {#simcomps_execution}
 Each simulation component is, by default, executed once per time step to perform
 associated computations and output. However, this can be modified by using the
 `compute_control` and `compute_value` parameters for the computation and the
@@ -90,7 +113,7 @@ rotation and do not suppress samples or control CSV output. Use
 For simcomps that compute 3D fields, the output can be either added to the main
 `.fld` file, containing velocity and pressure, or saved to a separate file. For
 the latter, the `output_filename` keyword should be provided. One can
-additionally provide the `precision` keyword, which can be set to either
+additionally provide the `output_precision` keyword, which can be set to either
 `single` or `double` to control the precision of the written data.
 
 For example, in the `tgv` example case the `curl` component is executed
@@ -286,6 +309,10 @@ Optional fields for this simcomp are:
 - `append_output`: HDF5 only. Selects between appending samples into shared datasets and writing each sample into its own `Step_i` subgroup, exactly as for \ref simcomp_probes. Default `true`.
 - `start_time`: only write samples after this time. Default `0.0`.
 
+@note The sampling itself is performed at every time step: `compute_control`
+and `compute_value` are ignored, with a warning if they are given. Use
+`output_control` and `output_value` to set how often data is written.
+
 ~~~~~~~~~~~~~~~{.json}
 {
   "type": "boundary_data_writer",
@@ -318,7 +345,7 @@ On a **moving mesh (ALE)**, the geometry changes every step, so it is written in
 
 ### probes {#simcomp_probes}
 Probes selected solution fields at a list of points. This list of points can be
-generated in a variety of ways, but the most common is to use the `csv` type.
+generated in a variety of ways, but the most common is to use the `file` type.
 
 Mandatory fields for this simcomp are:
 - `fields`: a list of fields to probe. Should be a list of field names that
@@ -327,6 +354,9 @@ Mandatory fields for this simcomp are:
   `.csv` or `.hdf5`. By default, will be written in the `case.output_directory` folder.
 
 Optional arguments:
+- `points_file`: The legacy way of specifying the points, the name of a file
+  in the format described for the `file` point type below. It is read in
+  addition to any `points`.
 - Interpolation parameters can be provided as a JSON sub-dictionary,
   `interpolation`. If not provided, default values defined in
   the `global_interpolation` module will be used.
@@ -421,6 +451,9 @@ The `output_control` is meant to be used for fault-tolerance, to avoid losing al
   }
   ~~~~~~~~~~~~~~~
   The points are assumed to be in the same units as the simulation.
+  The `coordinates` can also be the name of an entry under `constants`.
+- `point_zone`: Uses the points of a point zone, whose name is given with the
+  `name` keyword. See the [point zones](@ref point-zones) page.
 - `line`: Generates a list of points along a line. The line is defined by two
   points, `start` and `end`, and the number of points to generate, `amount`.
   The points are generated by linearly interpolating between `start` and `end`.
@@ -448,6 +481,7 @@ The `output_control` is meant to be used for fault-tolerance, to avoid losing al
     "amount": 4
   }
   ~~~~~~~~~~~~~~~
+  The `axis` must be one of `"x"`, `"y"` or `"z"`.
   Leads to the following points:
   ~~~~~~~~~~~~~~~{.csv}
   1.0, 0.0, 0.0
@@ -579,8 +613,7 @@ be specified relative to the `case.output_directory`, since the
 The `field_writer` may be used in conjunction with a `point_zone` to sample
 the corresponding subsection of the domain. At the moment, this capability
 can only be used with `nek5000` files.
-@attention When using `point_zone` with the `nek5000` format, an
-`output_filename` must be provided.
+@attention When using `point_zone`, an `output_filename` must be provided.
 
  ~~~~~~~~~~~~~~~{.json}
  {
@@ -622,11 +655,17 @@ Optional fields for this simcomp are:
   Defaults to `0.15`.
 - `nonlinear_exponent`: nonlinear drag exponent for inertial particles.
   Defaults to `0.687`.
-- `wall_zone_indices`: boundary zone indices that should act as elastic rebound
-  walls. This requires `inertia` to be `true`.
+- Elastic wall rebounds are enabled by listing the wall zones in
+  `wall_zone_indices` under the `fluid` object, i.e.
+  `case.fluid.wall_zone_indices`, not in the simcomp object, where the keyword
+  is not accepted. This requires `inertia` to be `true`.
+- `log`: whether to print the particle tracking status to the log. Defaults to
+  `true`.
+- `start_time`: the particles are not advanced before this simulation time.
+  Defaults to the start of the simulation.
 - `interpolation`: sub-dictionary passed to the global interpolation setup.
 - `output_filename`: base name for the trajectory output. Defaults to the
-  simcomp name.
+  simcomp name, which is `lpt` unless `name` is given.
 - `output_format`: trajectory output format. Supported values are `csv`, `h5`,
   and `hdf5`. Defaults to `csv`.
 - `snapshots_per_file`: controls how many written trajectory snapshots are
@@ -694,6 +733,8 @@ center point. The compute control specifies how often they are computed and
 printed into the log. Scale specifies a scale for the computed force/torque.
 Conventient if one wants to scale with the area or similar. long_print is
 default false and can be set to true to print all digits in the calculation.
+The name of the fluid whose forces are computed is set with `fluid_name`,
+which defaults to `"fluid"`.
 Subroutines used in the simcomp can be found in src/qoi/drag_torque.f90
 
  ~~~~~~~~~~~~~~~{.json}
@@ -745,7 +786,8 @@ Optional fields for this simcomp are:
 - `viscosity_field`: the registered field used as \f$ \mu \f$. Default
   `<fluid_name>_mu_tot`.
 - `components`: which of the four fields to register, given as a list of `"x"`,
-  `"y"`, `"z"` and `"mag"`, or as `"all"` (default). This only controls what is
+  `"y"`, `"z"` and `"mag"`, or as the list `["all"]` (default). A bare string
+  is not accepted. This only controls what is
   stored, to save memory; the full traction vector is always computed.
 
 ~~~~~~~~~~~~~~~{.json}
@@ -778,7 +820,8 @@ keywords:
     following additional keyword:
     - `c_s`: The Smagorinsky constant, defaults to 0.17.
   - `dynamic_smagorinsky`: The dynamic Smagorinsky model.
-    - `test_filter`: The test filter for the dynamic Smagorinsky model
+    - `test_filter`: The test filter for the dynamic Smagorinsky model, an
+      object, see below. Required.
   - `vreman`: The Vreman model. Configured by the following additional keywords:
     - `c`: The model constant, defaults to 0.07.
     - `buoyancy_correction`: Whether or not to apply a correction to the eddy
@@ -814,7 +857,7 @@ keywords:
     - `TKE_source_field`: The field name of the source terms in the TKE equation
       including shear production, buoyancy contribution and dissipation,
       defaults to `TKE_source`.
-- `les_delta`: Selects the way to compute the LES filter length scale. Currently
+- `delta_type`: Selects the way to compute the LES filter length scale. Currently
   three alternatives are provided and the default one is `pointwise` if nothing
   is specified:
   - `pointwise`: Computes a local value based on the spacing of the GLL nodes.
@@ -845,23 +888,25 @@ keywords:
  ~~~~~~~~~~~~~~~
 
  Please also note that for the dynamic Smagorinsky model, one needs to specify
- the test filter in the following way for the Boyd filter as the test filter
- (one could also use "nonBoyd" as the option):
+ the test filter with the `test_filter` object, in the following way for the
+ Boyd filter as the test filter (one could also use "nonBoyd" as the option,
+ which is the default):
  ~~~~~~~~~~~~~~~{.json}
  {
    "type": "les_model",
    "model": "dynamic_smagorinsky",
    "test_filter": {
-      "filter": {
-        "type": "elementwise",
-        "elementwise_filter_type": "Boyd"
-      }
-    }
+      "type": "elementwise",
+      "elementwise_filter_type": "Boyd"
+   }
  }
  ~~~~~~~~~~~~~~~
- And one could not change the default test filter's kernel through the case
- file. If one needs to do so, he/she needs to dig into the code in
- src/les/dynamic_smagorinksy.f90.
+ The keywords directly inside `test_filter` are `elementwise_filter_type`,
+ which is `Boyd` or `nonBoyd`, and an optional `type`, which can only be
+ `elementwise`. A transfer function cannot be specified in the case file: a
+ `transfer_function` in `test_filter` is an error. If one needs to change the
+ default test filter's kernel, he/she needs to dig into the code in
+ src/les/dynamic_smagorinsky.f90.
 
  ### User statistics {#user_stats}
 
@@ -945,7 +990,9 @@ The simcomp is controlled by the following keywords:
   given in the list.
 - `"stream_mesh"`: Whether or not to stream mesh coordinates, in the order
   `x`, `y`, `z`. The mesh coordinates will always be streamed first, in
-  that exact order, before the fields in `"fields"`.
+  that exact order, before the fields in `"fields"`. Defaults to `false`.
+- `"start_time"`: The simulation time before which no data is streamed.
+  It can be the name of a constant. Defaults to `-1.0`.
 
 See the `cylinder` or `turb_pipe` examples for more details on how this
 simcomp cam be coupled to Python scripts for in-situ data processing.
@@ -1009,6 +1056,9 @@ following keywords:
     to 0.5
     - `c_avisc_entropy`: Coefficient for entropy-based artificial viscosity,
     defaults to 1.0
+
+    Both coefficients must be given as literal reals, they cannot refer to
+    constants.
 
 - `field_name`: The name of the artificial viscosity field added to the registry.
   Defaults to the model name.

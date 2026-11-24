@@ -111,6 +111,28 @@
         }
       ]
     },
+    "realNumber": {
+      "type": "number",
+      "x-neko-real": true
+    },
+    "positiveRealNumber": {
+      "type": "number",
+      "x-neko-real": true,
+      "exclusiveMinimum": 0
+    },
+    "nonNegativeRealNumber": {
+      "type": "number",
+      "x-neko-real": true,
+      "minimum": 0
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    },
     "numberArray": {
       "type": "array",
       "items": {
@@ -233,16 +255,16 @@
           "$ref": "#/$defs/coarseGridPreconditionerType"
         },
         "iterations": {
-          "$ref": "#/$defs/positiveIntegerOrRef"
+          "$ref": "#/$defs/positiveInteger"
         },
         "monitor": {
           "type": "boolean"
         },
         "levels": {
-          "$ref": "#/$defs/positiveIntegerOrRef"
+          "$ref": "#/$defs/positiveInteger"
         },
         "cheby_degree": {
-          "$ref": "#/$defs/positiveIntegerOrRef"
+          "$ref": "#/$defs/positiveInteger"
         }
       },
       "additionalProperties": false
@@ -254,13 +276,13 @@
           "type": "boolean"
         },
         "frequency": {
-          "$ref": "#/$defs/nonNegativeIntegerOrRef"
+          "$ref": "#/$defs/nonNegativeInteger"
         },
         "warm_start": {
           "type": "boolean"
         },
         "warm_start_iterations": {
-          "$ref": "#/$defs/positiveIntegerOrRef"
+          "$ref": "#/$defs/positiveInteger"
         }
       },
       "additionalProperties": false
@@ -281,13 +303,13 @@
       "type": "object",
       "properties": {
         "levels": {
-          "$ref": "#/$defs/positiveIntegerOrRef"
+          "$ref": "#/$defs/positiveInteger"
         },
         "iterations": {
-          "$ref": "#/$defs/positiveIntegerOrRef"
+          "$ref": "#/$defs/positiveInteger"
         },
         "cheby_degree": {
-          "$ref": "#/$defs/positiveIntegerOrRef"
+          "$ref": "#/$defs/positiveInteger"
         }
       },
       "additionalProperties": false
@@ -348,7 +370,7 @@
           }
         },
         "smoother_iterations": {
-          "$ref": "#/$defs/positiveIntegerOrRef"
+          "$ref": "#/$defs/positiveInteger"
         },
         "smoother_cheby_acc": {
           "type": "string",
@@ -493,9 +515,7 @@
         "absolute_tolerance": {
           "$ref": "#/$defs/numberOrRef"
         },
-        "relative_tolerance": {
-          "$ref": "#/$defs/numberOrRef"
-        },
+        "relative_tolerance": false,
         "max_iterations": {
           "$ref": "#/$defs/positiveIntegerOrRef"
         },

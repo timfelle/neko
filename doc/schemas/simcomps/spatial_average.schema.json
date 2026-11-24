@@ -21,7 +21,8 @@
               "$ref": "urn:neko:schema:simulation-components#/$defs/simcompFields"
             },
             "avg_direction": {
-              "$ref": "urn:neko:schema:simulation-components#/$defs/simcompAvgDirection"
+              "type": "string",
+              "enum": ["x", "y", "z", "xy", "xz", "yz"]
             },
             "output_filename": {
               "$ref": "urn:neko:schema:simulation-components#/$defs/nonEmptyString"

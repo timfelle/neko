@@ -49,12 +49,17 @@ The kernel is defined through an optional array `transfer_function` whose size i
 
 One could set up the elementwise_filter in the following way for polynomial order `7`.
 ~~~~~~~~~~~~~~~{.json}
-"filter": {
-    "type": "elementwise",
+{
     "elementwise_filter_type": "Boyd",
     "transfer_function": [1,1,1,0.7,0.3,0,0,0]
 }
 ~~~~~~~~~~~~~~~
+The initialisation of `elementwise_filter_t` from a JSON object reads only the
+keywords `elementwise_filter_type` and `transfer_function`; a `type` keyword in
+the object is not used to select the filter. Where this object is placed in the
+case file is decided by the code using the filter, e.g. `test_filter` of the
+`dynamic_smagorinsky` model of the \ref simcomp_les_model simcomp, which does
+not accept a `transfer_function`.
 One could also refer to `dynamic_smagorinsky.f90` for an example of using `elementwise_filter_t` in the neko code.
 
 ## High-pass filter relaxation source term {#filter_hpfrt}

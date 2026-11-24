@@ -1,8 +1,9 @@
 # Scalar {#case-file_scalar}
 The scalar object allows to add a scalar transport equation to the solution. The
 solution variable is called `s` by default, but can be controlled by the
- `field_name` entry in the case file. In the fld files, it is saved as
-`temperature`. Some properties of the object are inherited from `fluid`: the
+`name` entry in the case file. When several scalars are defined in the `scalars`
+array, the default names are `s_1`, `s_2`, and so on. In the fld files, it is
+saved as `temperature`. Some properties of the object are inherited from `fluid`: the
 value of the density, and the output control.
 
 ## Material properties
@@ -145,12 +146,18 @@ file documentation.
    }
    ~~~~~~~~~~~~~~~
 4. `point_zone`, the values are set to a constant base value, supplied under the
-   `base_value` keyword, and then assigned a zone value inside a point zone. The
-   point zone is specified by the `zone_name` keyword, and should be defined in the
-   `case.point_zones` object. See more about [point zones](@ref point-zones).
+   `base_value` keyword, and then assigned the value given under the
+   `zone_value` keyword inside a point zone. The point zone is specified by the
+   `zone_name` keyword, and should be defined in the `case.point_zones` object.
+   See more about [point zones](@ref point-zones).
 5. `field`, where the initial condition is retrieved from a field file. Works
    in the same way as for the fluid. See the
-   [fluid section](@ref case-file_fluid-ic) for detailed explanations.
+   [fluid section](@ref case-file_fluid-ic) for detailed explanations. In
+   addition to the keywords described there, `target_index` selects which
+   field in the file is read. It is a non-negative integer, where 0 is the
+   temperature, and it defaults to the index of the scalar. The keywords
+   `interpolation.tolerance` and `interpolation.padding` must be given as
+   literal reals.
 
 ## Source terms
 
@@ -167,21 +174,21 @@ standard choice would be `"type": "cg"` and `"preconditioner": "jacobi"`.
 
 | Name                           | Description                                                           | Admissible values                           | Default value |
 | ------------------------------ | --------------------------------------------------------------------- | ------------------------------------------- | ------------- |
-| `enabled`                      | Whether to enable the scalar computation.                             | `true` or `false`                           | `true`        |
-| `name`                         | The name associated to the scalar solver.                             | String                                      | `scalar`      |
-| `field_name`                   | The name of the solution in the field registry.                       | A string                                    | `s`           |
+| `enabled`                      | Whether to enable the scalar computation. If `false`, `initial_condition` and `solver` are not required. | `true` or `false`                           | `true`        |
+| `scheme`                       | The scalar solver scheme.                                             | `pnpn`                                      | `pnpn`        |
+| `name`                         | The name associated to the scalar solver, which is also the name of the solution in the field registry. | A string                                    | `s` for a single scalar, `s_<i>` for entry `i` of `scalars` |
+| `freeze`                       | Whether to skip the time step of the scalar equation, leaving the field unchanged. | `true` or `false`                           | `false`       |
 | `Pe`                           | The Peclet number.                                                    | Positive real                               | -             |
 | `cp`                           | Specific heat capacity.                                               | Positive real                               | -             |
 | `lambda`                       | Thermal conductivity.                                                 | Positive real                               | -             |
 | `alphat.nut_dependency`        | Whether the eddy diffusivity depends on the eddy kinematic viscosity. | `true` or `false`                           | -             |
-| `alphat.alphat_field`          | Name of the turbulent diffusivity field.                              | String                                      | Empty string  |
-| `alphat.nut_field`             | Name of the turbulent kinematic viscosity field.                      | String                                      | Empty string  |
-| `alphat.Pr_t`                  | Turbulent Prandtl number                                              | Positive real                               | -             |
-| `boundary_types`               | Boundary types/conditions labels.                                     | Array of strings                            | -             |
+| `alphat.alphat_field`          | Name of the turbulent diffusivity field. Required if `nut_dependency` is `false`. | String                          | -             |
+| `alphat.nut_field`             | Name of the turbulent kinematic viscosity field. Required if `nut_dependency` is `true`. | String                      | -             |
+| `alphat.Pr_t`                  | Turbulent Prandtl number. Required if `nut_dependency` is `true`.     | Positive real                               | -             |
+| `boundary_conditions`          | Array of JSON objects, defining the boundary conditions.              | See list of boundary conditions above       | -             |
 | `initial_condition.type`       | Initial condition type.                                               | `user`, `uniform`, `expression`, `point_zone`, `field` | -           |
 | `initial_condition.value`      | Value of the scalar initial condition.                                | Real, or a string if `"type" = "expression"` | -             |
 | `source_terms`                 | Array of JSON objects, defining additional source terms.              | See list of source terms above              | -             |
-| `gradient_jump_penalty`        | Array of JSON objects, defining additional gradient jump penalty.     | See list of gradient jump penalty above     | -             |
 | `advection`                    | Whether to compute the advetion term.                                 | `true` or `false`                           | `true`        |
 | `solver.type`                  | Linear solver for scalar equation.                                    | `cg`, `pipecg`, `bicgstab`, `cacg`, `gmres` | -             |
 | `solver.preconditioner.type`   | Linear solver preconditioner for the momentum equation.               | `ident`, `hsmg`, `jacobi`                   | -             |

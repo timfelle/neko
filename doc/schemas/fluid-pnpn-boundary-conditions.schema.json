@@ -32,7 +32,7 @@
           "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
         },
         "h_index": {
-          "$ref": "urn:neko:schema:common#/$defs/positiveIntegerOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/positiveInteger"
         },
         "sampling": {
           "oneOf": [
@@ -66,7 +66,7 @@
                   ]
                 },
                 "n_samples": {
-                  "$ref": "urn:neko:schema:common#/$defs/positiveIntegerOrRef"
+                  "$ref": "urn:neko:schema:common#/$defs/positiveInteger"
                 },
                 "output_h": {
                   "type": "boolean",
@@ -121,7 +121,7 @@
                   ]
                 },
                 "n_samples": {
-                  "$ref": "urn:neko:schema:common#/$defs/positiveIntegerOrRef"
+                  "$ref": "urn:neko:schema:common#/$defs/positiveInteger"
                 },
                 "output_h": {
                   "type": "boolean",
@@ -191,9 +191,7 @@
             "name": {
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
             },
-            "value": {
-              "$ref": "urn:neko:schema:common#/$defs/vector3OrRef"
-            }
+            "value": false
           },
           "additionalProperties": false
         },
@@ -290,14 +288,12 @@
             "name": {
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
             },
-            "value": {
-              "$ref": "urn:neko:schema:common#/$defs/vector3OrRef"
-            },
+            "value": false,
             "delta": {
-              "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
             },
             "velocity_scale": {
-              "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
             }
           },
           "additionalProperties": false
@@ -372,10 +368,10 @@
               "additionalProperties": false
             },
             "delta": {
-              "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
             },
             "velocity_scale": {
-              "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+              "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
             }
           },
           "additionalProperties": false
@@ -403,10 +399,10 @@
               "type": "object",
               "properties": {
                 "tolerance": {
-                  "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
+                  "$ref": "urn:neko:schema:common#/$defs/realNumber"
                 },
                 "padding": {
-                  "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
+                  "$ref": "urn:neko:schema:common#/$defs/realNumber"
                 }
               },
               "additionalProperties": false
@@ -638,7 +634,7 @@
                   "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
                 },
                 "z0h": {
-                  "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+                  "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
                 },
                 "g": {
                   "$ref": "urn:neko:schema:common#/$defs/vector3OrRef"
@@ -692,7 +688,7 @@
                   "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
                 },
                 "z0h": {
-                  "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+                  "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
                 },
                 "g": {
                   "$ref": "urn:neko:schema:common#/$defs/vector3OrRef"
@@ -801,8 +797,44 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "zone_indices",
+            "velocity",
+            "pressure"
+          ],
+          "properties": {
+            "type": false,
+            "zone_indices": {
+              "$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"
+            },
+            "name": {
+              "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
+            },
+            "velocity": {
+              "$ref": "#/$defs/splitBoundaryConditionPart"
+            },
+            "pressure": {
+              "$ref": "#/$defs/splitBoundaryConditionPart"
+            }
+          },
+          "additionalProperties": true
         }
       ]
+    },
+    "splitBoundaryConditionPart": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
+        }
+      },
+      "additionalProperties": true
     }
   }
 }

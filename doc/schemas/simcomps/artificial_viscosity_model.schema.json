@@ -26,10 +26,12 @@
               "$ref": "urn:neko:schema:simulation-components#/$defs/nonEmptyString"
             },
             "c_avisc_low": {
-              "$ref": "urn:neko:schema:simulation-components#/$defs/numberOrRef"
+              "type": "number",
+              "x-neko-real": true
             },
             "c_avisc_entropy": {
-              "$ref": "urn:neko:schema:simulation-components#/$defs/numberOrRef"
+              "type": "number",
+              "x-neko-real": true
             }
           },
           "additionalProperties": true
