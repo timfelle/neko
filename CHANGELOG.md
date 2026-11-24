@@ -34,6 +34,15 @@
 - `checkneko` and the case-file schemas now reject a key that the code never
   reads but used to ignore, so cases that ran may now fail validation: `value`
   on plain `outflow` conditions. Remove it.
+- A `combine` point zone whose `subsets` name several other zones now uses
+  each named zone. Previously every named subset resolved to the first one, so
+  the results of such cases change.
+- The default `target_index` of a scalar `field` initial condition is now the
+  position of the scalar among the enabled scalars, counted from 0, which is
+  the slot Neko writes it to (the first scalar goes in the temperature slot).
+  Previously it counted from 1 for scalars not named `temperature`. Cases that
+  read a file not written by Neko, e.g. Nek5000 passive scalars, with the
+  default should set `target_index` explicitly.
 
 ## Develop
 
