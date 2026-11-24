@@ -15,7 +15,9 @@ This formulation can effectively be obtained by setting \f$ \rho = 1 \f$ and \f$
 provided in the case file.
 
 Note that if both `Re` and any of the dimensional material properties are
-provided, the simulation will issue an error.
+provided, the simulation will issue an error, unless the material properties
+are set in the user file, see below. In that case `Re`, `rho` and `mu` in the
+case file are ignored by Neko, and the schemas accept them.
 
 As an alternative to providing material properties in the case file, it is
 possible to do that in a special routine in the user file. This is demonstrated
@@ -369,7 +371,9 @@ A more detailed description of each boundary condition is provided below.
 * `outflow+dong`. Same as `outflow`, but additionally applies the Dong boundary
   condition on the pressure. This is a way to prevent backflow and therefore
   promotes numerical stability without having to create a mesh "sponge" at the
-  outlet. The optional keywords `delta`, the smoothing parameter of the
+  outlet, which is the one used when `full_stress_formulation` is `false` (the
+  default). With `full_stress_formulation` set to `true`, `value` is read and
+  required, and `file_name` is not. The optional keywords `delta`, the smoothing parameter of the
   backflow switch, and `velocity_scale`, the characteristic velocity scale,
   default to `0.01` and `1.0`, respectively. They must be given as literal
   reals, not as constants.
@@ -389,7 +393,8 @@ A more detailed description of each boundary condition is provided below.
   ```
 
 * `shear_stress`. Non-penetration condition combined with a set shear stress
-   vector. Only works with axis-aligned boundaries. The stress value is
+   vector. Only works with axis-aligned boundaries, and requires
+   `full_stress_formulation` to be `true`, as Neko stops otherwise. The stress value is
    specified by the `value` keyword, which should be an array of 3 reals. It is
    the responsibility of the user to set the vector in the direction parallel
    to the boundary.
@@ -403,7 +408,8 @@ A more detailed description of each boundary condition is provided below.
 
 * `wall_model`. A shear stress condition where the values are computed by a wall
    model. Meant to be used for wall-modelled large-eddy simulation. Only works
-   with axis-aligned boundaries. The model is selected using the `model`
+   with axis-aligned boundaries, and requires `full_stress_formulation` to be
+   `true`, as Neko stops otherwise. The model is selected using the `model`
    keyword. Additional configuration depends on the model selected.
 
    * The `spalding`model requires specifying `kappa` and `B`, which are the
@@ -863,7 +869,7 @@ The following types are currently implemented.
    - `reference_value`: The reference value of the scalar.
    - `g`: The gravity vector.
    - `beta`: The thermal expansion coefficient, defaults to the inverse of
-      `ref_value`.
+      `reference_value`.
 3. `coriolis`, a source term introducing a Coriolis force, defined as \f$ -2
    \Omega \times (u - U_g) \f$. Here, \f$ \Omega \f$ is the rotation vector and
    \f$ u \f$ is the velocity vector, and \f$ U_g \f$ is the geostrophic wind.

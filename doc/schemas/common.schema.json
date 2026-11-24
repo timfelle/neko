@@ -402,14 +402,40 @@
         },
         {
           "$ref": "#/$defs/phmgPreconditioner"
+        },
+        {
+          "$ref": "#/$defs/customPreconditioner"
         }
       ]
     },
-    "svv": {
+    "customPreconditioner": {
+      "description": "A preconditioner registered through the extension mechanism, which defines its own keys.",
       "type": "object",
       "required": [
-        "enabled"
+        "type"
       ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      },
+      "not": {
+        "properties": {
+          "type": {
+            "enum": [
+              "ident",
+              "jacobi",
+              "hsmg",
+              "phmg"
+            ]
+          }
+        },
+        "required": ["type"]
+      },
+      "additionalProperties": true
+    },
+    "svv": {
+      "type": "object",
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -478,6 +504,7 @@
       "allOf": [
         {
           "if": {
+            "required": ["enabled"],
             "properties": {
               "enabled": {"const": true}
             }
@@ -515,7 +542,6 @@
         "absolute_tolerance": {
           "$ref": "#/$defs/numberOrRef"
         },
-        "relative_tolerance": false,
         "max_iterations": {
           "$ref": "#/$defs/positiveIntegerOrRef"
         },

@@ -14,7 +14,7 @@
           "oneOf": [
             {
               "type": "integer",
-              "minimum": 1,
+              "minimum": 0,
               "maximum": 3
             },
             {
@@ -626,7 +626,7 @@
           "type": "boolean"
         },
         "wall_zone_indices": {
-          "$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/integerArray"
         },
         "ale": {
           "$ref": "#/$defs/ale"
@@ -693,18 +693,68 @@
               "velocity_solver",
               "pressure_solver"
             ],
-            "not": {
-              "required": ["Re"],
-              "anyOf": [
-                {"required": ["mu"]},
-                {"required": ["rho"]}
-              ]
-            },
             "properties": {
               "boundary_conditions": {
                 "type": "array",
                 "items": {
                   "$ref": "urn:neko:schema:fluid-pnpn-boundary-conditions#/$defs/fluidPnpnBoundaryCondition"
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "shear_stress and wall_model abort without the full stress formulation",
+          "if": {
+            "properties": {
+              "scheme": {
+                "const": "pnpn"
+              },
+              "boundary_conditions": {
+                "type": "array",
+                "items": {
+                  "not": {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "type": {
+                            "enum": ["shear_stress", "wall_model"]
+                          }
+                        },
+                        "required": ["type"]
+                      },
+                      {
+                        "properties": {
+                          "velocity": {
+                            "properties": {
+                              "type": {
+                                "enum": ["shear_stress", "wall_model"]
+                              }
+                            },
+                            "required": ["type"]
+                          }
+                        },
+                        "required": ["velocity"]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "if": {
+              "properties": {
+                "scheme": {
+                  "const": "pnpn"
+                }
+              }
+            },
+            "then": {
+              "required": ["full_stress_formulation"],
+              "properties": {
+                "full_stress_formulation": {
+                  "const": true
                 }
               }
             }

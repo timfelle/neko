@@ -36,6 +36,15 @@ supports this. Here is a list of things you can implement.
 - Matrix-vector products (`ax_t` descendants).
 - Scalar schemes (`scalar_scheme_t` descendants).
 - Scalar boundary conditions ([bc_t](#bc::bc_t) descendants).
+- Fluid velocity and pressure boundary conditions of the `pnpn` scheme
+  ([bc_t](#bc::bc_t) descendants), registered with
+  `register_fluid_pnpn_velocity_bc` and `register_fluid_pnpn_pressure_bc`, with
+  the procedure interface `fluid_pnpn_bc_allocate`. They are selected by the
+  `type` of the `velocity` or the `pressure` object of a boundary condition
+  that is given in the split form, as the joint `type` keyword only takes the
+  built-in types.
+- Artificial viscosity models (`avm_t` descendants), registered with
+  `register_avm`, with the procedure interface `avm_allocate`.
 
 This list will hopefully be extended later. Fluid schemes are a notable
 omission.
@@ -116,6 +125,24 @@ extern "C" {
 
 After compiling with `makeneko`, you can select your type in the JSON in the 
 appropriate place.
+
+## Checking a case file with custom types {#extending_checking}
+
+The JSON Schemas in `doc/schemas`, which `contrib/validate_case_schema.py` and
+`checkneko` check a case file against, accept a type that Neko does not define
+itself for simulation components, source terms, point zones, LES models,
+artificial viscosity models, wall models and preconditioners, and for scalar
+boundary conditions and scalar schemes. Such an entry must name its type with a
+string that is not one of the built-in ones, and may carry any other keys, as
+your type defines them. The keys that all simulation components share, such as
+`compute_control`, are still checked. A simulation component with a registered
+type must not set `is_user`, which is reserved for the simulation components of
+the user file. Those must give a `type` too.
+
+@note A built-in type is checked in full, but a misspelt name of one cannot be
+told from the name of a registered type, so it is accepted by the schemas and
+only reported by Neko, when it fails to find the type.
+
 
 One might wonder whether it's necessary to use this functionality—for example, 
 for source terms—when it's possible to simply use a corresponding user routine 

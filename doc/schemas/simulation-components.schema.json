@@ -137,7 +137,15 @@
           "$ref": "#/$defs/nonEmptyString"
         },
         "order": {
-          "type": "integer"
+          "oneOf": [
+            {
+              "const": -1
+            },
+            {
+              "type": "integer",
+              "minimum": 1
+            }
+          ]
         },
         "preprocess_control": {
           "$ref": "#/$defs/simcompComputeControl"
@@ -158,7 +166,7 @@
           "$ref": "#/$defs/numericOrRef"
         },
         "comment": {
-          "$ref": "#/$defs/nonEmptyString"
+          "type": "string"
         },
         "is_user": {
           "const": false
@@ -345,7 +353,9 @@
             "nek5000",
             "fld",
             "vtkhdf",
-            "adios2"
+            "adios2",
+            "hdf5",
+            "h5"
           ]
         },
         "output_subdivide": {
@@ -355,10 +365,24 @@
           "$ref": "#/$defs/nonEmptyString"
         }
       },
+      "additionalProperties": true
+    },
+    "simcompFieldWriterPointZone": {
+      "description": "The field writers abort on a point_zone without output_filename, and on one with a file format other than nek5000 or fld. Not used by field_subsampler, which removes point_zone before it sets up its writer and names its output after the component.",
+      "type": "object",
       "dependentRequired": {
         "point_zone": ["output_filename"]
       },
-      "additionalProperties": true
+      "if": {
+        "required": ["point_zone", "output_format"]
+      },
+      "then": {
+        "properties": {
+          "output_format": {
+            "enum": ["nek5000", "fld"]
+          }
+        }
+      }
     },
     "simcompProbesPoint": {
       "oneOf": [
@@ -392,7 +416,12 @@
             "type": {"const": "line"},
             "start": {"$ref": "#/$defs/vector3OrRef"},
             "end": {"$ref": "#/$defs/vector3OrRef"},
-            "amount": {"$ref": "#/$defs/integerOrRef"}
+            "amount": {
+              "oneOf": [
+                {"type": "integer", "minimum": 2},
+                {"$ref": "#/$defs/constRef"}
+              ]
+            }
           },
           "additionalProperties": false
         },
@@ -403,8 +432,18 @@
             "type": {"const": "circle"},
             "center": {"$ref": "#/$defs/vector3OrRef"},
             "normal": {"$ref": "#/$defs/vector3OrRef"},
-            "radius": {"$ref": "#/$defs/numberOrRef"},
-            "amount": {"$ref": "#/$defs/integerOrRef"},
+            "radius": {
+              "oneOf": [
+                {"type": "number", "x-neko-real": true, "exclusiveMinimum": 0},
+                {"$ref": "#/$defs/constRef"}
+              ]
+            },
+            "amount": {
+              "oneOf": [
+                {"type": "integer", "minimum": 1},
+                {"$ref": "#/$defs/constRef"}
+              ]
+            },
             "axis": {"enum": ["x", "y", "z"]}
           },
           "additionalProperties": false
@@ -491,15 +530,7 @@
           "const": "les_model"
         },
         "model": {
-          "type": "string",
-          "enum": [
-            "smagorinsky",
-            "dynamic_smagorinsky",
-            "vreman",
-            "sigma",
-            "wale",
-            "deardorff"
-          ]
+          "$ref": "#/$defs/nonEmptyString"
         },
         "nut_field": {
           "$ref": "#/$defs/nonEmptyString"
@@ -535,7 +566,8 @@
         {
           "type": "object",
           "required": [
-            "is_user"
+            "is_user",
+            "type"
           ],
           "properties": {
             "is_user": {
@@ -546,6 +578,50 @@
             }
           },
           "additionalProperties": true
+        },
+        {
+          "description": "A type registered through the extension mechanism, which defines its own keys and takes no is_user.",
+          "allOf": [
+            {
+              "$ref": "#/$defs/simcompBase"
+            },
+            {
+              "not": {
+                "properties": {
+                  "type": {
+                    "enum": [
+                      "boundary_operation",
+                      "boundary_flux",
+                      "lagrangian_particles",
+                      "lambda2",
+                      "probes",
+                      "les_model",
+                      "field_writer",
+                      "fluid_stats",
+                      "fluid_sgs_stats",
+                      "scalar_stats",
+                      "scalar_sgs_stats",
+                      "gradient",
+                      "divergence",
+                      "curl",
+                      "derivative",
+                      "weak_gradient",
+                      "force_torque",
+                      "spatial_average",
+                      "user_stats",
+                      "spectral_error",
+                      "data_streamer",
+                      "field_subsampler",
+                      "artificial_viscosity_model",
+                      "wall_shear_stress",
+                      "boundary_data_writer"
+                    ]
+                  }
+                },
+                "required": ["type"]
+              }
+            }
+          ]
         },
         {
           "$ref": "urn:neko:schema:simcomps:lambda2#/$defs/simulationComponent"

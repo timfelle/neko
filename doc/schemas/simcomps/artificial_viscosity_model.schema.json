@@ -11,6 +11,9 @@
           "$ref": "urn:neko:schema:simulation-components#/$defs/simcompFieldWriterOptions"
         },
         {
+          "$ref": "urn:neko:schema:simulation-components#/$defs/simcompFieldWriterPointZone"
+        },
+        {
           "type": "object",
           "required": [
             "model"
@@ -19,21 +22,43 @@
             "type": {
               "const": "artificial_viscosity_model"
             },
-            "model": {
-              "const": "entropy_viscosity"
-            },
             "field_name": {
               "$ref": "urn:neko:schema:simulation-components#/$defs/nonEmptyString"
-            },
-            "c_avisc_low": {
-              "type": "number",
-              "x-neko-real": true
-            },
-            "c_avisc_entropy": {
-              "type": "number",
-              "x-neko-real": true
             }
           },
+          "oneOf": [
+            {
+              "properties": {
+                "model": {
+                  "const": "entropy_viscosity"
+                },
+                "c_avisc_low": {
+                  "type": "number",
+                  "x-neko-real": true
+                },
+                "c_avisc_entropy": {
+                  "type": "number",
+                  "x-neko-real": true
+                }
+              }
+            },
+            {
+              "description": "A model registered through the extension mechanism, which defines its own keys.",
+              "properties": {
+                "model": {
+                  "$ref": "urn:neko:schema:simulation-components#/$defs/nonEmptyString"
+                }
+              },
+              "not": {
+                "properties": {
+                  "model": {
+                    "enum": ["entropy_viscosity"]
+                  }
+                },
+                "required": ["model"]
+              }
+            }
+          ],
           "additionalProperties": true
         }
       ]

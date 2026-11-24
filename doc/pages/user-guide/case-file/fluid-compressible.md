@@ -35,6 +35,11 @@ property is provided, both default to zero and no physical viscous flux is added
 See the user file documentation for details on implementing
 `material_properties`.
 
+@note Only the initial condition of type `user` sets the density. The built-in
+initial condition types set the velocity and the pressure, and leave the density
+unset, which the scheme then divides by when it computes the temperature. Use
+`"type": "user"` with the compressible scheme.
+
 Example configuration:
 ~~~~~~~~~~~~~~~{.json}
 {
@@ -52,7 +57,7 @@ Example configuration:
       {
         "type": "velocity_value",
         "zone_indices": [1],
-        "value": [3, 0, 0]
+        "value": [3.0, 0.0, 0.0]
       },
       {
         "type": "density_value",
@@ -62,7 +67,7 @@ Example configuration:
       {
         "type": "pressure_value",
         "zone_indices": [1],
-        "value": 1
+        "value": 1.0
       }
     ],
     "output_control": "nsamples",

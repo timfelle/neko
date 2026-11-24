@@ -35,16 +35,19 @@ addition to the `compute_` and `output_` ones described
   order. When given, the values of all simcomps must be unique and contiguous,
   starting at 1. Simcomps without `order` are placed after those that have it,
   in their order of appearance in the case file. By default, the order of
-  appearance is used.
+  appearance is used. The value `-1`, which is also the default, stands for no
+  order given. Other values below 1 are not valid.
 - `preprocess_control` and `preprocess_value`: Control when the preprocessing
   step of the simcomp is executed. They follow the same rules as the `compute_`
   keywords, including `fluid_output`, and default to `tsteps` and `1`.
 - `is_user`: If `true`, no built-in simcomp is created for the entry, i.e. the
-  factory returns without allocating one, and `type` can be any non-empty
-  string. The executor then stops with the error "Simulation component not
+  factory returns without allocating one, and `type`, which must still be given,
+  can be any non-empty string. Simcomps registered with
+  `register_simulation_component` must not set `is_user`, see
+  @ref extending. The executor then stops with the error "Simulation component not
   initialized" at the end of the setup, unless the simcomp has been set up by
   the user code. Defaults to `false`.
-- `comment`: A free-form string.
+- `comment`: A free-form string, which may be empty.
 
 ## List of simulation components
 
@@ -583,7 +586,10 @@ Unless `output_filename` is specified, the `fields` are appended to the
 fluid output as additional scalars.
 
 - The output format is controlled by the `output_format` keyword, which can be
-  set to `nek5000` (default), `vtkhdf`, or `adios2`.
+  set to `nek5000` (default), `fld`, `vtkhdf`, or `adios2`. The values `hdf5`
+  and `h5` select the HDF5 file writer, which needs Neko built with HDF5. A
+  `point_zone` given to a simcomp with these keywords, other than the
+  `field_subsampler`, is only supported with `nek5000` or `fld`.
 - The `output_precision` keyword controls the precision of the written data
   and can be set to `single` (default) or `double`.
 - When using the `vtkhdf` format, the `output_subdivide` keyword can be set to
@@ -641,7 +647,10 @@ Mandatory fields for this simcomp are:
 - Either `coordinates` or `points_file`:
   - `coordinates`: a flat list of particle coordinates,
     `[x1, y1, z1, x2, y2, z2, ...]`.
-  - `points_file`: a CSV file containing the initial particle coordinates.
+  - `points_file`: a CSV file containing the initial particle data, one
+    particle per row: the columns `x, y, z` if `inertia` is `false`, and
+    `x, y, z, u, v, w, d, rho` (position, velocity, diameter and density) if it
+    is `true`.
 
 When `inertia` is `true`, the JSON particle input also requires:
 - `velocities`: a flat list of initial particle velocities,
@@ -871,7 +880,8 @@ keywords:
   Defaults to `nut`. This allows two different SGS models to be active and saved
   to different fields, for example one for the scalar and one for the fluid.
 - `extrapolation`: Whether or not to extrapolate the velocity to
-  compute the eddy viscosity.
+  compute the eddy viscosity. The `deardorff` model does not implement it and
+  stops with an error if it is `true`.
   - `true`: extrapolate the velocity to the same order as
   the time scheme.
   - `false`: the default option, disables extrapolation.
@@ -1024,11 +1034,15 @@ The simcomp is controlled by the following keywords:
   (must exist in the registry).
 - `point_zone` (optional): The name of the point zone to use to mask the fields.
 - `polynomial_order` (optional): The new polynomial at which to interpolate
-  the fields. Must be different from the order used in the simulation.
+  the fields. When no `point_zone` is given, it must be different from the
+  order used in the simulation, as Neko stops otherwise. At least one of
+  `point_zone` and `polynomial_order` is required.
 
 The `field_subsampler` contains its own `field_writer`. Therefore, all the
 keywords used by the latter can also be specified, with the exception of
 `point_zone` and `fields` which will be handled by the `field_subsampler`.
+Unlike for the `field_writer`, `output_filename` is not needed with a
+`point_zone`: it defaults to the name of the simcomp.
 
 ~~~~~~~~~~~~~~~{.json}
  {

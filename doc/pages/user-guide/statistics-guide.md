@@ -139,9 +139,9 @@ The statistics fields created by this simcomp are accessible from the
 neko registry and retrievable under the following naming convention:
 `name_in_registry = name_of_simcomp + "/mean_" + name_of_field`. Unless 
 specified, the name of the simcomp will default to `fluid_stats`.
-For example, if `"fields": ["s", "my_field"]` and `"name": "my_stats"` then 
-the fields `"my_stats/mean_s"` and `"my_stats/mean_my_field"` will be added 
-to the registry. 
+For example, if `"name": "my_stats"` then the fields `"my_stats/mean_u"`,
+`"my_stats/mean_v"` and so on will be added to the registry. The fluid
+statistics simcomp has no `fields` keyword. 
 
 ## List of fields in output files
 

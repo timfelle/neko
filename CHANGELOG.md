@@ -31,10 +31,9 @@
 - Entries of `case.scalars` with `"enabled": false` are now skipped, instead
   of being solved. Remove the entry, or set `enabled` to true, if the scalar
   is needed.
-- `checkneko` and the case-file schemas now reject keys that the code never
-  reads but used to ignore, so cases that ran may now fail validation: a
-  linear-solver `relative_tolerance` and `value` on plain `outflow`
-  conditions. Remove these keys.
+- `checkneko` and the case-file schemas now reject a key that the code never
+  reads but used to ignore, so cases that ran may now fail validation: `value`
+  on plain `outflow` conditions. Remove it.
 
 ## Develop
 

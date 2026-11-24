@@ -11,6 +11,9 @@
           "$ref": "urn:neko:schema:simulation-components#/$defs/simcompFieldWriterOptions"
         },
         {
+          "$ref": "urn:neko:schema:simulation-components#/$defs/simcompFieldWriterPointZone"
+        },
+        {
           "type": "object",
           "properties": {
             "type": {

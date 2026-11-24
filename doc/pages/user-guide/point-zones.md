@@ -26,7 +26,7 @@ A box is defined from its `x,y` and `z` boundaries.
 ~~~~~~~~~~~~~~~{.json}
 [
     {
-        "name": mybox,
+        "name": "mybox",
         "geometry": "box",
         "x_bounds": [-1.0, 1.0],
         "y_bounds": [-1.0, 1.0],
@@ -45,7 +45,7 @@ A sphere is defined by its center and its radius.
         "geometry": "sphere",
         "center": [0.0, 0.0, 0.0],
         "radius": 0.01
-    },
+    }
 ]
 ~~~~~~~~~~~~~~~
 
@@ -61,7 +61,7 @@ A cylinder is defined by its end points and its radius.
         "start": [0.0, 0.0, 0.0],
         "end": [0.0, 0.0, 1.0],
         "radius": 0.01
-    },
+    }
 ]
 ~~~~~~~~~~~~~~~
 
@@ -79,9 +79,9 @@ select all the points **but** those inside the point zone.
         "geometry": "cylinder",
         "start": [0.0, 0.0, 0.0],
         "end": [0.0, 0.0, 1.0],
-        "radius": 0.01
-        "invert": true,
-    },
+        "radius": 0.01,
+        "invert": true
+    }
 ]
 ~~~~~~~~~~~~~~~
 
@@ -155,9 +155,8 @@ correct order in the case file, as demonstrated in the code snippet below.
                 "x_bounds": [-1.0, 1.0],
                 "y_bounds": [-1.0, 1.0],
                 "z_bounds": [-1.0, 1.0]
-            },
-
-        ],
+            }
+        ]
     },
     {
         "name": "inverted_combination",
@@ -166,10 +165,9 @@ correct order in the case file, as demonstrated in the code snippet below.
         "invert": true,
         "subsets":
         [
-            {"name": "combined_box_and_sphere"},
-        ],
-    },
-
+            {"name": "combined_box_and_sphere"}
+        ]
+    }
 ]
 ~~~~~~~~~~~~~~~
 
@@ -189,9 +187,10 @@ to the case file by registering an allocator for it with the
 `module_name_register_types` routine. The `geometry` keyword of a point zone in
 the case file can then take the name given in the registration, and it is also
 accepted for the zones listed in the `subsets` of a `combine` zone. The
-JSON schema in `doc/schemas/point-zones.schema.json`, however, only describes
-the built-in geometries, so a case file using a custom geometry is not accepted
-by the schema validator.
+JSON schema in `doc/schemas/point-zones.schema.json` checks the built-in
+geometries in full, and accepts any other `geometry` name together with any
+other keys, so that a case file using a custom geometry is accepted by the
+schema validator.
 
 
 ## Using point zones {#point-zones_using-point-zones}

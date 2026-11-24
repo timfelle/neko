@@ -485,7 +485,8 @@ boundary condition allows for time-dependent velocity profiles or non-uniform
 simulation.
 
 The user routine is called by the `user_velocity` and `user_pressure` boundary
-conditions for the fluid, and the `user` boundary condtition for the scalar.
+conditions for the fluid, and the `user_dirichlet` boundary condition for the
+scalar.
 Once the appropriate boundaries have been identified, the user function
 `dirichlet_conditions` should be used to compute and apply the desired values to
 our velocity/pressure/scalar field(s).
@@ -499,7 +500,7 @@ the scalar (`s` by default).
 
 It is crucial to understand that all three boundary condition will call the same
 routine! So, if one has, for example, both `user_velocity` for the fluid and
-`user` for the scalar, it is necessary to have an `if` statement in the user
+`user_dirichlet` for the scalar, it is necessary to have an `if` statement in the user
 routine to distinguish between the two cases. The convenient way to do that is
 to check the size of the passed field list and the names of the fields inside.
 For example, if there is one field and it is called `s`, one executes the code
@@ -643,8 +644,10 @@ The user-defined boundary conditions (`user_velocity`, `user_pressure`,
 `outflow+user`, `normal_outflow+user` for the fluid, and `user_dirichlet` and
 `user_neumann` for the scalar) accept additional keys of your choosing in the
 case file, including keys named `value` or `flux`. Neko does not read such keys
-and the case-file schema does not check their type. The one exception is
-`value` on `normal_outflow+user`, which is read as for `normal_outflow`.
+and the case-file schema does not check their type. The exceptions are the keys
+that `normal_outflow+user` reads as `normal_outflow` does: `value`,
+`file_name`, `interpolate`, `mesh_file_name` and `interpolation`, which the
+schema checks.
 
 The boundary condition object does not keep its JSON, and the
 `dirichlet_conditions` and `neumann_conditions` routines receive only the
@@ -661,8 +664,8 @@ This user function can be used to specify Neumann boundary values for
 the scalar(s). This type of boundary condition allows for time-dependent
 scalar flux over the surface.
 
-The user routine is called by the `user` boundary condition for the scalar.
-Once the appropriate boundaries have been identified, the user function
+The user routine is called by the `user_neumann` boundary condition for the
+scalar. Once the appropriate boundaries have been identified, the user function
 `neumann_conditions` should be used to compute and apply the desired values to
 our scalar field(s).
 
@@ -673,12 +676,12 @@ A single field with the same name as the solution field for
 the scalar (`s` by default).
 
 It is crucial to understand that all boundary conditions will call the same
-routine! So, if one has, for example, both `user` for two scalars,
+routine! So, if one has, for example, both `user_neumann` for two scalars,
 it is necessary to have an `if` statement in the user
 routine to distinguish between the two cases. The convenient way to do that is
 to check the names of the fields inside.
-For example, if there is one field and it is called `s0`, one executes the code
-setting the boundary values for the scalar `s0`.
+For example, if there is one field and it is called `s`, one executes the code
+setting the boundary values for the scalar `s`.
 
 Note that the fields that one manipulates in the user routine are not the actual
 scalar fields. Instead, the code does a masked copy from the dummy fields
@@ -1174,8 +1177,9 @@ with the scalar enabled. For a practical example of usage, see the
 
 Other fields may be added to the registry by various simulation components. For
 example:
-- If running with `simulation_components.vorticity` enabled, the fields
-  `omega_x, omega_y, omega_z` will be accessible in the registry.
+- If running with a `curl` simulation component enabled, the fields
+  `curl_x, curl_y, curl_z` will be accessible in the registry. The prefix
+  `curl` is set by the `computed_field` keyword of the simcomp.
 - If running with `simulation_components.lambda2` enabled, the field `lambda2`
   will be accessible in the registry.
 

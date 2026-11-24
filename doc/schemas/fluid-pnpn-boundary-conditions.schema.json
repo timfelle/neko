@@ -105,12 +105,14 @@
                   "oneOf": [
                     {
                       "type": "number",
+                      "x-neko-real": true,
                       "exclusiveMinimum": 0
                     },
                     {
                       "type": "array",
                       "items": {
                         "type": "number",
+                        "x-neko-real": true,
                         "exclusiveMinimum": 0
                       },
                       "minItems": 1
@@ -610,6 +612,36 @@
               }
             },
             "additionalProperties": false
+          },
+          {
+            "description": "A wall model registered through the extension mechanism, which defines its own keys.",
+            "allOf": [
+              {
+                "$ref": "#/$defs/wallModelBase"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
+                  }
+                },
+                "not": {
+                  "properties": {
+                    "model": {
+                      "enum": [
+                        "cai_sagaut_model_ii",
+                        "spalding",
+                        "rough_log_law",
+                        "most",
+                        "richardson"
+                      ]
+                    }
+                  },
+                  "required": ["model"]
+                }
+              }
+            ]
           },
           {
             "allOf": [

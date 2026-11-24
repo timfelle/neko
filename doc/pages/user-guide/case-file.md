@@ -32,10 +32,14 @@ parameter you are setting.
 Keys that the schemas do not define are rejected in the objects of built-in
 components, so that a misspelt key, which Neko would silently ignore, does not
 go unnoticed. Other keys are accepted at the top level of the file, next to
-`case`, for instance for the settings of other tools, in `case`, `case.fluid`
-and `case.scalar`, and in user-defined components: initial conditions of type
-`user`, boundary conditions of the `user_*` types and source terms of type
-`user`, whose parameters the user file defines.
+`case`, for instance for the settings of other tools, in `case`, `case.fluid`,
+`case.scalar` and the entries of `case.scalars`, and in user-defined
+components: initial conditions of type `user`, boundary conditions of the
+`user_*` types, of `outflow+user` and `normal_outflow+user` and in the
+`velocity` and `pressure` objects of the split form, and source terms of type
+`user`, whose parameters the user file defines. Linear solver objects, wall
+model entries, and `viscous_regularization` accept further keys as well. Types registered through Neko's extension mechanism are accepted
+by the schemas with any keys, see @ref extending_checking.
 
 ## Checking a case file {#case-file_checking}
 
@@ -106,6 +110,7 @@ The current high-level structure of the case file is shown below.
 ~~~~~~~~~~~~~~~
 
 The `version` keyword is reserved to track changes in the format of the file.
+Neko does not read it, and it can be left out.
 The subsections below list all the configuration options for each of the
 high-level objects. Some parameters will have default values, and are therefore
 optional.
@@ -190,7 +195,7 @@ entries: `name` and `value`. Here is an example:
     },
     {
       "name": "vector1",
-      "value": [1, 0, 1]
+      "value": [1.0, 0.0, 1.0]
     }
   ]
 }
@@ -201,8 +206,8 @@ instead be defined as a string, pointing to the name of the corresponding
 parameter in the `constants` object. As an example, recall that output frequency
 is controlled by the keyword `output_value`. It is a plausible scenario that the
 frequency is the same for multiple solvers, simulation components, etc. Assuming
-a simulation with both [fluid](@ref case-file_fluid) and [scalar](@ref
-case-file_scalar) solvers active, the following could be used.
+a simulation with both the [fluid](@ref case-file_fluid) and a [simulation
+component](@ref simcomps) that writes output, the following could be used.
 
 ```json
 {
@@ -215,15 +220,24 @@ case-file_scalar) solvers active, the following could be used.
   ],
   "fluid":
   {
+    "output_control": "tsteps",
     "output_value": "common_output_value"
   },
-  "scalar":
-  {
-    "output_value": "common_output_value"
-  }
+  "simulation_components":
+  [
+    {
+      "type": "field_writer",
+      "fields": ["u"],
+      "output_filename": "u_fields",
+      "output_control": "tsteps",
+      "output_value": "common_output_value"
+    }
+  ]
 }
 ```
-The advantage is that this guarantees that the fluid and scalar output will be
+The scalar takes its output control from the fluid, see the
+[scalar](@ref case-file_scalar) section.
+The advantage is that this guarantees that the fluid and simulation component output will be
 in sync, and if one wants to change the frequency only does that in one place in
 the case file. Another use case is demonstrated in the `hemi` example, where the
 freestream velocity is defined under `constants` and then used to setup both

@@ -156,6 +156,36 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "description": "A geometry registered through the extension mechanism, which defines its own keys.",
+          "type": "object",
+          "required": [
+            "name",
+            "geometry"
+          ],
+          "properties": {
+            "name": {
+              "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
+            },
+            "geometry": {
+              "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
+            }
+          },
+          "not": {
+            "properties": {
+              "geometry": {
+                "enum": [
+                  "box",
+                  "sphere",
+                  "cylinder",
+                  "combine"
+                ]
+              }
+            },
+            "required": ["geometry"]
+          },
+          "additionalProperties": true
         }
       ]
     }

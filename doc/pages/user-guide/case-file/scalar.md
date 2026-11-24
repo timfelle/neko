@@ -2,7 +2,8 @@
 The scalar object allows to add a scalar transport equation to the solution. The
 solution variable is called `s` by default, but can be controlled by the
 `name` entry in the case file. When several scalars are defined in the `scalars`
-array, the default names are `s_1`, `s_2`, and so on. In the fld files, it is
+array, the default names are `s_1`, `s_2`, and so on, except that an array with
+a single entry gives that entry the name `s`. In the fld files, it is
 saved as `temperature`. Some properties of the object are inherited from `fluid`: the
 value of the density, and the output control.
 
@@ -58,7 +59,7 @@ The following types of conditions are available for the scalar:
   ```json
   {
     "type": "dirichlet",
-    "value": 1,
+    "value": 1.0,
     "zone_indices": [1, 2]
   }
   ```
@@ -76,7 +77,7 @@ The following types of conditions are available for the scalar:
   ```json
   {
     "type": "neumann",
-    "flux": 1,
+    "flux": 1.0,
     "zone_indices": [1, 2]
   }
   ```
@@ -94,14 +95,6 @@ The following types of conditions are available for the scalar:
   [user-file documentation](@ref user-file_field-neumann-update).
   Custom keys of your choosing, including `value` or `flux`, are accepted,
   see [user-defined condition keys](@ref user-file_user-bc-keys).
-  ```json
-  {
-    "type": "user_neumann",
-    "zone_indices": [1, 2]
-  }
-  ```
-* `user_neumann`. User-defined scalar flux, configured through the
-  [user-file Neumann callback](@ref user-file_field-neumann-update).
   ```json
   {
     "type": "user_neumann",
@@ -132,7 +125,8 @@ The following types of conditions are available for the scalar:
 ## Initial conditions
 
 The object `initial_condition` is used to provide initial conditions.
-It is mandatory.
+It is mandatory, except when the case restarts from a checkpoint with
+`case.restart_file`, as the initial condition is then not read.
 The means of prescribing the values are controlled via the `type` keyword:
 
 1. `user`, the values are set inside the compiled user file as explained in the
@@ -160,8 +154,9 @@ file documentation.
    addition to the keywords described there, `target_index` selects which
    field in the file is read. It is a non-negative integer, where 0 is the
    temperature. It defaults to the position of the scalar among the enabled
-   scalars not named `temperature`, counted from 1; a scalar named
-   `temperature` defaults to 0. Scalars with `enabled` set to `false` are not
+   scalars, counted from 0, which is where Neko writes it: the first scalar
+   goes in the temperature field and the following ones in scalars 1, 2, and
+   so on, whatever their names. Scalars with `enabled` set to `false` are not
    counted. When initialising from a file written with a different set of
    enabled scalars, set `target_index` explicitly, otherwise the fields are
    read shifted. The keywords `interpolation.tolerance` and `interpolation.padding` must be given as
@@ -169,14 +164,19 @@ file documentation.
 
 ## Source terms
 
-The configuration of source terms is the same as for the fluid. A demonstration
-of using source terms for the scalar can be found in the `scalar_mms` example.
+The configuration of source terms is the same as for the fluid, but only the
+types `constant` (with a single value in `values`), `field` (with a single name
+in `field_names`), `user`, `gradient_jump_penalty` and `hpfrt` are available
+for the scalar. The other source terms of the fluid act on the three velocity
+components, and the schema does not accept them. A demonstration of using
+source terms for the scalar can be found in the `scalar_mms` example.
 
 ## Linear solver configuration
 
 Should be provided as an object under the `solver` keyword. For available
 configuration options, see the corresponding documentation for the fliud. A
-standard choice would be `"type": "cg"` and `"preconditioner": "jacobi"`.
+standard choice would be `"type": "cg"` and `"preconditioner": {"type":
+"jacobi"}`.
 
 ## Full parameter table
 
@@ -184,7 +184,7 @@ standard choice would be `"type": "cg"` and `"preconditioner": "jacobi"`.
 | ------------------------------ | --------------------------------------------------------------------- | ------------------------------------------- | ------------- |
 | `enabled`                      | Whether to enable the scalar computation. If `false`, `initial_condition` and `solver` are not required. For an entry of `scalars`, the entry is skipped, and the other entries keep their position-based default names `s_<i>`. | `true` or `false`                           | `true`        |
 | `scheme`                       | The scalar solver scheme.                                             | `pnpn`                                      | `pnpn`        |
-| `name`                         | The name associated to the scalar solver, which is also the name of the solution in the field registry. | A string                                    | `s` for a single scalar, `s_<i>` for entry `i` of `scalars` |
+| `name`                         | The name associated to the scalar solver, which is also the name of the solution in the field registry. | A string                                    | `s` for a single scalar or a `scalars` array with one entry, `s_<i>` for entry `i` of a longer `scalars` array |
 | `freeze`                       | Whether to skip the time step of the scalar equation, leaving the field unchanged. | `true` or `false`                           | `false`       |
 | `Pe`                           | The Peclet number.                                                    | Positive real                               | -             |
 | `cp`                           | Specific heat capacity.                                               | Positive real                               | -             |
@@ -194,12 +194,12 @@ standard choice would be `"type": "cg"` and `"preconditioner": "jacobi"`.
 | `alphat.nut_field`             | Name of the turbulent kinematic viscosity field. Required if `nut_dependency` is `true`. | String                      | -             |
 | `alphat.Pr_t`                  | Turbulent Prandtl number. Required if `nut_dependency` is `true`.     | Positive real                               | -             |
 | `boundary_conditions`          | Array of JSON objects, defining the boundary conditions.              | See list of boundary conditions above       | -             |
-| `initial_condition.type`       | Initial condition type.                                               | `user`, `uniform`, `expression`, `point_zone`, `field` | -           |
+| `initial_condition.type`       | Initial condition type. Not read when the case restarts.              | `user`, `uniform`, `expression`, `point_zone`, `field` | -           |
 | `initial_condition.value`      | Value of the scalar initial condition.                                | Real, or a string if `"type" = "expression"` | -             |
 | `source_terms`                 | Array of JSON objects, defining additional source terms.              | See list of source terms above              | -             |
 | `advection`                    | Whether to compute the advetion term.                                 | `true` or `false`                           | `true`        |
-| `solver.type`                  | Linear solver for scalar equation.                                    | `cg`, `pipecg`, `bicgstab`, `cacg`, `gmres` | -             |
-| `solver.preconditioner.type`   | Linear solver preconditioner for the momentum equation.               | `ident`, `hsmg`, `jacobi`                   | -             |
+| `solver.type`                  | Linear solver for scalar equation.                                    | `cg`, `pipecg`, `bicgstab`, `cacg`, `gmres`, `fused_cg`, `cheby` | -             |
+| `solver.preconditioner.type`   | Linear solver preconditioner for the momentum equation.               | `ident`, `hsmg`, `phmg`, `jacobi`           | -             |
 | `solver.absolute_tolerance`    | Linear solver convergence criterion for the momentum equation.        | Positive real                               | -             |
 | `solver.max_iterations`        | Linear solver max iteration count for the scalar equation.            | Positive integer                            | 1000          |
 | `solver.space_size`            | Krylov space size of `gmres` for the scalar equation.                 | Positive integer                            | 30            |

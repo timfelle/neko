@@ -11,6 +11,9 @@
           "$ref": "urn:neko:schema:simulation-components#/$defs/simcompFieldWriterOptions"
         },
         {
+          "$ref": "urn:neko:schema:simulation-components#/$defs/simcompFieldWriterPointZone"
+        },
+        {
           "allOf": [
             {
               "$ref": "urn:neko:schema:simulation-components#/$defs/lesModelCommon"
@@ -157,6 +160,26 @@
                     "extrapolation": {
                       "const": false
                     }
+                  },
+                  "additionalProperties": true
+                },
+                {
+                  "description": "A model registered through the extension mechanism, which defines its own keys.",
+                  "type": "object",
+                  "not": {
+                    "properties": {
+                      "model": {
+                        "enum": [
+                          "smagorinsky",
+                          "dynamic_smagorinsky",
+                          "vreman",
+                          "sigma",
+                          "wale",
+                          "deardorff"
+                        ]
+                      }
+                    },
+                    "required": ["model"]
                   },
                   "additionalProperties": true
                 }

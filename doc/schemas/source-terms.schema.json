@@ -96,7 +96,7 @@
           "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
         },
         "file_index": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeIntegerOrRef"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeInteger"
         }
       },
       "allOf": [
@@ -464,6 +464,15 @@
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
             }
           },
+          "allOf": [
+            {
+              "if": {
+                "properties": {"type": {"const": "PDE"}},
+                "required": ["type"]
+              },
+              "then": {"required": ["radius"]}
+            }
+          ],
           "additionalProperties": false
         },
         "start_time": {
@@ -637,6 +646,39 @@
         }
       ]
     },
+    "customSourceTerm": {
+      "description": "A source term registered through the extension mechanism, which defines its own keys.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
+        }
+      },
+      "not": {
+        "properties": {
+          "type": {
+            "enum": [
+              "constant",
+              "field",
+              "user",
+              "gradient_jump_penalty",
+              "hpfrt",
+              "boussinesq",
+              "coriolis",
+              "centrifugal",
+              "brinkman",
+              "sponge",
+              "translation"
+            ]
+          }
+        },
+        "required": ["type"]
+      },
+      "additionalProperties": true
+    },
     "scalarSourceTerm": {
       "oneOf": [
         {
@@ -647,6 +689,9 @@
         },
         {
           "$ref": "#/$defs/sharedSourceTerm"
+        },
+        {
+          "$ref": "#/$defs/customSourceTerm"
         }
       ]
     },
@@ -663,6 +708,9 @@
         },
         {
           "$ref": "#/$defs/fluidOnlySourceTerm"
+        },
+        {
+          "$ref": "#/$defs/customSourceTerm"
         }
       ]
     }

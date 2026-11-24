@@ -4,7 +4,6 @@
   "title": "Neko case file",
   "type": "object",
   "required": [
-    "version",
     "case"
   ],
   "properties": {
@@ -191,8 +190,34 @@
             "properties": {
               "fluid": {
                 "required": ["initial_condition"]
+              },
+              "scalar": {
+                "$ref": "urn:neko:schema:scalar#/$defs/scalarInitialConditionRequired"
+              },
+              "scalars": {
+                "type": "array",
+                "items": {
+                  "$ref": "urn:neko:schema:scalar#/$defs/scalarInitialConditionRequired"
+                }
               }
             }
+          }
+        },
+        {
+          "$comment": "output_control org reads the number of samples from case.nsamples",
+          "if": {
+            "properties": {
+              "fluid": {
+                "properties": {
+                  "output_control": {"const": "org"}
+                },
+                "required": ["output_control"]
+              }
+            },
+            "required": ["fluid"]
+          },
+          "then": {
+            "required": ["nsamples"]
           }
         },
         {

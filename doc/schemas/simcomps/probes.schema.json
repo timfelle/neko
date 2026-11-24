@@ -21,7 +21,8 @@
               "$ref": "urn:neko:schema:simulation-components#/$defs/simcompFields"
             },
             "output_file": {
-              "$ref": "urn:neko:schema:simulation-components#/$defs/nonEmptyString"
+              "type": "string",
+              "pattern": "\\.(csv|h5|hdf5)$"
             },
             "points_file": {
               "$ref": "urn:neko:schema:simulation-components#/$defs/nonEmptyString"

@@ -238,6 +238,12 @@
             "flux": {
               "anyOf": [
                 {"$ref": "urn:neko:schema:common#/$defs/numberOrRef"},
+                {
+                  "type": "array",
+                  "items": {"type": "number", "x-neko-real": true},
+                  "minItems": 1,
+                  "maxItems": 1
+                },
                 {"$ref": "urn:neko:schema:common#/$defs/vector3"}
               ]
             }
@@ -408,11 +414,23 @@
             }
           },
           "else": {
-            "required": ["initial_condition", "solver"]
+            "required": ["solver"]
           }
         }
       ],
       "additionalProperties": true
+    },
+    "scalarInitialConditionRequired": {
+      "$comment": "Applied when the case does not restart, as a restart does not read the initial condition of the scalars",
+      "if": {
+        "required": ["enabled"],
+        "properties": {
+          "enabled": {"const": false}
+        }
+      },
+      "else": {
+        "required": ["initial_condition"]
+      }
     }
   }
 }
