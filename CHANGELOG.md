@@ -22,6 +22,19 @@
   logical `output_boundary`. Accordingly, `fluid%params` is now a copy of
   `case.fluid`, so keys must be looked up relative to it, e.g.
   `initial_condition` rather than `case.fluid.initial_condition`.
+- The `tamg` coarse grid solver of the `hsmg` preconditioner now runs
+  `coarse_grid.iterations` = 1 (the documented default) when the key is
+  absent, instead of 10. Set `iterations: 10` to keep the old behaviour.
+- The dynamic Smagorinsky model now stops with an error when
+  `test_filter.transfer_function` is set or `test_filter.type` is not
+  `elementwise`. These were previously accepted and partly overwritten.
+- Entries of `case.scalars` with `"enabled": false` are now skipped, instead
+  of being solved. Remove the entry, or set `enabled` to true, if the scalar
+  is needed.
+- `checkneko` and the case-file schemas now reject keys that the code never
+  reads but used to ignore, so cases that ran may now fail validation: a
+  linear-solver `relative_tolerance`, `value` on outflow conditions, `value`
+  and `flux` on user boundary conditions. Remove these keys.
 
 ## Develop
 
