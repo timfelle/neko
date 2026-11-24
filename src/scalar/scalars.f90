@@ -62,6 +62,8 @@ module scalars
      type(scalar_scheme_wrapper_t), allocatable :: scalar_fields(:)
      !> Shared KSP solver for all scalar fields
      class(ksp_t), allocatable :: shared_ksp
+     !> Position of each scalar field in the `case.scalars` array
+     integer, allocatable :: json_index(:)
    contains
      !> Initialize the scalars container
      generic :: init => scalars_init, scalars_init_single
@@ -113,9 +115,11 @@ contains
 
     ! Allocate the array of the scalar scheme wrappers
     allocate(this%scalar_fields(n_enabled))
+    allocate(this%json_index(n_enabled))
 
     ! Collect and validate field names for all scalars
     allocate(character(len=256) :: field_names(n_scalars))
+    field_names = ''
 
     do i = 1, n_scalars
        if (.not. enabled(i)) cycle
@@ -157,6 +161,7 @@ contains
     do i = 1, n_scalars
        if (.not. enabled(i)) cycle
        j = j + 1
+       this%json_index(j) = i
        call json_extract_item(params, "", i, json_subdict)
 
        ! Use the processed field names for all scalars
@@ -246,8 +251,7 @@ contains
     type(json_file), intent(inout) :: params
     type(user_t), intent(in) :: user
     logical, intent(in) :: is_restart
-    integer :: i, k, running_scalar_index, scalar_index, var_type
-    logical :: enabled
+    integer :: k, running_scalar_index, scalar_index, var_type
     type(json_file) :: json_subdict
 
     call neko_log%section("Scalar initial condition ")
@@ -260,9 +264,7 @@ contains
        ! object for `case.scalar`.
        call params%info('', var_type = var_type)
 
-       ! Field k belongs to the k-th enabled entry of the array.
        running_scalar_index = 0
-       i = 0
        do k = 1, size(this%scalar_fields)
           if (trim(this%scalar_fields(k)%scalar%name) .eq. 'temperature') then
              scalar_index = 0
@@ -272,13 +274,8 @@ contains
           end if
 
           if (var_type .eq. json_array) then
-             enabled = .false.
-             do while (.not. enabled)
-                i = i + 1
-                call json_extract_item(params, "", i, json_subdict)
-                call json_get_or_default(json_subdict, 'enabled', enabled, &
-                     .true.)
-             end do
+             call json_extract_item(params, "", this%json_index(k), &
+                  json_subdict)
              call this%scalar_fields(k)%scalar%set_initial_condition( &
                   json_subdict, user, scalar_index)
           else
@@ -316,6 +313,10 @@ contains
           call this%scalar_fields(i)%free()
        end do
        deallocate(this%scalar_fields)
+    end if
+
+    if (allocated(this%json_index)) then
+       deallocate(this%json_index)
     end if
 
     if (allocated(this%shared_ksp)) then
