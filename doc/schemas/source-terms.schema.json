@@ -105,6 +105,33 @@
       "allOf": [
         {
           "if": {
+            "properties": {"type": {"enum": ["point_zone", "field", "file"]}},
+            "required": ["type"]
+          },
+          "then": {
+            "properties": {
+              "distance_transform": false,
+              "cache": false,
+              "cache_file": false,
+              "mesh_transform": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"type": {"enum": ["boundary_mesh", "point_zone", "field"]}},
+            "required": ["type"]
+          },
+          "then": {
+            "properties": {
+              "file_name": false,
+              "field_name": false,
+              "file_index": false
+            }
+          }
+        },
+        {
+          "if": {
             "properties": {"type": {"enum": ["boundary_mesh", "point_zone", "field"]}},
             "required": ["type"]
           },

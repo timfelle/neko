@@ -11,6 +11,11 @@
 - PR#2891 `csv_file_t%header` is now a deferred-length allocatable, which
   stays unallocated until the header is set. Code reading it directly must
   check `allocated()` first.
+- `checkneko` and the source-term schema now reject keys that a Brinkman
+  source term never reads but used to ignore: `distance_transform`, `cache`,
+  `cache_file` and `mesh_transform` on `point_zone`, `field` and `file`, and
+  `file_name`, `field_name` and `file_index` on `boundary_mesh`, `point_zone`
+  and `field`. Remove these keys from cases that fail validation.
 
 ## Develop
 
