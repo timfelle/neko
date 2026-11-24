@@ -82,6 +82,8 @@ The following types of conditions are available for the scalar:
   ```
 * `user_dirichlet`. User-updated Dirichlet boundary condition, see the
   [user-file documentation](@ref user-file_field-dirichlet-update).
+  Custom keys of your choosing, including `value` or `flux`, are accepted,
+  see [user-defined condition keys](@ref user-file_user-bc-keys).
   ```json
   {
     "type": "user_dirichlet",
@@ -90,6 +92,8 @@ The following types of conditions are available for the scalar:
   ```
 * `user_neumann`. User-updated Neumann boundary condition, see the
   [user-file documentation](@ref user-file_field-neumann-update).
+  Custom keys of your choosing, including `value` or `flux`, are accepted,
+  see [user-defined condition keys](@ref user-file_user-bc-keys).
   ```json
   {
     "type": "user_neumann",

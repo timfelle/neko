@@ -167,6 +167,18 @@ def test_rejects_custom_properties_for_builtin_scalar_bc(tmp_path):
          ("case", "scalar", "boundary_conditions", 1),
          {"type": "user_neumann", "zone_indices": [2],
           "custom_parameter": 2.0}),
+        ("scalar_mms/scalar_mms.case",
+         ("case", "scalar", "boundary_conditions", 0),
+         {"type": "user_dirichlet", "zone_indices": [1],
+          "value": "my own meaning", "custom_parameter": 2.0}),
+        ("scalar_mms/scalar_mms.case",
+         ("case", "scalar", "boundary_conditions", 1),
+         {"type": "user_neumann", "zone_indices": [2],
+          "flux": [1, 2], "custom_parameter": 2.0}),
+        ("cylinder/cylinder.case",
+         ("case", "fluid", "boundary_conditions", 1),
+         {"type": "outflow+user", "zone_indices": [2],
+          "value": {"any": "thing"}, "custom_parameter": 2.0}),
         ("cylinder/cylinder.case",
          ("case", "fluid", "boundary_conditions", 0),
          {"type": "user_velocity", "zone_indices": [1],
@@ -181,6 +193,9 @@ def test_rejects_custom_properties_for_builtin_scalar_bc(tmp_path):
         "scalar_user_initial_condition",
         "user_dirichlet",
         "user_neumann",
+        "user_dirichlet_value",
+        "user_neumann_flux",
+        "outflow_user_value",
         "user_velocity",
         "user_source_term",
         "top_level_section",
@@ -287,7 +302,7 @@ def test_rejects_integer_encoding_in_real_array(tmp_path):
 
 @pytest.mark.parametrize(
     "boundary_type",
-    ["outflow", "normal_outflow", "outflow+user", "normal_outflow+user"],
+    ["outflow", "normal_outflow"],
 )
 @pytest.mark.parametrize("property_name", ["delta", "velocity_scale"])
 def test_rejects_dong_parameters_for_non_dong_outflow(
@@ -301,6 +316,28 @@ def test_rejects_dong_parameters_for_non_dong_outflow(
     boundary = data["case"]["fluid"]["boundary_conditions"][1]
     boundary["type"] = boundary_type
     boundary[property_name] = 0.1
+
+    case_file = tmp_path / "invalid.case"
+    case_file.write_text(json.dumps(data), encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(VALIDATOR), str(case_file)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+
+
+def test_rejects_value_on_plain_outflow(tmp_path):
+    """Plain outflow never reads `value`; only the user variant may carry it."""
+    with (EXAMPLES_DIR / "cylinder" / "cylinder.case").open(
+        encoding="utf-8"
+    ) as handle:
+        data = json5.load(handle)
+
+    boundary = data["case"]["fluid"]["boundary_conditions"][1]
+    boundary["type"] = "outflow"
+    boundary["value"] = [1.0, 0.0, 0.0]
 
     case_file = tmp_path / "invalid.case"
     case_file.write_text(json.dumps(data), encoding="utf-8")

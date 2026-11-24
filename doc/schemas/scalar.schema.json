@@ -214,8 +214,7 @@
             },
             "name": {
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
-            },
-            "value": false
+            }
           },
           "additionalProperties": true
         },
@@ -260,8 +259,7 @@
             },
             "name": {
               "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
-            },
-            "flux": false
+            }
           },
           "additionalProperties": true
         },

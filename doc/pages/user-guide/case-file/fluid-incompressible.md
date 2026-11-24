@@ -345,13 +345,18 @@ A more detailed description of each boundary condition is provided below.
   pressure. The pressure is specified via the same interface as `user_pressure`,
   see the
   [relevant section](#user-file_field-dirichlet-update) for more information.
+  Unlike plain `outflow`, this type may carry custom keys of your choosing,
+  including one named `value`, see
+  [user-defined condition keys](@ref user-file_user-bc-keys).
 
 * `normal_outflow+user`. Same as `normal_outflow`, but with user-specified
   pressure. The pressure profile is specified via the same interface as
   `user_pressure`, see
   the [relevant section](#user-file_field-dirichlet-update) for more
   information. The tangential velocity values are prescribed exactly as for
-  `normal_outflow`, i.e. using either `value` or `file_name`.
+  `normal_outflow`, i.e. using either `value` or `file_name`. Further custom
+  keys of your choosing are also accepted, see
+  [user-defined condition keys](@ref user-file_user-bc-keys).
 
   ```json
   {
@@ -461,7 +466,9 @@ A more detailed description of each boundary condition is provided below.
   ```
 * `user_velocity`, a Dirichlet boundary for more complex velocity profiles. This boundary
   condition uses a
-  [more advanced user interface](#user-file_field-dirichlet-update).
+  [more advanced user interface](#user-file_field-dirichlet-update). Custom
+  keys of your choosing are accepted, see
+  [user-defined condition keys](@ref user-file_user-bc-keys).
   ```json
   {
     "type": "user_velocity",

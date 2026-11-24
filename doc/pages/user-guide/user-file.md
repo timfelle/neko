@@ -637,6 +637,25 @@ would add overhead if executed at every time step.
 user-file_tips_running-on-gpus) apply when working on field arrays. Use
 `device_memcpy` to make sure the device arrays are also updated.
 
+### Custom keys on user-defined boundary conditions {#user-file_user-bc-keys}
+
+The user-defined boundary conditions (`user_velocity`, `user_pressure`,
+`outflow+user`, `normal_outflow+user` for the fluid, and `user_dirichlet` and
+`user_neumann` for the scalar) accept additional keys of your choosing in the
+case file, including keys named `value` or `flux`. Neko does not read such keys
+and the case-file schema does not check their type. The one exception is
+`value` on `normal_outflow+user`, which is read as for `normal_outflow`.
+
+The boundary condition object does not keep its JSON, and the
+`dirichlet_conditions` and `neumann_conditions` routines receive only the
+fields, the boundary condition and the time state. The only route to such keys
+that the code provides is the `startup` routine, see
+[above](@ref user-file_init-and-final), which receives the whole case
+configuration as a `json_file` called `params`. A key can be read there, for
+example, through the path `case.fluid.boundary_conditions` and stored in a
+module variable. This is not specific to boundary conditions: any part of the
+case file can be read this way.
+
 ### Neumann boundary conditions {#user-file_field-neumann-update}
 This user function can be used to specify Neumann boundary values for
 the scalar(s). This type of boundary condition allows for time-dependent

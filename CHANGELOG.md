@@ -33,8 +33,8 @@
   is needed.
 - `checkneko` and the case-file schemas now reject keys that the code never
   reads but used to ignore, so cases that ran may now fail validation: a
-  linear-solver `relative_tolerance`, `value` on outflow conditions, `value`
-  and `flux` on user boundary conditions. Remove these keys.
+  linear-solver `relative_tolerance` and `value` on plain `outflow`
+  conditions. Remove these keys.
 
 ## Develop
 
