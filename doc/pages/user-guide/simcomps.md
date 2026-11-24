@@ -350,8 +350,9 @@ generated in a variety of ways, but the most common is to use the `file` type.
 Mandatory fields for this simcomp are:
 - `fields`: a list of fields to probe. Should be a list of field names that
   exist in the registry. Example: `"fields": ["u", "v", "p", "s"]`.
-- `output_file`: Name of the file in which to output the probed fields. Must be
-  `.csv` or `.hdf5`. By default, will be written in the `case.output_directory` folder.
+- `output_file`: Name of the file in which to output the probed fields, ending
+  in `.csv`, `.h5` or `.hdf5`; the last two need Neko built with HDF5. By
+  default, will be written in the `case.output_directory` folder.
 
 Optional arguments:
 - `points_file`: The legacy way of specifying the points, the name of a file
