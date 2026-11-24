@@ -969,9 +969,10 @@ types are currently implemented.
    `neko_registry`. The field name should be specified in the `name`
    keyword.
 4. `file`, the indicator function is directly taken from a field file. The file
-   name should be specified in the `file_name` keyword. This requires the user
-   to specify the field name in the file, which should be done by setting the
-   `field_name` keyword.
+   name should be specified in the `file_name` keyword. The name of the field
+   to read from the file is set by the `field_name` keyword, which defaults to
+   `brinkman_indicator`. The `file_index` keyword selects the file in a series
+   to read, and defaults to `0`.
 
 Each object is added to a common indicator field, which is initially zero, by
 means of a point-wise max operator. This means that the indicator field will be
@@ -1015,6 +1016,11 @@ top-level filter is applied once to the combination. When any filter other than
 `none` is used, the point-wise max of all objects before any filtering is
 stored in the `neko_registry` as `brinkman_unfiltered`.
 
+The fields computed by the source term can be written to file through the
+`output` object. When `output.enable` is `true`, the indicator field and the
+Brinkman permeability field are written to a file named `brinkman` with an
+extension given by `output.format`, in the directory `output.path`.
+
 Additional keywords are available to modify the Brinkman force term.
 
 | Name                               | Description                                                                                   | Admissible values                 | Default value |
@@ -1026,6 +1032,13 @@ Additional keywords are available to modify the Brinkman force term.
 | `distance_transform.value`         | Cut-off distance of the distance transform (see above), in the units of the boundary mesh.    | Real                              | -             |
 | `filter.type`                      | Type of filtering applied to the indicator field, at the top level or for one object.         | `none`, `PDE`                     | `none`        |
 | `filter.radius`                    | Radius of a `PDE` filter, see the [PDE filter](@ref filter_pde) for its other keywords.       | Real                              | -             |
+| `file_name`                        | `file` objects only. Name of the file to read the indicator field from.                       | String                            | -             |
+| `field_name`                       | `file` objects only. Name of the field to read from the file.                                 | String                            | `brinkman_indicator` |
+| `file_index`                       | `file` objects only. Index of the file in the series to read.                                 | Non-negative integer              | `0`           |
+| `output.enable`                    | Write the indicator and permeability fields to file.                                          | `true` or `false`                 | `false`       |
+| `output.precision`                 | Floating point precision of the output file.                                                  | `sp`, `single`, `dp`, `double`    | `sp`          |
+| `output.path`                      | Directory the output file is written to. A trailing `/` is added if missing.                  | String                            | `./`          |
+| `output.format`                    | File format of the output. `nek5000`, `adios2` and `hdf5` give the extensions `.fld`, `.bp` and `.h5`; any other value is used as the extension. | String | `fld` |
 | `mesh_transform.type`              | Apply a transformation to the boundary mesh.                                                  | `bounding_box`, `none`            | `none`        |
 | `mesh_transform.box_min`           | Lower left front corner of the box to fit inside.                                             | Vector of 3 reals                 | -             |
 | `mesh_transform.box_max`           | Upper right back corner of the box to fit inside.                                             | Vector of 3 reals                 | -             |
