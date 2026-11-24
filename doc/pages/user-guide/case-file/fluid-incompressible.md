@@ -954,9 +954,10 @@ types are currently implemented.
    `neko_registry`. The field name should be specified in the `name`
    keyword.
 4. `file`, the indicator function is directly taken from a field file. The file
-   name should be specified in the `file_name` keyword. This requires the user
-   to specify the field name in the file, which should be done by setting the
-   `field_name` keyword.
+   name should be specified in the `file_name` keyword. The name of the field
+   to read from the file is set by the `field_name` keyword, which defaults to
+   `brinkman_indicator`. The `file_index` keyword selects the file in a series
+   to read, and defaults to `0`.
 
 Each object are added to a common indicator field by means of a point-wise max
 operator. This means that the indicator field will be the union of all the
@@ -979,10 +980,19 @@ before computing the Brinkman force. The following types are currently
 implemented.
 
 1. `none`, no filtering is applied.
+2. `PDE`, the indicator field is filtered using the PDE filter. The remaining
+   keywords of the `filter` object are those of the PDE filter, see
+   \ref filter_pde.
 
-The filtering can be defined for each object separately. Additionally, the
-filter can be specified for the entire source term, in which case it will be
-applied to the final indicator field, after all sources have been added.
+The filter is specified once for the entire source term, through the top-level
+`filter` keyword, and is applied to the final indicator field after all objects
+have been added. It cannot be set per object: a `filter` keyword inside an
+object is not read (and is rejected by the case-file schema).
+
+The fields computed by the source term can be written to file through the
+`output` object. When `output.enable` is `true`, the indicator field and the
+Brinkman permeability field are written to a file named `brinkman` with an
+extension given by `output.format`, in the directory `output.path`.
 
 Additional keywords are available to modify the Brinkman force term.
 
@@ -993,7 +1003,14 @@ Additional keywords are available to modify the Brinkman force term.
 | `objects`                          | Array of JSON objects, defining the objects to be immersed.                                   | Each object must specify a `type` | -             |
 | `distance_transform.type`          | How to map from distance field to indicator field.                                            | `step`, `smooth_step`             | -             |
 | `distance_transform.value`         | Values used to define the distance transform, such as cut-off distance for the step function. | Real                              | -             |
-| `filter.type`                      | Type of filtering applied to the indicator field either globally or for the current object.   | `none`                            | `none`        |
+| `filter.type`                      | Type of filtering applied to the final indicator field. For `PDE`, see \ref filter_pde.       | `none`, `PDE`                     | `none`        |
+| `file_name`                        | `file` objects only. Name of the file to read the indicator field from.                       | String                            | -             |
+| `field_name`                       | `file` objects only. Name of the field to read from the file.                                 | String                            | `brinkman_indicator` |
+| `file_index`                       | `file` objects only. Index of the file in the series to read.                                 | Non-negative integer              | `0`           |
+| `output.enable`                    | Write the indicator and permeability fields to file.                                          | `true` or `false`                 | `false`       |
+| `output.precision`                 | Floating point precision of the output file.                                                  | `sp`, `single`, `dp`, `double`    | `sp`          |
+| `output.path`                      | Directory the output file is written to. A trailing `/` is added if missing.                  | String                            | `./`          |
+| `output.format`                    | File format of the output. `nek5000`, `adios2` and `hdf5` give the extensions `.fld`, `.bp` and `.h5`; any other value is used as the extension. | String | `fld` |
 | `mesh_transform.type`              | Apply a transformation to the boundary mesh.                                                  | `bounding_box`, `none`            | `none`        |
 | `mesh_transform.box_min`           | Lower left front corner of the box to fit inside.                                             | Vector of 3 reals                 | -             |
 | `mesh_transform.box_max`           | Upper right back corner of the box to fit inside.                                             | Vector of 3 reals                 | -             |
@@ -1002,7 +1019,7 @@ Additional keywords are available to modify the Brinkman force term.
 Example of a Brinkman source term where a boundary mesh and a point zone are
 combined to define the resistance in the fluid domain. The indicator field for
 the boundary mesh is computed using a step function with a cut-off distance of
-\f$ 0.1 \f$. The indicator field for the point zone is not filtered.
+\f$ 0.1 \f$. No filter is applied to the final indicator field.
 
 ~~~~~~~~~~~~~~~{.json}
 "source_terms": [
