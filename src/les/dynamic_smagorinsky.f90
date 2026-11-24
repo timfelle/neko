@@ -100,22 +100,22 @@ contains
 
       call this%free()
       call this%init_base(fluid, nut_name, delta_type, if_ext)
-      call json_get(json, "test_filter", json_subdict)
-      call this%test_filter%init(json_subdict, coef)
-      if (json%valid_path('filter.transfer_function')) then
+      if (json%valid_path('test_filter.transfer_function')) then
          call neko_error("Dynamic Smagorinsky model does not support " // &
               "transfer function specified in the json file. " // &
               "Please hard-code it in " // &
               "subroutine set_ds_filt() in " // &
               "src/les/dynamic_smagorisnky.f90")
       end if
-      if (json%valid_path('filter.type')) then
-         call json_get(json, "filter.type", filter_type)
+      if (json%valid_path('test_filter.type')) then
+         call json_get(json, "test_filter.type", filter_type)
          if (trim(filter_type) .ne. "elementwise") then
             call neko_error("Currently only elementwise filter is supported &
             &for dynamic smagorinsky model.")
          end if
       end if
+      call json_get(json, "test_filter", json_subdict)
+      call this%test_filter%init(json_subdict, coef)
 
       call set_ds_filt(this%test_filter)
 

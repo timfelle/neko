@@ -155,7 +155,7 @@ contains
     integer :: output_dir_len
     integer :: precision, layout
     type(json_file) :: fluid_params, scalar_params, numerics_params
-    type(json_file) :: json_subdict
+    type(json_file) :: json_subdict, scalar_item
     integer :: n_scalars, i
     logical :: tmp_feature
 
@@ -322,9 +322,15 @@ contains
        n_scalars = 1
     else if (this%params%valid_path('case.scalars')) then
        call this%params%info('case.scalars', n_children = n_scalars)
-       if (n_scalars > 0) then
-          scalar = .true.
-       end if
+       ! Only set up the scalars if at least one entry is enabled
+       call json_get(this%params, 'case.scalars', json_subdict)
+       do i = 1, n_scalars
+          call json_extract_item(json_subdict, "", i, scalar_item)
+          call json_get_or_default(scalar_item, 'enabled', logical_val, &
+               .true.)
+          scalar = scalar .or. logical_val
+       end do
+       call scalar_item%destroy()
     end if
 
     if (scalar) then

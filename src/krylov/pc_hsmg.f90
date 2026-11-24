@@ -163,11 +163,22 @@ contains
          crs_solver, "cg")
 
     !
-    ! Parameters for a Krylov based coarse grid solverthis
+    ! Number of coarse grid iterations, its default depends on the solver
+    ! (a Krylov solver or tree-amg), so only the selected one reads it
     !
-    call json_get_or_default(json, 'coarse_grid.iterations', &
-         this%niter, 10)
+    if (trim(crs_solver) .eq. 'tamg') then
+       this%niter = 10
+       call json_get_or_default(json, 'coarse_grid.iterations', &
+            crs_tamg_itrs, 1)
+    else
+       call json_get_or_default(json, 'coarse_grid.iterations', &
+            this%niter, 10)
+       crs_tamg_itrs = 1
+    end if
 
+    !
+    ! Parameters for a Krylov based coarse grid solver
+    !
     call json_get_or_default(json, 'coarse_grid.preconditioner', &
          crs_pc, "jacobi")
 
@@ -179,9 +190,6 @@ contains
     !
     call json_get_or_default(json, 'coarse_grid.levels', &
          crs_tamg_lvls, 3)
-
-    call json_get_or_default(json, 'coarse_grid.iterations', &
-         crs_tamg_itrs, 1)
 
     call json_get_or_default(json, 'coarse_grid.cheby_degree', &
          crs_tamg_cheby_degree, 4)

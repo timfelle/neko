@@ -97,18 +97,28 @@ contains
     TYPE(field_t), TARGET, INTENT(IN) :: rho
     type(chkp_t), target, intent(inout) :: chkp
     type(json_file) :: json_subdict
-    integer :: i, j
+    integer :: i, j, n_enabled
     character(len=:), allocatable :: field_name
     character(len=:), allocatable :: field_names(:)
     character(len=256) :: error_msg, buffer
+    logical :: enabled(n_scalars)
+
+    ! Entries with `enabled` set to false are skipped. The default names
+    ! still use the position in the "scalars" array.
+    do i = 1, n_scalars
+       call json_extract_item(params, "", i, json_subdict)
+       call json_get_or_default(json_subdict, 'enabled', enabled(i), .true.)
+    end do
+    n_enabled = count(enabled)
 
     ! Allocate the array of the scalar scheme wrappers
-    allocate(this%scalar_fields(n_scalars))
+    allocate(this%scalar_fields(n_enabled))
 
     ! Collect and validate field names for all scalars
     allocate(character(len=256) :: field_names(n_scalars))
 
     do i = 1, n_scalars
+       if (.not. enabled(i)) cycle
        ! Extract element i from the "scalars" array
        call json_extract_item(params, "", i, json_subdict)
 
@@ -131,7 +141,8 @@ contains
        if (n_scalars > 1) then
           j = 1
           do while (j < i)
-             if (trim(field_names(i)) == trim(field_names(j))) then
+             if (enabled(j) .and. &
+                  trim(field_names(i)) == trim(field_names(j))) then
                 call neko_error("Duplicate scalar field name detected: "// &
                      trim(field_names(i)) // &
                      ". Please provide unique names for each scalar field.")
@@ -142,14 +153,17 @@ contains
        end if
     end do
 
+    j = 0
     do i = 1, n_scalars
+       if (.not. enabled(i)) cycle
+       j = j + 1
        call json_extract_item(params, "", i, json_subdict)
 
        ! Use the processed field names for all scalars
        call json_subdict%add('name', trim(field_names(i)))
 
        ! Allocate the scalar fields
-       call this%scalar_fields(i)%init(msh, coef, gs, json_subdict, &
+       call this%scalar_fields(j)%init(msh, coef, gs, json_subdict, &
             numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, rho)
     end do
   end subroutine scalars_init
@@ -232,7 +246,8 @@ contains
     type(json_file), intent(inout) :: params
     type(user_t), intent(in) :: user
     logical, intent(in) :: is_restart
-    integer :: i, running_scalar_index, scalar_index, var_type
+    integer :: i, k, running_scalar_index, scalar_index, var_type
+    logical :: enabled
     type(json_file) :: json_subdict
 
     call neko_log%section("Scalar initial condition ")
@@ -245,9 +260,11 @@ contains
        ! object for `case.scalar`.
        call params%info('', var_type = var_type)
 
+       ! Field k belongs to the k-th enabled entry of the array.
        running_scalar_index = 0
-       do i = 1, size(this%scalar_fields)
-          if (trim(this%scalar_fields(i)%scalar%name) .eq. 'temperature') then
+       i = 0
+       do k = 1, size(this%scalar_fields)
+          if (trim(this%scalar_fields(k)%scalar%name) .eq. 'temperature') then
              scalar_index = 0
           else
              running_scalar_index = running_scalar_index + 1
@@ -255,11 +272,17 @@ contains
           end if
 
           if (var_type .eq. json_array) then
-             call json_extract_item(params, "", i, json_subdict)
-             call this%scalar_fields(i)%scalar%set_initial_condition( &
+             enabled = .false.
+             do while (.not. enabled)
+                i = i + 1
+                call json_extract_item(params, "", i, json_subdict)
+                call json_get_or_default(json_subdict, 'enabled', enabled, &
+                     .true.)
+             end do
+             call this%scalar_fields(k)%scalar%set_initial_condition( &
                   json_subdict, user, scalar_index)
           else
-             call this%scalar_fields(i)%scalar%set_initial_condition( &
+             call this%scalar_fields(k)%scalar%set_initial_condition( &
                   params, user, scalar_index)
           end if
        end do
