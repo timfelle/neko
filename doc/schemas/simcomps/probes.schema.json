@@ -52,18 +52,6 @@
               "$ref": "urn:neko:schema:simulation-components#/$defs/numberOrRef"
             }
           },
-          "anyOf": [
-            {
-              "required": [
-                "points_file"
-              ]
-            },
-            {
-              "required": [
-                "points"
-              ]
-            }
-          ],
           "additionalProperties": true
         }
       ]

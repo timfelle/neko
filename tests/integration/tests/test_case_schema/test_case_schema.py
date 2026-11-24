@@ -572,3 +572,19 @@ def test_time_order_four_only_for_compressible(tmp_path):
 
     result = _validate_modified(tmp_path, "euler_tgv/euler_tgv.case", path, 4)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_allows_probes_without_points(tmp_path):
+    # Neko sets up zero probes when neither points nor points_file is given.
+    path = ("case", "simulation_components")
+    probes = {"type": "probes", "fields": ["u", "p"],
+              "output_file": "probes.csv"}
+    result = _validate_modified(tmp_path, "cylinder/cylinder.case", path,
+                                [probes])
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    # The probes schema still applies: a malformed points list is rejected.
+    probes["points"] = "points.csv"
+    result = _validate_modified(tmp_path, "cylinder/cylinder.case", path,
+                                [probes])
+    assert result.returncode != 0
