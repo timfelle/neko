@@ -187,6 +187,7 @@ EXTRA_DIST = \
 	registry/test_field_registry.pf\
 	registry/test_vector_registry.pf\
 	registry/test_matrix_registry.pf\
+	registry/test_point_zone_registry.pf\
 	errors/test_errors.pf\
 	fixtures/error_redirection.f90\
 	fixtures/mesh_fixture.f90\

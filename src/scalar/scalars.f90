@@ -251,7 +251,7 @@ contains
     type(json_file), intent(inout) :: params
     type(user_t), intent(in) :: user
     logical, intent(in) :: is_restart
-    integer :: k, running_scalar_index, scalar_index, var_type
+    integer :: k, scalar_index, var_type
     type(json_file) :: json_subdict
 
     call neko_log%section("Scalar initial condition ")
@@ -264,14 +264,10 @@ contains
        ! object for `case.scalar`.
        call params%info('', var_type = var_type)
 
-       running_scalar_index = 0
        do k = 1, size(this%scalar_fields)
-          if (trim(this%scalar_fields(k)%scalar%name) .eq. 'temperature') then
-             scalar_index = 0
-          else
-             running_scalar_index = running_scalar_index + 1
-             scalar_index = running_scalar_index
-          end if
+          ! Field files written by Neko store the first scalar in the
+          ! temperature slot (index 0) and scalar k in slot k - 1.
+          scalar_index = k - 1
 
           if (var_type .eq. json_array) then
              call json_extract_item(params, "", this%json_index(k), &

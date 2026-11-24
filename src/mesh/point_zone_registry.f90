@@ -222,6 +222,7 @@ contains
     do i = cpz%n_internal_zones + 1, cpz%n_zones
        cpz%zones(i)%pz => &
             neko_point_zone_registry%get_point_zone(cpz%names(i_external))
+       i_external = i_external + 1
     end do
 
     call object%map(dof)

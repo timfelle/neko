@@ -1,0 +1,77 @@
+!> Tests of the point zone registry.
+module test_point_zone_registry
+  use pfunit
+  use num_types, only : rp
+  use point, only : point_t
+  use mesh, only : mesh_t
+  use comm, only : pe_rank, pe_size
+  use json_module, only : json_file
+  use point_zone, only : point_zone_t
+  use point_zone_registry, only : neko_point_zone_registry
+  implicit none
+
+contains
+
+  !> One unit hexahedron, [0, 1]^3.
+  subroutine unit_hex_mesh(msh)
+    type(mesh_t), intent(inout) :: msh
+    type(point_t) :: p(8)
+    integer :: i
+
+    call p(1)%init(0d0, 0d0, 0d0)
+    call p(2)%init(1d0, 0d0, 0d0)
+    call p(3)%init(0d0, 1d0, 0d0)
+    call p(4)%init(1d0, 1d0, 0d0)
+    call p(5)%init(0d0, 0d0, 1d0)
+    call p(6)%init(1d0, 0d0, 1d0)
+    call p(7)%init(0d0, 1d0, 1d0)
+    call p(8)%init(1d0, 1d0, 1d0)
+    do i = 1, 8
+       call p(i)%set_id(i)
+    end do
+
+    call msh%init(3, 1)
+    call msh%add_element(1, 1, p(1), p(2), p(3), p(4), &
+         p(5), p(6), p(7), p(8))
+    pe_rank = 0
+    pe_size = 1
+    call msh%generate_conn()
+  end subroutine unit_hex_mesh
+
+  !> A combine zone listing several registry zones by name must use each of
+  !! them, not the first one repeatedly.
+  @test
+  subroutine test_combine_named_zones()
+    type(mesh_t) :: msh
+    type(json_file) :: json
+    class(point_zone_t), pointer :: pz
+
+    call unit_hex_mesh(msh)
+
+    ! With polynomial order 4 the GLL points along x are 0, 0.173, 0.5,
+    ! 0.827 and 1, so each box holds two of the five x-planes, 50 points.
+    call json%load_from_string( &
+         '{"case": {"numerics": {"polynomial_order": 4},' // &
+         '"point_zones": [' // &
+         '{"name": "left", "geometry": "box", "x_bounds": [-0.1, 0.3],' // &
+         '"y_bounds": [-0.1, 1.1], "z_bounds": [-0.1, 1.1]},' // &
+         '{"name": "right", "geometry": "box", "x_bounds": [0.7, 1.1],' // &
+         '"y_bounds": [-0.1, 1.1], "z_bounds": [-0.1, 1.1]},' // &
+         '{"name": "both", "geometry": "combine", "operator": "OR",' // &
+         '"subsets": [{"name": "left"}, {"name": "right"}]}]}}')
+
+    call neko_point_zone_registry%init(json, msh)
+
+    pz => neko_point_zone_registry%get_point_zone("left")
+    @assertEqual(50, pz%size)
+    pz => neko_point_zone_registry%get_point_zone("right")
+    @assertEqual(50, pz%size)
+    pz => neko_point_zone_registry%get_point_zone("both")
+    @assertEqual(100, pz%size)
+
+    call neko_point_zone_registry%free()
+    call json%destroy()
+    call msh%free()
+  end subroutine test_combine_named_zones
+
+end module test_point_zone_registry
