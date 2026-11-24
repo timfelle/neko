@@ -155,8 +155,12 @@ file documentation.
    [fluid section](@ref case-file_fluid-ic) for detailed explanations. In
    addition to the keywords described there, `target_index` selects which
    field in the file is read. It is a non-negative integer, where 0 is the
-   temperature, and it defaults to the index of the scalar. The keywords
-   `interpolation.tolerance` and `interpolation.padding` must be given as
+   temperature. It defaults to the position of the scalar among the enabled
+   scalars not named `temperature`, counted from 1; a scalar named
+   `temperature` defaults to 0. Scalars with `enabled` set to `false` are not
+   counted. When initialising from a file written with a different set of
+   enabled scalars, set `target_index` explicitly, otherwise the fields are
+   read shifted. The keywords `interpolation.tolerance` and `interpolation.padding` must be given as
    literal reals.
 
 ## Source terms
@@ -174,7 +178,7 @@ standard choice would be `"type": "cg"` and `"preconditioner": "jacobi"`.
 
 | Name                           | Description                                                           | Admissible values                           | Default value |
 | ------------------------------ | --------------------------------------------------------------------- | ------------------------------------------- | ------------- |
-| `enabled`                      | Whether to enable the scalar computation. If `false`, `initial_condition` and `solver` are not required. | `true` or `false`                           | `true`        |
+| `enabled`                      | Whether to enable the scalar computation. If `false`, `initial_condition` and `solver` are not required. For an entry of `scalars`, the entry is skipped, and the other entries keep their position-based default names `s_<i>`. | `true` or `false`                           | `true`        |
 | `scheme`                       | The scalar solver scheme.                                             | `pnpn`                                      | `pnpn`        |
 | `name`                         | The name associated to the scalar solver, which is also the name of the solution in the field registry. | A string                                    | `s` for a single scalar, `s_<i>` for entry `i` of `scalars` |
 | `freeze`                       | Whether to skip the time step of the scalar equation, leaving the field unchanged. | `true` or `false`                           | `false`       |
