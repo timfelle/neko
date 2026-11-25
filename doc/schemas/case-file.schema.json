@@ -115,7 +115,7 @@
           "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
         },
         "mesh2mesh_tolerance": {
-          "$ref": "urn:neko:schema:common#/$defs/realNumber"
+          "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
         },
         "job_timelimit": {
           "type": "string",

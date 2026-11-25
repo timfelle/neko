@@ -255,16 +255,16 @@
           "$ref": "#/$defs/coarseGridPreconditionerType"
         },
         "iterations": {
-          "$ref": "#/$defs/positiveInteger"
+          "$ref": "#/$defs/positiveIntegerOrRef"
         },
         "monitor": {
           "type": "boolean"
         },
         "levels": {
-          "$ref": "#/$defs/positiveInteger"
+          "$ref": "#/$defs/positiveIntegerOrRef"
         },
         "cheby_degree": {
-          "$ref": "#/$defs/positiveInteger"
+          "$ref": "#/$defs/positiveIntegerOrRef"
         }
       },
       "additionalProperties": false
@@ -276,13 +276,13 @@
           "type": "boolean"
         },
         "frequency": {
-          "$ref": "#/$defs/nonNegativeInteger"
+          "$ref": "#/$defs/nonNegativeIntegerOrRef"
         },
         "warm_start": {
           "type": "boolean"
         },
         "warm_start_iterations": {
-          "$ref": "#/$defs/positiveInteger"
+          "$ref": "#/$defs/positiveIntegerOrRef"
         }
       },
       "additionalProperties": false
@@ -303,13 +303,13 @@
       "type": "object",
       "properties": {
         "levels": {
-          "$ref": "#/$defs/positiveInteger"
+          "$ref": "#/$defs/positiveIntegerOrRef"
         },
         "iterations": {
-          "$ref": "#/$defs/positiveInteger"
+          "$ref": "#/$defs/positiveIntegerOrRef"
         },
         "cheby_degree": {
-          "$ref": "#/$defs/positiveInteger"
+          "$ref": "#/$defs/positiveIntegerOrRef"
         }
       },
       "additionalProperties": false
@@ -370,7 +370,7 @@
           }
         },
         "smoother_iterations": {
-          "$ref": "#/$defs/positiveInteger"
+          "$ref": "#/$defs/positiveIntegerOrRef"
         },
         "smoother_cheby_acc": {
           "type": "string",

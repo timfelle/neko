@@ -165,10 +165,10 @@
               "type": "object",
               "properties": {
                 "tolerance": {
-                  "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
+                  "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
                 },
                 "padding": {
-                  "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
+                  "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
                 }
               },
               "additionalProperties": false
@@ -185,7 +185,7 @@
           "required": ["type", "zone_indices", "value"],
           "properties": {
             "type": {"const": "velocity_value"},
-            "zone_indices": {"$ref": "urn:neko:schema:common#/$defs/integerArray"},
+            "zone_indices": {"$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"},
             "name": {"$ref": "urn:neko:schema:common#/$defs/nonEmptyString"},
             "value": {"$ref": "urn:neko:schema:common#/$defs/vector3OrRef"}
           },
@@ -196,7 +196,7 @@
           "required": ["type", "zone_indices", "value"],
           "properties": {
             "type": {"enum": ["density_value", "pressure_value"]},
-            "zone_indices": {"$ref": "urn:neko:schema:common#/$defs/integerArray"},
+            "zone_indices": {"$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"},
             "name": {"$ref": "urn:neko:schema:common#/$defs/nonEmptyString"},
             "value": {"$ref": "urn:neko:schema:common#/$defs/numberOrRef"}
           },
@@ -207,7 +207,7 @@
           "required": ["type", "zone_indices"],
           "properties": {
             "type": {"enum": ["no_slip", "slip", "symmetry", "outflow", "normal_outflow"]},
-            "zone_indices": {"$ref": "urn:neko:schema:common#/$defs/integerArray"},
+            "zone_indices": {"$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"},
             "name": {"$ref": "urn:neko:schema:common#/$defs/nonEmptyString"}
           },
           "additionalProperties": false
@@ -548,7 +548,7 @@
           "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
         },
         "gamma": {
-          "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
+          "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
         },
         "freeze": {
           "type": "boolean"
@@ -575,7 +575,7 @@
           "$ref": "urn:neko:schema:common#/$defs/svv"
         },
         "schwarz_iterations": {
-          "$ref": "urn:neko:schema:common#/$defs/nonNegativeInteger"
+          "$ref": "urn:neko:schema:common#/$defs/nonNegativeIntegerOrRef"
         },
         "nut_field": {
           "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
@@ -626,7 +626,7 @@
           "type": "boolean"
         },
         "wall_zone_indices": {
-          "$ref": "urn:neko:schema:common#/$defs/integerArray"
+          "$ref": "urn:neko:schema:common#/$defs/integerArrayOrRef"
         },
         "ale": {
           "$ref": "#/$defs/ale"

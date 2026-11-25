@@ -32,7 +32,7 @@
           "$ref": "urn:neko:schema:common#/$defs/nonEmptyString"
         },
         "h_index": {
-          "$ref": "urn:neko:schema:common#/$defs/positiveInteger"
+          "$ref": "urn:neko:schema:common#/$defs/positiveIntegerOrRef"
         },
         "sampling": {
           "oneOf": [
@@ -66,7 +66,7 @@
                   ]
                 },
                 "n_samples": {
-                  "$ref": "urn:neko:schema:common#/$defs/positiveInteger"
+                  "$ref": "urn:neko:schema:common#/$defs/positiveIntegerOrRef"
                 },
                 "output_h": {
                   "type": "boolean",
@@ -123,7 +123,7 @@
                   ]
                 },
                 "n_samples": {
-                  "$ref": "urn:neko:schema:common#/$defs/positiveInteger"
+                  "$ref": "urn:neko:schema:common#/$defs/positiveIntegerOrRef"
                 },
                 "output_h": {
                   "type": "boolean",
@@ -383,10 +383,10 @@
               },
               "value": false,
               "delta": {
-                "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
+                "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
               },
               "velocity_scale": {
-                "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
+                "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
               }
             },
             "additionalProperties": false
@@ -461,10 +461,10 @@
                 "additionalProperties": false
               },
               "delta": {
-                "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
+                "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
               },
               "velocity_scale": {
-                "$ref": "urn:neko:schema:common#/$defs/positiveRealNumber"
+                "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
               }
             },
             "additionalProperties": false
@@ -492,10 +492,10 @@
                 "type": "object",
                 "properties": {
                   "tolerance": {
-                    "$ref": "urn:neko:schema:common#/$defs/realNumber"
+                    "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
                   },
                   "padding": {
-                    "$ref": "urn:neko:schema:common#/$defs/realNumber"
+                    "$ref": "urn:neko:schema:common#/$defs/numberOrRef"
                   }
                 },
                 "additionalProperties": false
