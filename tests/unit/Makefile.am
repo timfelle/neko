@@ -58,6 +58,7 @@ SUBDIRS = tuple\
 	  csv_file\
 	  crystal_router\
 	  ale_rigid_kinematics\
+	  reichardt\
 	  templates/serial
 
 TESTS = device/device_test\
@@ -120,6 +121,7 @@ TESTS = device/device_test\
 	csv_file/csv_file_test\
 	crystal_router/crystal_router_test\
 	ale_rigid_kinematics/ale_rigid_kinematics_test\
+	reichardt/reichardt_test\
 	templates/serial/serial_test
 
 # Note we need to list .pf and runner scripts manually
@@ -239,6 +241,7 @@ EXTRA_DIST = \
 	crystal_router/crystal_router_test\
 	fixtures/mesh_fixture.f90\
 	ale_rigid_kinematics/test_ale_rigid_kinematics.pf\
+	reichardt/test_reichardt.pf\
 	templates/serial/test_serial.pf
 
 if ENABLE_HDF5
