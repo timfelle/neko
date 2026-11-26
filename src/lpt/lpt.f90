@@ -41,7 +41,7 @@ module lpt
   use dofmap, only : dofmap_t
   use coefs, only : coef_t
   use json_utils, only : json_get, json_get_or_default, &
-       json_get_subdict_or_empty
+       json_get_subdict_or_empty, json_get_or_lookup
   use time_state, only : time_state_t
   use time_based_controller, only : time_based_controller_t
   use global_interpolation, only : global_interpolation_t
@@ -198,7 +198,7 @@ contains
     this%w_field => neko_registry%get_field_by_name("w")
 
     if (case%params%valid_path("case.fluid.wall_zone_indices")) then
-       call json_get(case%params, "case.fluid.wall_zone_indices", &
+       call json_get_or_lookup(case%params, "case.fluid.wall_zone_indices", &
             this%wall_zone_indices)
        if (.not. this%inertia .and. size(this%wall_zone_indices) .gt. 0) then
           call neko_error("lpt wall_zone_indices requires inertia = true")

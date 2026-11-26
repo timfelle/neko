@@ -35,7 +35,7 @@
 module gradient_jump_penalty
   use num_types, only : rp
   use utils, only : neko_error
-  use json_utils, only : json_get_or_default
+  use json_utils, only : json_get_or_lookup_or_default
   use json_module, only : json_file
   use math, only : add2, col2, col3, invcol2, add3, copy, absval
   use point, only : point_t
@@ -170,15 +170,15 @@ contains
     real(kind=rp) :: start_time, end_time
     real(kind=rp) :: a, b
 
-    call json_get_or_default(json, "start_time", start_time, 0.0_rp)
-    call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
+    call json_get_or_lookup_or_default(json, "start_time", start_time, 0.0_rp)
+    call json_get_or_lookup_or_default(json, "end_time", end_time, huge(0.0_rp))
 
     if ((coef%Xh%lx - 1) .eq. 1) then
-       call json_get_or_default(json, 'tau', a, 0.02_rp)
+       call json_get_or_lookup_or_default(json, 'tau', a, 0.02_rp)
        b = 0.0_rp
     else
-       call json_get_or_default(json, 'scaling_factor', a, 0.8_rp)
-       call json_get_or_default(json, 'scaling_exponent', b, 4.0_rp)
+       call json_get_or_lookup_or_default(json, 'scaling_factor', a, 0.8_rp)
+       call json_get_or_lookup_or_default(json, 'scaling_exponent', b, 4.0_rp)
     end if
 
     call this%init_from_components(coef, fields, start_time, end_time, a, b, &

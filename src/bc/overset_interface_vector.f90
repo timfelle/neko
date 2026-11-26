@@ -64,7 +64,7 @@ module overset_interface_vector
   use utils, only : neko_error, nonlinear_index, linear_index
   use stack, only : stack_i4_t
   use json_module, only : json_file
-  use json_utils, only : json_get_or_default
+  use json_utils, only : json_get_or_default, json_get_or_lookup_or_default
   use field_list, only : field_list_t
   use iextm_time_scheme, only : iextm_time_scheme_t
   use, intrinsic :: iso_c_binding, only : c_ptr, c_size_t
@@ -174,9 +174,9 @@ contains
     logical :: log
 
     !> Parse the interpolation settings
-    call json_get_or_default(json, "interpolation.tolerance", &
+    call json_get_or_lookup_or_default(json, "interpolation.tolerance", &
          tol, -1.0_rp)
-    call json_get_or_default(json, "interpolation.padding", &
+    call json_get_or_lookup_or_default(json, "interpolation.padding", &
          pad, -1.0_rp)
     call json_get_or_default(json, "order", this%iextm_order, 1)
     if (this%iextm_order .lt. 1 .or. this%iextm_order .gt. 3) then

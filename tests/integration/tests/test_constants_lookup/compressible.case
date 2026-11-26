@@ -1,0 +1,40 @@
+{
+  "version": 1.0,
+  "case": {
+    "mesh_file": "meshes/small_test_cyl.nmsh",
+    "output_at_end": false,
+    "output_boundary": false,
+    "output_checkpoints": false,
+    "time": {
+      "end_time": 2e-4,
+      "timestep": 1e-4
+    },
+    "numerics": {
+      "time_order": 4,
+      "polynomial_order": 3
+    },
+    "fluid": {
+      "scheme": "compressible",
+      "gamma": 1.4,
+      "initial_condition": {
+        "type": "user"
+      },
+      "boundary_conditions": [
+        {
+          "type": "velocity_value",
+          "zone_indices": [1],
+          "value": [0.5, 0.0, 0.0]
+        },
+        {
+          "type": "no_slip",
+          "zone_indices": [7]
+        },
+        {
+          "type": "symmetry",
+          "zone_indices": [5, 6]
+        }
+      ],
+      "output_control": "never"
+    }
+  }
+}

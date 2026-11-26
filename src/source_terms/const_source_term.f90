@@ -35,7 +35,8 @@ module const_source_term
   use num_types, only : rp
   use field_list, only : field_list_t
   use json_module, only : json_file
-  use json_utils, only: json_get_or_default, json_get_or_lookup
+  use json_utils, only: json_get_or_lookup, json_get_or_lookup_or_default
+  use registry, only : neko_const_registry
   use source_term, only : source_term_t
   use coefs, only : coef_t
   use neko_config, only : NEKO_BCKND_DEVICE
@@ -48,7 +49,9 @@ module const_source_term
 
   !> A constant source term.
   !! The strength is specified with the `values` keyword, which should be an
-  !! array, with a value for each component of the source.
+  !! array, with a value for each component of the source, or the name of a
+  !! vector constant. A one-component source also takes a number or the name
+  !! of a scalar constant.
   type, public, extends(source_term_t) :: const_source_term_t
      !> The value of the source term.
      real(kind=rp), allocatable :: values(:)
@@ -78,11 +81,28 @@ contains
     type(coef_t), intent(in), target :: coef
     character(len=*), intent(in) :: variable_name
     real(kind=rp), allocatable :: values(:)
-    real(kind=rp) :: start_time, end_time
+    real(kind=rp) :: start_time, end_time, value
+    character(len=:), allocatable :: constant_name
+    logical :: found
 
-    call json_get_or_lookup(json, "values", values)
-    call json_get_or_default(json, "start_time", start_time, 0.0_rp)
-    call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
+    ! An array of numbers
+    call json%get("values", values, found)
+
+    if (.not. found) then
+       call json%get("values", constant_name, found)
+       if (found .and. &
+            .not. neko_const_registry%real_scalar_exists(constant_name)) then
+          ! The name of a vector constant
+          call json_get_or_lookup(json, "values", values)
+       else
+          ! A number or the name of a scalar constant
+          call json_get_or_lookup(json, "values", value)
+          values = [value]
+       end if
+    end if
+
+    call json_get_or_lookup_or_default(json, "start_time", start_time, 0.0_rp)
+    call json_get_or_lookup_or_default(json, "end_time", end_time, huge(0.0_rp))
 
 
     call const_source_term_init_from_components(this, fields, values, coef, &

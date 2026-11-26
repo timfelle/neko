@@ -56,7 +56,8 @@ module overset_interface
   use utils, only : neko_error, nonlinear_index, linear_index
   use stack, only : stack_i4_t
   use json_module, only : json_file
-  use json_utils, only : json_get, json_get_or_default
+  use json_utils, only : json_get, json_get_or_default, &
+       json_get_or_lookup_or_default
   use field, only : field_t
   use field_series, only : field_series_t
   use logger, only : neko_log, LOG_SIZE
@@ -191,8 +192,10 @@ contains
     logical :: log
 
     call json_get(json, "field_name", field_name)
-    call json_get_or_default(json, "interpolation.tolerance", tol, -1.0_rp)
-    call json_get_or_default(json, "interpolation.padding", pad, -1.0_rp)
+    call json_get_or_lookup_or_default(json, "interpolation.tolerance", &
+         tol, -1.0_rp)
+    call json_get_or_lookup_or_default(json, "interpolation.padding", &
+         pad, -1.0_rp)
     call json_get_or_default(json, "order", this%iextm_order, 1)
     if (this%iextm_order .lt. 1 .or. this%iextm_order .gt. 3) then
        call neko_error("The order of the IEXTm time scheme must be 1 to 3.")

@@ -35,7 +35,8 @@ module field_source_term
   use num_types, only : rp
   use field_list, only : field_list_t
   use json_module, only : json_file
-  use json_utils, only : json_get_or_default, json_get_or_lookup, json_get
+  use json_utils, only : json_get_or_lookup_or_default, json_get_or_lookup, &
+       json_get
   use source_term, only : source_term_t
   use coefs, only : coef_t
   use utils, only : neko_error, NEKO_VARNAME_LEN
@@ -81,8 +82,8 @@ contains
     character(len=NEKO_VARNAME_LEN), allocatable :: field_names(:)
 
     call json_get(json, "field_names", field_names)
-    call json_get_or_default(json, "start_time", start_time, 0.0_rp)
-    call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
+    call json_get_or_lookup_or_default(json, "start_time", start_time, 0.0_rp)
+    call json_get_or_lookup_or_default(json, "end_time", end_time, huge(0.0_rp))
 
 
     call field_source_term_init_from_components(this, fields, field_names, &

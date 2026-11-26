@@ -54,7 +54,8 @@ module phmg
   use tree_amg_multigrid, only : tamg_solver_t
   use interpolation, only : interpolator_t
   use json_module, only : json_file
-  use json_utils, only : json_get_or_default, json_get
+  use json_utils, only : json_get_or_default, json_get, &
+       json_get_or_lookup_or_default
   use math, only : copy, col2, add2, add2s2, add2s1
   use device, only : device_get_ptr, device_stream_wait_event, glb_cmd_queue, &
        glb_cmd_event
@@ -142,19 +143,19 @@ contains
     integer, allocatable :: pcrs_sched(:)
     logical :: update_enabled
 
-    call json_get_or_default(json, 'smoother_iterations', &
+    call json_get_or_lookup_or_default(json, 'smoother_iterations', &
          smoother_itrs, 3)
 
     call json_get_or_default(json, 'smoother_cheby_acc', &
          cheby_acc, "jacobi")
 
-    call json_get_or_default(json, 'coarse_grid.levels', &
+    call json_get_or_lookup_or_default(json, 'coarse_grid.levels', &
          crs_tamg_lvls, 3)
 
-    call json_get_or_default(json, 'coarse_grid.iterations', &
+    call json_get_or_lookup_or_default(json, 'coarse_grid.iterations', &
          crs_tamg_itrs, 1)
 
-    call json_get_or_default(json, 'coarse_grid.cheby_degree', &
+    call json_get_or_lookup_or_default(json, 'coarse_grid.cheby_degree', &
          crs_tamg_cheby_degree, 4)
 
     if (json%valid_path('pcoarsening_schedule')) then
@@ -171,12 +172,12 @@ contains
     ! Control the eigenvalue re-estimation; geometry always refreshes.
     call json_get_or_default(json, 'update.eigs.enabled', &
          this%refresh_eigs, .true.)
-    call json_get_or_default(json, 'update.eigs.frequency', &
+    call json_get_or_lookup_or_default(json, 'update.eigs.frequency', &
          this%refresh_eigs_frequency, 20)
     call json_get_or_default(json, 'update.eigs.warm_start', &
          this%eigs_warm_start, .true.)
-    call json_get_or_default(json, 'update.eigs.warm_start_iterations', &
-         this%power_its_refresh, 20)
+    call json_get_or_lookup_or_default(json, &
+         'update.eigs.warm_start_iterations', this%power_its_refresh, 20)
 
     call this%init_from_components(coef, bclst, smoother_itrs, &
          cheby_acc, crs_tamg_lvls, crs_tamg_itrs, crs_tamg_cheby_degree,&

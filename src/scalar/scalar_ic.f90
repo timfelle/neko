@@ -134,7 +134,8 @@ contains
 
          ! Give the user the option to select which scalar they want to import
          ! the values from, in the fld file. 0 corresponds to temperature.
-         call json_get_or_default(params, 'target_index', tgt_scal_idx, i)
+         call json_get_or_lookup_or_default(params, 'target_index', &
+              tgt_scal_idx, i)
 
          call json_get_or_default(params, 'interpolate', interpolate, .false.)
          call json_get_subdict_or_empty(params, "interpolation", interp_subdict)

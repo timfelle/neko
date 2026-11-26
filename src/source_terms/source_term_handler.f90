@@ -39,7 +39,8 @@ module source_term_handler
        source_term_factory
   use field, only: field_t
   use field_list, only: field_list_t
-  use json_utils, only: json_get, json_extract_item, json_get_or_default
+  use json_utils, only: json_get, json_extract_item, &
+       json_get_or_lookup_or_default
   use json_module, only: json_file
   use coefs, only: coef_t
   use user_intf, only: user_t
@@ -291,9 +292,9 @@ contains
              call this%init_user_source(this%source_terms(i+ i0)%source_term, &
                   this%rhs_fields, this%coef, this%user, this%scheme_name)
 
-             call json_get_or_default(source_subdict, "start_time", &
+             call json_get_or_lookup_or_default(source_subdict, "start_time", &
                   this%source_terms(i + i0)%source_term%start_time, 0.0_rp)
-             call json_get_or_default(source_subdict, "end_time", &
+             call json_get_or_lookup_or_default(source_subdict, "end_time", &
                   this%source_terms(i + i0)%source_term%end_time, huge(0.0_rp))
           else
              call source_term_factory(this%source_terms(i + i0)%source_term, &

@@ -33,7 +33,7 @@
 !> Factory for wall-model samplers.
 module wall_sampler_fctry
   use json_module, only : json_file
-  use json_utils, only : json_get
+  use json_utils, only : json_get, json_get_or_lookup
   use wall_sampler, only : wall_sampler_t
   use wall_gll_sampler, only : wall_gll_sampler_t
   use wall_distance_sampler, only : wall_distance_sampler_t
@@ -62,7 +62,7 @@ contains
     end if
 
     if (.not. json%valid_path('sampling')) then
-       call json_get(json, 'h_index', h_index)
+       call json_get_or_lookup(json, 'h_index', h_index)
        call wall_sampler_allocator(object, 'gll')
        select type (object)
        type is (wall_gll_sampler_t)

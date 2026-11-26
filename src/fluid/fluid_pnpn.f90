@@ -572,7 +572,7 @@ contains
     call payload%add_series(this%wlag)
 
     !> Set the number of schwarz iterations to perform each time step.
-    call json_get_or_default(params, 'schwarz_iterations', &
+    call json_get_or_lookup_or_default(params, 'schwarz_iterations', &
          this%schwarz_iterations, 0)
 
     call neko_log%end_section()

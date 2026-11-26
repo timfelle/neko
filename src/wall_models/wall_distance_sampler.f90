@@ -37,7 +37,7 @@ module wall_distance_sampler
   use coefs, only : coef_t
   use vector, only : vector_t
   use json_module, only : json_file
-  use json_utils, only : json_get, json_get_or_default
+  use json_utils, only : json_get, json_get_or_default, json_get_or_lookup
   use wall_sampler, only : wall_sampler_t
   use user_intf, only : user_t
   use global_interpolation, only : global_interpolation_t
@@ -109,7 +109,7 @@ contains
           call neko_error('Wall distance sampler value must be a real,' // &
                ' array, or user')
        end if
-       call json_get(json, 'n_samples', n_samples)
+       call json_get_or_lookup(json, 'n_samples', n_samples)
        call this%init_from_user(n_samples, output_h)
     case default
        call neko_error('Wall distance sampler value must be a real, array,' // &

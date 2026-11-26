@@ -62,7 +62,8 @@ module PDE_filter
   use sx_jacobi, only : sx_jacobi_t
   use utils, only : neko_error
   use device_math, only : device_cfill, device_subcol3, device_cmult
-  use json_utils, only : json_get, json_get_or_default
+  use json_utils, only : json_get_or_default, json_get_or_lookup, &
+       json_get_or_lookup_or_default
   implicit none
   private
 
@@ -122,9 +123,9 @@ contains
     character(len=:), allocatable :: ksp_solver, precon_type
 
     ! user parameters
-    call json_get(json, "radius", r)
-    call json_get_or_default(json, "tolerance", tol, 1e-10_rp)
-    call json_get_or_default(json, "max_iter", max_iter, 200)
+    call json_get_or_lookup(json, "radius", r)
+    call json_get_or_lookup_or_default(json, "tolerance", tol, 1e-10_rp)
+    call json_get_or_lookup_or_default(json, "max_iter", max_iter, 200)
     call json_get_or_default(json, "solver", ksp_solver, "cg")
     call json_get_or_default(json, "preconditioner", precon_type, "jacobi")
 

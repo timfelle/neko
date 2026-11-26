@@ -86,7 +86,7 @@ module hsmg
   use coefs, only : coef_t, COEF_OPERATOR
   use mesh, only : mesh_t
   use json_module, only : json_file
-  use json_utils, only : json_get_or_default
+  use json_utils, only : json_get_or_default, json_get_or_lookup_or_default
   use krylov, only : ksp_t, ksp_monitor_t, KSP_MAX_ITER, &
        krylov_solver_factory
   use tree_amg_multigrid, only : tamg_solver_t
@@ -168,10 +168,10 @@ contains
     !
     if (trim(crs_solver) .eq. 'tamg') then
        this%niter = 10
-       call json_get_or_default(json, 'coarse_grid.iterations', &
+       call json_get_or_lookup_or_default(json, 'coarse_grid.iterations', &
             crs_tamg_itrs, 1)
     else
-       call json_get_or_default(json, 'coarse_grid.iterations', &
+       call json_get_or_lookup_or_default(json, 'coarse_grid.iterations', &
             this%niter, 10)
        crs_tamg_itrs = 1
     end if
@@ -188,10 +188,10 @@ contains
     !
     ! Parameters for a tree-amg based coarse grid solver
     !
-    call json_get_or_default(json, 'coarse_grid.levels', &
+    call json_get_or_lookup_or_default(json, 'coarse_grid.levels', &
          crs_tamg_lvls, 3)
 
-    call json_get_or_default(json, 'coarse_grid.cheby_degree', &
+    call json_get_or_lookup_or_default(json, 'coarse_grid.cheby_degree', &
          crs_tamg_cheby_degree, 4)
 
     call this%init_from_components(coef, bclst, crs_solver, crs_pc, &

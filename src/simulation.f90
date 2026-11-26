@@ -43,7 +43,8 @@ module simulation
   use profiler, only : profiler_start, profiler_stop, &
        profiler_start_region, profiler_end_region
   use simcomp_executor, only : neko_simcomps
-  use json_utils, only : json_get, json_get_or_default
+  use json_utils, only : json_get, json_get_or_default, &
+       json_get_or_lookup_or_default
   use time_state, only : time_state_t
   use time_step_controller, only : time_step_controller_t
   implicit none
@@ -271,8 +272,8 @@ contains
        call previous_meshf%init(trim(restart_mesh_file))
        call previous_meshf%read(C%chkp%previous_mesh)
 
-       call json_get_or_default(C%params, 'case.mesh2mesh_tolerance', &
-            C%chkp%mesh2mesh_tol, 1e-6_dp)
+       call json_get_or_lookup_or_default(C%params, &
+            'case.mesh2mesh_tolerance', C%chkp%mesh2mesh_tol, 1e-6_dp)
     end if
 
     call neko_log%section('Restarting from checkpoint')

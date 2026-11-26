@@ -47,7 +47,8 @@ module fluid_scheme_compressible_ns
   use mesh, only : mesh_t
   use checkpoint, only : chkp_t
   use json_module, only : json_file, json_core, json_value
-  use json_utils, only : json_get, json_get_or_default, json_extract_item
+  use json_utils, only : json_get, json_get_or_default, json_extract_item, &
+       json_get_or_lookup, json_get_or_lookup_or_default
   use profiler, only : profiler_start_region, profiler_end_region
   use user_intf, only : user_t
   use time_step_controller, only : time_step_controller_t
@@ -240,7 +241,8 @@ contains
     call this%setup_viscous_regularization(params)
 
     ! Initialize Runge-Kutta scheme
-    call json_get_or_default(numerics_params, 'time_order', rk_order, 4)
+    call json_get_or_lookup_or_default(numerics_params, 'time_order', &
+         rk_order, 4)
     call this%rk_scheme%init(rk_order)
 
     call neko_log%section("Fluid boundary conditions")
@@ -457,7 +459,7 @@ contains
        do i = 1, n_bcs
           ! Extract BC configuration
           call json_extract_item(core, bc_object, i, bc_subdict)
-          call json_get(bc_subdict, "zone_indices", zone_indices)
+          call json_get_or_lookup(bc_subdict, "zone_indices", zone_indices)
 
           ! Validate zones
           do j = 1, size(zone_indices)

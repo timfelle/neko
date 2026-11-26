@@ -38,7 +38,7 @@ module sponge_source_term
   use registry, only : neko_registry
   use field, only : field_t
   use json_utils, only : json_get, json_get_or_default, json_get_or_lookup, &
-       json_get_subdict_or_empty
+       json_get_subdict_or_empty, json_get_or_lookup_or_default
   use utils, only : neko_error
   use device, only : device_memcpy, HOST_TO_DEVICE
   use device_math, only : device_sub3, device_col2, device_add2s2
@@ -152,8 +152,8 @@ contains
        call neko_error("(SPONGE) Expected 3 elements for 'amplitudes'")
     end if
 
-    call json_get_or_default(json, "start_time", start_time, 0.0_rp)
-    call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
+    call json_get_or_lookup_or_default(json, "start_time", start_time, 0.0_rp)
+    call json_get_or_lookup_or_default(json, "end_time", end_time, huge(0.0_rp))
 
 
     call json_get(json, 'baseflow', &

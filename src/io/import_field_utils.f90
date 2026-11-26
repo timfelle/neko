@@ -45,7 +45,7 @@ module import_field_utils
   use logger, only : LOG_SIZE, neko_log
   use device, only : HOST_TO_DEVICE
   use json_module, only : json_file
-  use json_utils, only : json_get_or_default
+  use json_utils, only : json_get_or_lookup_or_default
   implicit none
   private
 
@@ -100,9 +100,9 @@ contains
 
     real(kind=dp) :: tolerance, padding
 
-    call json_get_or_default(global_interp_subdict, "tolerance", &
+    call json_get_or_lookup_or_default(global_interp_subdict, "tolerance", &
          tolerance, GLOB_INTERP_TOL)
-    call json_get_or_default(global_interp_subdict, "padding", &
+    call json_get_or_lookup_or_default(global_interp_subdict, "padding", &
          padding, GLOB_INTERP_PAD)
 
     call import_fields_from_params(fname, mesh_fname, &

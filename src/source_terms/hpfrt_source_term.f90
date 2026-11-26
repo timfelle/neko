@@ -37,7 +37,7 @@ module hpfrt_source_term
   use field_list, only : field_list_t
   use field_math, only : field_add2, field_cmult, field_sub3
   use json_module, only : json_file
-  use json_utils, only : json_get_or_default, json_get_or_lookup
+  use json_utils, only : json_get_or_lookup_or_default, json_get_or_lookup
   use source_term, only : source_term_t
   use coefs, only : coef_t
   use elementwise_filter, only : elementwise_filter_t
@@ -101,8 +101,8 @@ contains
 
     call json_get_or_lookup(json, "filter_weight", filter_weight)
     call json_get_or_lookup(json, "filter_modes", filter_modes)
-    call json_get_or_default(json, "start_time", start_time, 0.0_rp)
-    call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
+    call json_get_or_lookup_or_default(json, "start_time", start_time, 0.0_rp)
+    call json_get_or_lookup_or_default(json, "end_time", end_time, huge(0.0_rp))
 
     call hpfrt_source_term_init_from_components(this, fields, coef, &
          filter_weight, filter_modes, start_time, end_time, variable_name)

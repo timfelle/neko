@@ -46,7 +46,7 @@ module dong_outflow
   use, intrinsic :: iso_c_binding, only : c_ptr, c_sizeof, c_null_ptr, &
        c_associated
   use json_module, only : json_file
-  use json_utils, only : json_get, json_get_or_default
+  use json_utils, only : json_get, json_get_or_lookup_or_default
   use utils, only : neko_error
   use time_state, only : time_state_t
   implicit none
@@ -91,8 +91,9 @@ contains
     call this%init_base(coef)
     this%bc_type = BC_DIRICHLET
 
-    call json_get_or_default(json, 'delta', this%delta, 0.01_rp)
-    call json_get_or_default(json, 'velocity_scale', this%uinf, 1.0_rp)
+    call json_get_or_lookup_or_default(json, 'delta', this%delta, 0.01_rp)
+    call json_get_or_lookup_or_default(json, 'velocity_scale', this%uinf, &
+         1.0_rp)
 
   end subroutine dong_outflow_init
 

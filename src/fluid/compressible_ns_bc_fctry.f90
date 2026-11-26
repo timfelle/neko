@@ -36,7 +36,6 @@ submodule(fluid_scheme_compressible_ns) compressible_ns_bc_fctry
   use inflow, only : inflow_t
   use zero_dirichlet, only : zero_dirichlet_t
   use symmetry, only : symmetry_t
-  use json_utils, only : json_get_or_lookup
   implicit none
 
   ! List of all possible types created by the boundary condition factories

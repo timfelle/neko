@@ -562,7 +562,7 @@ contains
     call json_get(json, 'file_name', file_name)
     call json_get_or_default(json, 'field_name', field_name, &
          'brinkman_indicator')
-    call json_get_or_default(json, 'file_index', file_idx, 0)
+    call json_get_or_lookup_or_default(json, 'file_index', file_idx, 0)
 
     call neko_scratch_registry%request_field(temp_field, temp_idx, .true.)
 

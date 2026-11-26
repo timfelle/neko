@@ -239,7 +239,7 @@ contains
     call this%set_material_properties(params, user)
 
     ! Compressible parameters
-    call json_get_or_default(params, 'gamma', this%gamma, 1.4_rp)
+    call json_get_or_lookup_or_default(params, 'gamma', this%gamma, 1.4_rp)
 
     ! Calculate global points for logging
     this%glb_n_points = int(this%msh%glb_nelv, i8)*int(this%Xh%lxyz, i8)
@@ -599,7 +599,8 @@ contains
     write(log_buf, '(A,ES13.6)') 'gamma      :', this%gamma
     call neko_log%message(log_buf)
 
-    call json_get_or_default(numerics_params, 'time_order', integer_val, 4)
+    call json_get_or_lookup_or_default(numerics_params, 'time_order', &
+         integer_val, 4)
     write(log_buf, '(A, I0)') 'RK order   : ', integer_val
     call neko_log%message(log_buf)
 
