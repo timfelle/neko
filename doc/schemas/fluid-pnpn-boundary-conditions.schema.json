@@ -632,6 +632,7 @@
                       "enum": [
                         "cai_sagaut_model_ii",
                         "spalding",
+                        "reichardt",
                         "rough_log_law",
                         "most",
                         "richardson"
@@ -695,6 +696,37 @@
                   },
                   "B": {
                     "$ref": "urn:neko:schema:common#/$defs/nonNegativeNumberOrRef"
+                  }
+                },
+                "additionalProperties": true
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/$defs/wallModelBase"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kappa"
+                ],
+                "properties": {
+                  "model": {
+                    "const": "reichardt"
+                  },
+                  "kappa": {
+                    "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+                  },
+                  "C": {
+                    "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+                  },
+                  "B1": {
+                    "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
+                  },
+                  "B2": {
+                    "$ref": "urn:neko:schema:common#/$defs/positiveNumberOrRef"
                   }
                 },
                 "additionalProperties": true
