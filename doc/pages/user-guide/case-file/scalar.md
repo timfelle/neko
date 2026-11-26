@@ -160,7 +160,7 @@ file documentation.
    counted. When initialising from a file written with a different set of
    enabled scalars, set `target_index` explicitly, otherwise the fields are
    read shifted. The keywords `interpolation.tolerance` and
-   `interpolation.padding` must be given as literal reals.
+   `interpolation.padding` may also be names of real constants.
 
 ## Source terms
 

@@ -10,13 +10,13 @@ The compressible solver accepts the following parameters:
 
 | Name    | Description                                      | Admissible values | Default value |
 | ------- | ------------------------------------------------ | ----------------- | ------------- |
-| `gamma` | Ratio of specific heats for ideal gas. Must be given as a literal. | Positive reals    | `1.4`         |
+| `gamma` | Ratio of specific heats for ideal gas. | Positive reals    | `1.4`         |
 | `mu`    | Constant physical dynamic viscosity              | Non-negative real | `0.0`         |
 | `kappa` | Constant physical thermal conductivity           | Non-negative real | `0.0`         |
 
 The order of the Runge-Kutta time integration is set with `time_order` in the
 numerics object. It accepts 1, 2, 3 or 4, and defaults to 4. For the
-compressible solver it must be given as a literal integer, not as a constant.
+compressible solver it may also be the name of a constant.
 
 The compressible solver uses variable time-stepping controlled by the CFL
 number. Set `variable_timestep` to `true` and specify `target_cfl` in the time
@@ -98,8 +98,8 @@ The compressible solver supports the following boundary conditions:
 | outflow            | Pressure outlet (zero gradient)           |
 | normal_outflow     | Normal outflow condition                  |
 
-The `zone_indices` of the compressible boundary conditions must be given as a
-literal array of integers, they cannot refer to constants.
+The `zone_indices` of the compressible boundary conditions may be given as an
+array of integers or as the name of an array constant.
 
 For examples of compressible flow setups, see the `euler_1d_sod`,
 `euler_2d_forward_facing_step`, and `euler_tgv` examples.

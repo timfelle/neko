@@ -141,7 +141,7 @@ but also defines several parameters that pertain to the simulation as a whole.
 | `checkpoint_format`   | The file format of checkpoints                                                                        | `chkp` or `hdf5`                                | `chkp`        |
 | `restart_file`        | Checkpoint to use for a restart from previous data                                                    | Strings ending with `.chkp`, `.h5`, or `.hdf5`  | -             |
 | `restart_mesh_file`   | If the restart file is on a different mesh, specify the .nmsh file used to generate it here           | Strings ending with `.nmsh`                     | -             |
-| `mesh2mesh_tolerance` | Tolerance for the restart when restarting from another mesh. Must be given as a literal, it cannot refer to a constant. | Positive reals                  | 1e-6          |
+| `mesh2mesh_tolerance` | Tolerance for the restart when restarting from another mesh. | Positive reals                  | 1e-6          |
 | `job_timelimit`       | The maximum wall clock duration of the simulation.                                                    | String formatted as [[[DD-]HH:]MM:]SS           | No limit      |
 | `output_at_end`       | Whether to always write all enabled output at the end of the run.                                     | `true` or `false`                               | `true`        |
 | `output_at_start`     | Whether to write the initial state of the simulation. Checkpoints and statistics never do.            | `true` or `false`                               | `true`        |

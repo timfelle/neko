@@ -150,8 +150,8 @@ velocity. The `coupled_bicgstab` solver is currently available on CPUs only.
 ## Schwarz iterations {#case-file_fluid-schwarz}
 This feature is enabled by setting the `schwarz_iterations` keyword inside
 the `fluid` group to an integer larger than zero. In this case, each fluid
-timestep solves for velocity and pressure multiple times. The value must be a
-literal integer, it cannot refer to a constant.
+timestep solves for velocity and pressure multiple times. The value may also be
+the name of an integer constant.
 
 The total number of passes is `1 + schwarz_iterations`. This feature is often
 needed to increase the stability of solutions when using `overset_interface`
@@ -385,8 +385,8 @@ A more detailed description of each boundary condition is provided below.
   default). With `full_stress_formulation` set to `true`, `value` is read and
   required, and `file_name` is not. The optional keywords `delta`, the smoothing parameter of the
   backflow switch, and `velocity_scale`, the characteristic velocity scale,
-  default to `0.01` and `1.0`, respectively. They must be given as literal
-  reals, not as constants.
+  default to `0.01` and `1.0`, respectively. Both may also be names of real
+  constants.
 
 * `normal_outflow+dong`. Same as `normal_outflow`, but additionally applies the
   Dong boundary condition for the pressure to prevent backflow. The tangential
@@ -868,9 +868,8 @@ user-defined source terms as well, whose execution can additionally be
 controlled directly in the user code. By default, all source terms are active
 during the entire simulation. For the `constant`, `field`, `boussinesq`,
 `user`, `gradient_jump_penalty`, `hpfrt` and `sponge` source terms,
-`start_time` and `end_time` must be literal reals; only `brinkman`,
-`coriolis`, `centrifugal` and `translation` also accept the name of a
-constant.
+all source terms accept the name of a real constant for `start_time` and
+`end_time`, as an alternative to a literal real.
 
 The following types are currently implemented.
 
@@ -1113,7 +1112,7 @@ uses the following parameters:
 * `scaling_exponent`, the scaling parameter \f$ b \f$ for \f$ P > 1 \f$, default
   to be `4.0`.
 
-These three parameters must be given as literal reals, not as constants. `tau`
+These three parameters may also be names of real constants. `tau`
 is only read for \f$ P = 1 \f$, and `scaling_factor` and `scaling_exponent` are
 only read for \f$ P > 1 \f$.
 
@@ -1390,8 +1389,8 @@ The parameters for the sponge source term are summarized in the table below:
 | `baseflow.file_name`       | File containing baseflow velocity field                                 | String                            | -                 |
 | `baseflow.mesh_file_name`  | Mesh file corresponding to the baseflow field                           | String                            | -                 |
 | `baseflow.interpolate`     | Whether to interpolate field values to current mesh                     | Boolean                           | `false`           |
-| `baseflow.interpolation.tolerance` | Tolerance for interpolation convergence, given as a literal   | Real                              | Global interpolation default |
-| `baseflow.interpolation.padding`   | Padding for the interpolation search, given as a literal      | Real                              | Global interpolation default |
+| `baseflow.interpolation.tolerance` | Tolerance for interpolation convergence, may be a constant name  | Real                              | Global interpolation default |
+| `baseflow.interpolation.padding`   | Padding for the interpolation search, may be a constant name     | Real                              | Global interpolation default |
 | `fringe_registry_name`     | Name of the fringe mask field in `neko_registry`                        | String                            | `"sponge_fringe"` |
 | `baseflow_registry_prefix` | Prefix of the base flow fields in `neko_registry`                       | String                            | `"sponge_bf"`     |
 | `dump_fields`              | If `true`, dumps the fringe and baseflow fields for visualization       | Boolean                           | `false`           |
@@ -1402,6 +1401,10 @@ The parameters for the sponge source term are summarized in the table below:
 Neko supports the simulation of moving walls through the Arbitrary Lagrangian-Eulerian (ALE) framework. The current implementation allows for an arbitrary number of individually moving or deformable walls, collectively referred to as bodies.
 
 @note Currently, the ALE framework supports CPU backend, as well as HIP and CUDA backends for GPU acceleration.
+
+@note With ALE enabled, `numerics.time_order` and the `zone_indices` of the
+fluid boundary conditions must be literal values: the ALE framework reads them
+again without resolving constants.
 
 The `"ale"` block in case file is part of the `"fluid"` object, and has the following high-level structure:
 
@@ -1824,8 +1827,7 @@ additional set of parameters related to the solution of the coarse
 grid problem. These parameters are specified as a `coarse_grid` block
 under `preconditioner`.
 
-The integer parameters below must be given as literal integers, they cannot
-refer to constants.
+The integer parameters below may also be given as names of integer constants.
 
 For `hsmg`, the following keywords are used:
 
@@ -1936,7 +1938,7 @@ concisely directly in the table.
 | `flow_rate_force.log`                              | Whether to print the flow-rate forcing log message during the volume-flow adjustment.             | `true` or `false`                                           | `true`        |
 | `freeze`                                           | Whether to fix the velocity field at initial conditions.                                          | `true` or `false`                                           | `false`       |
 | `cyclic`                                           | Whether to treat the periodic boundaries of the mesh as cyclic boundaries, for which rotation matrices are built from the facet normals. An error is issued if the mesh has no periodic boundaries. | `true` or `false` | `false` |
-| `schwarz_iterations`                               | Number of additional Schwarz passes per time step, see [Schwarz iterations](#case-file_fluid-schwarz). Literal integer. | Non-negative integer          | `0`           |
+| `schwarz_iterations`                               | Number of additional Schwarz passes per time step, see [Schwarz iterations](#case-file_fluid-schwarz). May be a constant name. | Non-negative integer          | `0`           |
 | `strict_convergence`                               | Whether to enforce strict convergence in the linear solvers.                                      | `true` or `false`                                           | `false`       |
 | `allow_stabilization`                              | Whether to allow an initial stabilization phase before enforcing strict convergence.              | `true` or `false`                                           | `false`       |
 | `advection`                                        | Whether to compute the advection term.                                                            | `true` or `false`                                           | `true`        |

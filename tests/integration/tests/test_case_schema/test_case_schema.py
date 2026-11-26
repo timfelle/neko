@@ -501,10 +501,11 @@ def _validate_modified(tmp_path, example, property_path, value):
     )
 
 
-# Keys that Neko reads without resolving constants. A schema that accepts a
-# constants reference there lets a case through that the solver then rejects.
+# Keys that Neko reads with json_get_or_lookup*, so that a name from the
+# top-level "constants" object may stand in for the literal value. The
+# schemas must accept both forms.
 # Each entry is (id, example, path, literal value, constants reference).
-LITERAL_ONLY_KEYS = [
+LOOKUP_KEYS_ACCEPT_CONSTANTS = [
     ("schwarz_iterations", "tgv/tgv.case",
      ("case", "fluid", "schwarz_iterations"), 1, "n_iter"),
     ("mesh2mesh_tolerance", "tgv/tgv.case",
@@ -540,18 +541,18 @@ LITERAL_ONLY_KEYS = [
 
 
 @pytest.mark.parametrize(
-    "example, property_path, good, bad",
-    [entry[1:] for entry in LITERAL_ONLY_KEYS],
-    ids=[entry[0] for entry in LITERAL_ONLY_KEYS],
+    "example, property_path, literal, reference",
+    [entry[1:] for entry in LOOKUP_KEYS_ACCEPT_CONSTANTS],
+    ids=[entry[0] for entry in LOOKUP_KEYS_ACCEPT_CONSTANTS],
 )
-def test_literal_only_keys_reject_constant_references(
-    tmp_path, example, property_path, good, bad
+def test_lookup_keys_accept_constant_references(
+    tmp_path, example, property_path, literal, reference
 ):
-    accepted = _validate_modified(tmp_path, example, property_path, good)
+    accepted = _validate_modified(tmp_path, example, property_path, literal)
     assert accepted.returncode == 0, accepted.stdout + accepted.stderr
 
-    rejected = _validate_modified(tmp_path, example, property_path, bad)
-    assert rejected.returncode != 0
+    by_name = _validate_modified(tmp_path, example, property_path, reference)
+    assert by_name.returncode == 0, by_name.stdout + by_name.stderr
 
 
 def test_allows_split_velocity_pressure_boundary_condition(tmp_path):
@@ -808,10 +809,6 @@ REJECTED_AS_THE_CODE_ABORTS = [
         "sampling": {"type": "distance", "value": 1}})]),
     ("brinkman_pde_filter_without_radius", "immersed_zones/sphere.case",
      [(("case", "fluid", "source_terms", 0, "filter"), {"type": "PDE"})]),
-    ("brinkman_file_index_constant", "immersed_zones/sphere.case",
-     [(("case", "fluid", "source_terms", 0, "objects", 0),
-       {"type": "file", "file_name": "indicator0.f00000",
-        "file_index": "idx"})]),
     ("scalar_source_term_of_fluid_type", "scalar_mms/scalar_mms.case",
      [(("case", "scalar", "source_terms"),
        [{"type": "boussinesq", "g": [0.0, 0.0, -1.0],
@@ -839,11 +836,19 @@ def test_wall_distance_real_is_accepted(tmp_path):
                                      edits))
 
 
-def test_wall_zone_indices_reject_constant_reference(tmp_path):
+def test_brinkman_file_index_accepts_constant_reference(tmp_path):
+    edits = [(("case", "fluid", "source_terms", 0, "objects", 0),
+              {"type": "file", "file_name": "indicator0.f00000",
+               "file_index": "idx"})]
+    _assert_accepted(_validate_edits(tmp_path, "immersed_zones/sphere.case",
+                                     edits))
+
+
+def test_wall_zone_indices_accept_constant_reference(tmp_path):
     path = ("case", "fluid", "wall_zone_indices")
     _assert_accepted(_validate_edits(tmp_path, "cylinder/cylinder.case",
                                      [(path, [7])]))
-    _assert_rejected(_validate_edits(tmp_path, "cylinder/cylinder.case",
+    _assert_accepted(_validate_edits(tmp_path, "cylinder/cylinder.case",
                                      [(path, "walls")]))
 
 
