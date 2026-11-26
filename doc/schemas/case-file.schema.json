@@ -16,6 +16,17 @@
   },
   "additionalProperties": true,
   "$defs": {
+    "notHsmgSolver": {
+      "$comment": "A solver block whose preconditioner is not hsmg.",
+      "properties": {
+        "preconditioner": {
+          "not": {
+            "properties": {"type": {"const": "hsmg"}},
+            "required": ["type"]
+          }
+        }
+      }
+    },
     "constantEntry": {
       "type": "object",
       "required": [
@@ -296,18 +307,44 @@
               "numerics": {
                 "required": ["time_order", "dealias"],
                 "properties": {
-                  "polynomial_order": {
-                    "oneOf": [
-                      {"type": "integer", "minimum": 3},
-                      {"$ref": "urn:neko:schema:common#/$defs/constRef"}
-                    ]
-                  },
                   "time_order": {
                     "oneOf": [
                       {"type": "integer", "minimum": 1, "maximum": 3},
                       {"$ref": "urn:neko:schema:common#/$defs/constRef"}
                     ]
                   }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "src/krylov/pc_hsmg.f90 (hsmg init) aborts with 'Polynomial order < 2 not supported for hsmg precon' when the polynomial order is 1. hsmg can be selected through precon_factory for fluid velocity_solver, fluid pressure_solver, the ALE mesh motion solver and the scalar solver, all built on the numerics space. Only a literal order is checked here.",
+          "if": {
+            "properties": {
+              "numerics": {
+                "properties": {"polynomial_order": {"const": 1}},
+                "required": ["polynomial_order"]
+              }
+            },
+            "required": ["numerics"]
+          },
+          "then": {
+            "properties": {
+              "fluid": {
+                "properties": {
+                  "velocity_solver": {"$ref": "#/$defs/notHsmgSolver"},
+                  "pressure_solver": {"$ref": "#/$defs/notHsmgSolver"},
+                  "ale": {
+                    "properties": {
+                      "solver": {"$ref": "#/$defs/notHsmgSolver"}
+                    }
+                  }
+                }
+              },
+              "scalar": {
+                "properties": {
+                  "solver": {"$ref": "#/$defs/notHsmgSolver"}
                 }
               }
             }

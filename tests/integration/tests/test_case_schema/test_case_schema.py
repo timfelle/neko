@@ -698,6 +698,17 @@ ACCEPTED_BY_THE_CODE = [
      [(("case", "simulation_components"),
        [{"type": "curl", "fields": ["u", "v", "w"],
          "output_filename": "curl", "output_format": "hdf5"}])]),
+    # Only hsmg has a floor (pc_hsmg.f90); pnpn itself runs at order 2 and 1.
+    ("pnpn_order_two_with_hsmg", "cylinder/cylinder.case",
+     [(("case", "numerics", "polynomial_order"), 2),
+      (("case", "fluid", "pressure_solver", "preconditioner"),
+       {"type": "hsmg"})]),
+    ("pnpn_order_one_with_jacobi", "cylinder/cylinder.case",
+     [(("case", "numerics", "polynomial_order"), 1),
+      (("case", "fluid", "pressure_solver", "preconditioner"),
+       {"type": "jacobi"}),
+      (("case", "fluid", "velocity_solver", "preconditioner"),
+       {"type": "jacobi"})]),
 ]
 
 
@@ -756,6 +767,10 @@ def test_field_writer_point_zone_needs_fld_and_output_filename(tmp_path):
 # Rejected because the code aborts on them. Each entry is
 # (id, example, edits).
 REJECTED_AS_THE_CODE_ABORTS = [
+    ("order_one_with_hsmg_pressure", "cylinder/cylinder.case",
+     [(("case", "numerics", "polynomial_order"), 1),
+      (("case", "fluid", "pressure_solver", "preconditioner"),
+       {"type": "hsmg"})]),
     ("shear_stress_without_full_stress", "cylinder/cylinder.case",
      [(("case", "fluid", "boundary_conditions", 4),
        {"type": "shear_stress", "zone_indices": [7],
