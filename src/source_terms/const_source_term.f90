@@ -47,6 +47,8 @@ module const_source_term
   implicit none
   private
 
+  public :: const_source_term_values_from_json
+
   !> A constant source term.
   !! The strength is specified with the `values` keyword, which should be an
   !! array, with a value for each component of the source, or the name of a
@@ -81,25 +83,9 @@ contains
     type(coef_t), intent(in), target :: coef
     character(len=*), intent(in) :: variable_name
     real(kind=rp), allocatable :: values(:)
-    real(kind=rp) :: start_time, end_time, value
-    character(len=:), allocatable :: constant_name
-    logical :: found
+    real(kind=rp) :: start_time, end_time
 
-    ! An array of numbers
-    call json%get("values", values, found)
-
-    if (.not. found) then
-       call json%get("values", constant_name, found)
-       if (found .and. &
-            .not. neko_const_registry%real_scalar_exists(constant_name)) then
-          ! The name of a vector constant
-          call json_get_or_lookup(json, "values", values)
-       else
-          ! A number or the name of a scalar constant
-          call json_get_or_lookup(json, "values", value)
-          values = [value]
-       end if
-    end if
+    call const_source_term_values_from_json(json, values)
 
     call json_get_or_lookup_or_default(json, "start_time", start_time, 0.0_rp)
     call json_get_or_lookup_or_default(json, "end_time", end_time, huge(0.0_rp))
@@ -109,6 +95,52 @@ contains
          start_time, end_time)
 
   end subroutine const_source_term_init_from_json
+
+  !> Reads the `values` of a constant source term.
+  !! @details Dispatches on the JSON type, so that the result does not
+  !! depend on the strict type checking of `json`. An array is read as it
+  !! is. A string names a real scalar or a vector constant; a name that is
+  !! both is an error. Anything else is read as one real.
+  !! @param json The JSON object for the source.
+  !! @param values The values, one for each component of the source.
+  subroutine const_source_term_values_from_json(json, values)
+    type(json_file), intent(inout) :: json
+    real(kind=rp), allocatable, intent(inout) :: values(:)
+    character(len=:), allocatable :: constant_name
+    real(kind=rp) :: value
+    logical :: found, is_scalar, is_vector
+    integer :: var_type
+
+    call json%info("values", found = found, var_type = var_type)
+
+    if (found .and. var_type .eq. 3) then
+       ! An array of numbers
+       call json_get_or_lookup(json, "values", values)
+    else if (found .and. var_type .eq. 7) then
+       ! The name of a constant
+       call json%get("values", constant_name)
+       is_scalar = neko_const_registry%real_scalar_exists(constant_name)
+       is_vector = neko_const_registry%vector_exists(constant_name)
+       if (is_scalar .and. is_vector) then
+          call neko_error("Constant source term values: " // &
+               constant_name // " names both a scalar and a vector constant")
+       else if (is_vector) then
+          call json_get_or_lookup(json, "values", values)
+       else if (.not. is_scalar .and. &
+            neko_const_registry%integer_scalar_exists(constant_name)) then
+          call neko_error("Constant source term values: " // &
+               constant_name // " is an integer constant, a real is required")
+       else
+          call json_get_or_lookup(json, "values", value)
+          values = [value]
+       end if
+    else
+       ! A number, or missing
+       call json_get_or_lookup(json, "values", value)
+       values = [value]
+    end if
+
+  end subroutine const_source_term_values_from_json
 
   !> The constructor from type components.
   !! @param fields A list of fields for adding the source values.

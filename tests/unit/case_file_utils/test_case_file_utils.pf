@@ -9,6 +9,8 @@ module test_case_file_utils
   use registry, only : neko_const_registry
   use vector, only : vector_t
   use device, only : device_init, device_finalize, HOST_TO_DEVICE
+  use const_source_term, only : const_source_term_values_from_json
+  use error_redirection, only : redirect_errors, restore_errors
   implicit none
 
   @TestCase
@@ -28,10 +30,12 @@ contains
     end if
     call neko_const_registry%free()
     call neko_const_registry%init()
+    call redirect_errors()
   end subroutine setUp
 
   subroutine tearDown(this)
     class(case_file_utils_tc), intent(inout) :: this
+    call restore_errors()
     call neko_const_registry%free()
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_finalize
@@ -267,5 +271,142 @@ contains
     @assertEqual(default_val, stored)
   end subroutine test_default_value_for_integers
 
+  !> Reads the constant source term values from `case`, with or without
+  !! strict type checking in the JSON object.
+  subroutine read_const_values(case, strict, values)
+    character(len=*), intent(in) :: case
+    logical, intent(in) :: strict
+    real(kind=rp), allocatable, intent(inout) :: values(:)
+    type(json_file) :: json
+
+    call json%initialize(strict_type_checking = strict)
+    call json%deserialize(case)
+    call const_source_term_values_from_json(json, values)
+    call json%destroy()
+  end subroutine read_const_values
+
+  !> Adds a real scalar constant q and a vector constant v.
+  subroutine add_const_values_constants()
+    type(vector_t), pointer :: vec_ptr
+
+    call neko_const_registry%add_real_scalar(0.25_rp, 'q')
+    call neko_const_registry%add_vector(2, 'v')
+    vec_ptr => neko_const_registry%get_vector('v')
+    vec_ptr%x = [1.25_rp, 2.5_rp]
+  end subroutine add_const_values_constants
+
+  @test
+  subroutine test_const_values_number(this)
+    class(case_file_utils_tc), intent(inout) :: this
+    real(kind=rp), allocatable :: values(:)
+    logical :: strict
+    integer :: i
+
+    call add_const_values_constants()
+    do i = 1, 2
+       strict = i .eq. 1
+       call read_const_values('{"values": 0.5}', strict, values)
+       @assertEqual([0.5_rp], values, tolerance=NEKO_EPS)
+       deallocate(values)
+    end do
+  end subroutine test_const_values_number
+
+  @test
+  subroutine test_const_values_array(this)
+    class(case_file_utils_tc), intent(inout) :: this
+    real(kind=rp), allocatable :: values(:)
+    logical :: strict
+    integer :: i
+
+    call add_const_values_constants()
+    do i = 1, 2
+       strict = i .eq. 1
+       call read_const_values('{"values": [0.5, 1.5]}', strict, values)
+       @assertEqual([0.5_rp, 1.5_rp], values, tolerance=NEKO_EPS)
+       deallocate(values)
+    end do
+  end subroutine test_const_values_array
+
+  @test
+  subroutine test_const_values_scalar_constant(this)
+    class(case_file_utils_tc), intent(inout) :: this
+    real(kind=rp), allocatable :: values(:)
+    logical :: strict
+    integer :: i
+
+    call add_const_values_constants()
+    do i = 1, 2
+       strict = i .eq. 1
+       call read_const_values('{"values": "q"}', strict, values)
+       @assertEqual([0.25_rp], values, tolerance=NEKO_EPS)
+       deallocate(values)
+    end do
+  end subroutine test_const_values_scalar_constant
+
+  @test
+  subroutine test_const_values_vector_constant(this)
+    class(case_file_utils_tc), intent(inout) :: this
+    real(kind=rp), allocatable :: values(:)
+    logical :: strict
+    integer :: i
+
+    call add_const_values_constants()
+    do i = 1, 2
+       strict = i .eq. 1
+       call read_const_values('{"values": "v"}', strict, values)
+       @assertEqual([1.25_rp, 2.5_rp], values, tolerance=NEKO_EPS)
+       deallocate(values)
+    end do
+  end subroutine test_const_values_vector_constant
+
+  @test
+  subroutine test_const_values_name_clash_strict(this)
+    class(case_file_utils_tc), intent(inout) :: this
+    real(kind=rp), allocatable :: values(:)
+
+    call neko_const_registry%add_real_scalar(0.25_rp, 'c')
+    call neko_const_registry%add_vector(2, 'c')
+    call read_const_values('{"values": "c"}', .true., values)
+    ! neko_error passes no message on, so check that it stopped the read
+    @assertExceptionRaised()
+    @assertFalse(allocated(values))
+  end subroutine test_const_values_name_clash_strict
+
+  @test
+  subroutine test_const_values_name_clash_nonstrict(this)
+    class(case_file_utils_tc), intent(inout) :: this
+    real(kind=rp), allocatable :: values(:)
+
+    call neko_const_registry%add_real_scalar(0.25_rp, 'c')
+    call neko_const_registry%add_vector(2, 'c')
+    call read_const_values('{"values": "c"}', .false., values)
+    ! neko_error passes no message on, so check that it stopped the read
+    @assertExceptionRaised()
+    @assertFalse(allocated(values))
+  end subroutine test_const_values_name_clash_nonstrict
+
+  @test
+  subroutine test_const_values_integer_constant_strict(this)
+    class(case_file_utils_tc), intent(inout) :: this
+    real(kind=rp), allocatable :: values(:)
+
+    call neko_const_registry%add_integer_scalar(3, 'n')
+    call read_const_values('{"values": "n"}', .true., values)
+    ! neko_error passes no message on, so check that it stopped the read
+    @assertExceptionRaised()
+    @assertFalse(allocated(values))
+  end subroutine test_const_values_integer_constant_strict
+
+  @test
+  subroutine test_const_values_integer_constant_nonstrict(this)
+    class(case_file_utils_tc), intent(inout) :: this
+    real(kind=rp), allocatable :: values(:)
+
+    call neko_const_registry%add_integer_scalar(3, 'n')
+    call read_const_values('{"values": "n"}', .false., values)
+    ! neko_error passes no message on, so check that it stopped the read
+    @assertExceptionRaised()
+    @assertFalse(allocated(values))
+  end subroutine test_const_values_integer_constant_nonstrict
 
 end module test_case_file_utils

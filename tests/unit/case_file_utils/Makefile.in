@@ -10,6 +10,10 @@ NEKO_LIB := $(wildcard @top_builddir@/src/libneko.la)
 %.o : %.F90 $(NEKO_LIB)
 	$(FC) -c $(FFLAGS) $<
 
+# The fixture is compiled here, not in ../fixtures, so that its module file
+# ends up in this directory whatever other suite has compiled it before.
+error_redirection.o : ../fixtures/error_redirection.f90 $(NEKO_LIB)
+	$(FC) -c $(FFLAGS) -o $@ $<
 
 check: case_file_utils_test
 
@@ -21,9 +25,12 @@ Makefile: Makefile.in @top_builddir@/config.status
 	cd @top_builddir@ && $(SHELL) ./config.status $(SUBDIR)/Makefile
 
 case_file_utils_test_TESTS := test_case_file_utils.pf
+case_file_utils_test_OTHER_SOURCES = error_redirection.f90
 case_file_utils_test_OTHER_LIBRARIES = -L@top_builddir@/src/.libs -lneko @LDFLAGS@ @LIBS@
 $(eval $(call make_pfunit_test,case_file_utils_test))
 case_file_utils_test.inc: Makefile
+case_file_utils_test_driver.o: error_redirection.o
+test_case_file_utils.o: error_redirection.o
 
 distclean:
 clean:
