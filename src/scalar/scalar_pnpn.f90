@@ -43,8 +43,7 @@ module scalar_pnpn
   use scalar_bc_projector, only : scalar_bc_projector_t
   use mesh, only : mesh_t
   use coefs, only : coef_t
-  use device, only : HOST_TO_DEVICE, device_memcpy, glb_cmd_event, &
-       device_event_sync
+  use device, only : HOST_TO_DEVICE, device_memcpy, glb_cmd_event
   use gather_scatter, only : gs_t, GS_OP_ADD, GS_OP_MIN, GS_OP_MAX
   use scalar_residual, only : scalar_residual_t, scalar_residual_factory
   use ax_product, only : ax_t, ax_helm_allocator
@@ -60,6 +59,7 @@ module scalar_pnpn
   use scratch_registry, only : neko_scratch_registry
   use logger, only : neko_log, LOG_SIZE, NEKO_LOG_DEBUG
   use advection, only : advection_t, advection_factory
+  use adv_oifs, only : adv_oifs_t
   use profiler, only : profiler_start_region, profiler_end_region
   use json_utils, only : json_get, json_get_or_default, json_extract_item
   use json_module, only : json_file, json_core, json_value
@@ -246,7 +246,11 @@ contains
 
     ! Setup backend dependent Ax routines
     if (this%svv_enabled) then
-       call ax_helm_allocator(this%ax, type_name = "standard_svv")
+       if (this%svv%formulation .eq. "factorized") then
+          call ax_helm_allocator(this%ax, type_name = "factorized_svv")
+       else
+          call ax_helm_allocator(this%ax, type_name = "one_sided_svv")
+       end if
        select type (operator => this%ax)
        class is (ax_helm_svv_t)
           operator%svv => this%svv
@@ -286,7 +290,7 @@ contains
     end associate
 
     ! Set up boundary conditions
-    call this%setup_bcs_(user)
+    call this%setup_bcs_(user, params)
 
     do i = 1, this%bcs%size()
        if (this%bcs%bc_type(i) .eq. BC_DIRICHLET) then
@@ -390,6 +394,14 @@ contains
 
     nullify(bc_i)
 
+    ! The OIFS convecting field series is not in the checkpoint, rebuild it
+    ! from the restored velocity lags of the fluid. The fluid is restarted
+    ! before the scalars, so these lags are already restored.
+    select type (adv => this%adv)
+    type is (adv_oifs_t)
+       call adv%restart()
+    end select
+
   end subroutine scalar_pnpn_restart
 
   subroutine scalar_pnpn_free(this)
@@ -460,7 +472,9 @@ contains
     n = this%dm_Xh%size()
     call neko_scratch_registry%request_field(rho_cp, rho_cp_index, .false.)
 
-    call profiler_start_region(trim(this%name), 2)
+    ! The regions are named after the scalar, so they take no fixed id:
+    ! another scalar would start the same id under a different name.
+    call profiler_start_region(trim(this%name))
     associate(u => this%u, v => this%v, w => this%w, s => this%s, &
          cp => this%cp, rho => this%rho, lambda_tot => this%lambda_tot, &
          ds => this%ds, &
@@ -534,26 +548,32 @@ contains
       call this%apply_strong_bcs(time)
 
       ! Compute scalar residual.
-      call profiler_start_region(trim(this%name) // '_residual', 20)
+      ! Every scalar shares the fixed-id regions, which are named the same
+      ! for all, and nests its own named region inside.
+      call profiler_start_region('Scalar_residual', 20)
+      call profiler_start_region(trim(this%name) // '_residual')
       call res%compute(Ax, s, s_res, f_Xh, c_Xh, msh, Xh, lambda_tot, &
            rho_cp, ext_bdf%diffusion_coeffs%x(1), &
            real(dt, kind=rp), dm_Xh%size())
 
-      call gs_Xh%op(s_res, GS_OP_ADD)
+      call gs_Xh%op(s_res, GS_OP_ADD, glb_cmd_event)
 
       ! Zero-out residual at Dirichlet nodes before solving.
       call this%bc_projector%apply(s_res%x, dm_Xh%size())
 
-      call profiler_end_region(trim(this%name) // '_residual', 20)
+      call profiler_end_region(trim(this%name) // '_residual')
+      call profiler_end_region('Scalar_residual', 20)
 
       call this%proj_s%pre_solving(s_res%x, tstep, c_Xh, n, dt_controller)
 
       call this%pc%update()
-      call profiler_start_region(trim(this%name) // '_solve', 21)
+      call profiler_start_region('Scalar_solve', 21)
+      call profiler_start_region(trim(this%name) // '_solve')
       ksp_results = this%ksp%solve(Ax, ds, s_res%x, n, &
            c_Xh, this%bc_projector, gs_Xh)
       ksp_results%name = trim(this%name)
-      call profiler_end_region(trim(this%name) // '_solve', 21)
+      call profiler_end_region(trim(this%name) // '_solve')
+      call profiler_end_region('Scalar_solve', 21)
 
       call this%proj_s%post_solving(ds%x, Ax, c_Xh, this%bc_projector, gs_Xh, &
            n, tstep, dt_controller)
@@ -567,7 +587,7 @@ contains
 
     end associate
     call neko_scratch_registry%relinquish_field(rho_cp_index)
-    call profiler_end_region(trim(this%name), 2)
+    call profiler_end_region(trim(this%name))
   end subroutine scalar_pnpn_step
 
   subroutine print_debug(this)
@@ -590,9 +610,11 @@ contains
 
   !> Initialize boundary conditions
   !! @param user The user object binding the user-defined routines.
-  subroutine scalar_pnpn_setup_bcs_(this, user)
+  !! @param params The parameters of this scalar.
+  subroutine scalar_pnpn_setup_bcs_(this, user, params)
     class(scalar_pnpn_t), target, intent(inout) :: this
     type(user_t), target, intent(in) :: user
+    type(json_file), intent(inout) :: params
     integer :: i, j, n_bcs, zone_size, global_zone_size, ierr
     type(json_core) :: core
     type(json_value), pointer :: bc_object
@@ -604,11 +626,11 @@ contains
     integer, allocatable :: zone_indices(:)
     character(len=256) :: error_msg
 
-    if (this%params%valid_path('boundary_conditions')) then
-       call this%params%info('boundary_conditions', &
+    if (params%valid_path('boundary_conditions')) then
+       call params%info('boundary_conditions', &
             n_children = n_bcs)
-       call this%params%get_core(core)
-       call this%params%get('boundary_conditions', bc_object, found)
+       call params%get_core(core)
+       call params%get('boundary_conditions', bc_object, found)
 
        call this%bcs%init(n_bcs)
 
@@ -700,7 +722,6 @@ contains
     ! Take a nodewise minimum between the local nodes.
     ! Now, all local nodes store m = min(d, u)
     call this%gs_Xh%op(this%s, GS_OP_MIN, glb_cmd_event)
-    call device_event_sync(glb_cmd_event)
 
     ! Second apply call, so Dirichlet nodes again store d, the rest still store
     ! m, where m < d by construction.
@@ -708,7 +729,6 @@ contains
     ! Now apply a max, which guarantees that d wins and gets stored in all the
     ! local nodes.
     call this%gs_Xh%op(this%s, GS_OP_MAX, glb_cmd_event)
-    call device_event_sync(glb_cmd_event)
 
     ! Reset updated flags
     do i = 1, this%bcs%size()
