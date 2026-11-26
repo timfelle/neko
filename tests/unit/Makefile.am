@@ -57,6 +57,7 @@ SUBDIRS = tuple\
 	  restart_consistency\
 	  crystal_router\
 	  filter\
+	  reichardt\
 	  templates/serial
 
 TESTS = device/device_test\
@@ -118,6 +119,7 @@ TESTS = device/device_test\
 	restart_consistency/restart_consistency_test\
 	crystal_router/crystal_router_test\
 	filter/filter_test\
+	reichardt/reichardt_test\
 	templates/serial/serial_test
 
 # Note we need to list .pf and runner scripts manually
@@ -236,6 +238,7 @@ EXTRA_DIST = \
 	crystal_router/test_crystal_router_parallel.pf\
 	crystal_router/crystal_router_test\
 	fixtures/mesh_fixture.f90\
+	reichardt/test_reichardt.pf\
 	templates/serial/test_serial.pf
 
 if ENABLE_HDF5
